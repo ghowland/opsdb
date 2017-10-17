@@ -7,9 +7,8 @@ import (
 	"log"
 	"time"
 	"sync"
-	. "yudien/yudienutil"
-	. "yudien/yudiendata"
-	. "yudien/yudien"
+	. "github.com/ghowland/yudien/yudienutil"
+	. "github.com/ghowland/yudien/yudiendata"
 )
 
 
