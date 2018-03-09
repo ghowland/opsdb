@@ -290,7 +290,7 @@ func RunJobWorkers() {
 	go CreateWorkers()
 
 	// DB
-	db, err := sql.Open("postgres", PgConnect)
+	db, err := sql.Open("postgres", Opsdb.ConnectOptions)
 	if err != nil {
 		log.Fatal(err)
 	}
