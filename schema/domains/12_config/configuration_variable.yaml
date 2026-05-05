@@ -1,0 +1,75 @@
+# === configuration_variable.yaml ===
+name: configuration_variable
+description: "Typed key-value scoped to any entity via scope_type and scope_id. Holds Helm values, ConfigMap contents, service parameters, runner parameters, package parameters. Versioned through change management."
+category: config-vars
+versioned: true
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: scope_type
+    type: enum
+    enum_values:
+      - helm_release_version
+      - k8s_config_map_version
+      - service_version
+      - runner_spec_version
+      - package_version
+      - host_group
+      - machine
+      - service
+      - k8s_namespace
+    nullable: false
+    description: "What entity type this variable is scoped to. Determines how scope_id is interpreted."
+
+  - name: scope_id
+    type: int
+    nullable: false
+    min_value: 1
+    max_value: 2147483647
+    description: "ID of the scoping entity. Interpreted with scope_type."
+
+  - name: variable_key
+    type: varchar
+    max_length: 1024
+    nullable: false
+    description: "Variable name within scope"
+
+  - name: variable_value
+    type: text
+    nullable: false
+    description: "Variable value as string"
+
+  - name: variable_type
+    type: enum
+    enum_values:
+      - string
+      - int
+      - float
+      - bool
+      - json
+      - secret_reference
+    nullable: false
+    description: "Discriminator for variable_data_json. Determines how variable_value is interpreted."
+
+  - name: variable_data_json
+    type: json
+    json_type_discriminator: variable_type
+    nullable: true
+    description: "Structured variable data. JSON values too large for variable_value, or secret reference pointers."
+
+  - name: is_sensitive
+    type: boolean
+    nullable: false
+    default: false
+    description: "Affects logging and display. Sensitive variables are masked in logs and UI. Does not affect storage — secret values belong in secret backends, not here."
+
+indexes:
+  - fields: [scope_type, scope_id, variable_key]
+    unique: true
+  - fields: [scope_type, scope_id]
+  - fields: [variable_type]
+
+governance:
+  _access_classification: true
+  
