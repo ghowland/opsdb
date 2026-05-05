@@ -56,8 +56,6 @@ This creates one operational loop for three user classes:
 - automation
 - auditors
 
-![Fig. 1: OpsDB as a Closed Operational Loop — operate, govern, and evidence through the same motion.](docs/figures/opsdb_01_operational_loop.png)
-
 ## Why this exists
 
 Most organizations operate through a patchwork of:
@@ -80,8 +78,6 @@ OpsDB is meant to provide a single operational grammar across all of that:
 - query later
 
 That applies to cloud resources, Kubernetes operations, internal systems, manual procedures, and compliance-relevant activity.
-
-![Fig. 2: Definitions Become Runtime Control — schema definitions become live runtime behavior through the loader, database, and metadata path.](docs/figures/opsdb_02_schema_to_runtime.png)
 
 ## Current status
 
@@ -141,10 +137,16 @@ It is the beginning of an implementation, not the completion of one.
 
 OpsDB is a skeleton implementation of a unified operations, automation, and audit control plane, intended to show what the project should look like in real code before it fully exists as working software.
 
-![Fig. 1: OpsDB as a Closed Operational Loop — operate, govern, and evidence through the same motion.](docs/figures/opsdb_01_operational_loop.png)
-
 
 # OpsDB Explanatory Diagrams
+
+## OpsDB as a Closed Operational Loop
+
+![Fig. 1: OpsDB as a Closed Operational Loop — operate, govern, and evidence through the same motion.](docs/figures/opsdb_01_operational_loop.png)
+
+## Schema Definitions Provide Runtime Control
+
+![Fig. 2: Definitions Become Runtime Control — schema definitions become live runtime behavior through the loader, database, and metadata path.](docs/figures/opsdb_02_schema_to_runtime.png)
 
 ## Change Management
 
