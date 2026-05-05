@@ -1,0 +1,336 @@
+# OpsDB Schema Conventions — Reserved Fields and Governance Fields
+#
+# This file defines fields that the schema engine injects automatically
+# based on entity-level flags. Entity YAML files never declare these
+# fields — the engine adds them during DDL generation and records them
+# in _schema_field metadata.
+#
+# Validated against meta/_schema_meta.yaml during bootstrap.
+
+# ============================================================
+# Universal Reserved Fields
+# Applied to every table unconditionally.
+# ============================================================
+universal:
+  - name: id
+    type: int
+    nullable: false
+    description: "Primary key, auto-increment"
+    postgres_override: "SERIAL PRIMARY KEY"
+
+  - name: created_time
+    type: datetime
+    nullable: false
+    description: "Set on row insertion, never modified"
+    postgres_override: "TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT NOW()"
+
+  - name: updated_time
+    type: datetime
+    nullable: false
+    description: "Set on insert and every update"
+    postgres_override: "TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT NOW()"
+
+# ============================================================
+# Soft Delete Field
+# Injected when entity declares soft_delete: true
+# ============================================================
+soft_delete:
+  - name: is_active
+    type: boolean
+    nullable: false
+    default: true
+    description: "Soft delete flag. False means logically deleted. Row persists."
+
+# ============================================================
+# Hierarchical Self-FK Field
+# Injected when entity declares hierarchical: true
+# The {entity_name} placeholder is resolved by the engine.
+# ============================================================
+hierarchical:
+  - name: "parent_{entity_name}_id"
+    type: foreign_key
+    references: "{entity_name}"
+    nullable: true
+    description: "Self-referencing FK for tree hierarchy. Null at root nodes."
+
+# ============================================================
+# Versioning Sibling Table Fields
+# When entity declares versioned: true, the engine generates a
+# sibling table named {entity_name}_version containing these fields
+# plus the universal reserved fields above.
+# ============================================================
+versioning_sibling:
+  - name: "{entity_name}_id"
+    type: foreign_key
+    references: "{entity_name}"
+    nullable: false
+    description: "FK to parent entity row"
+
+  - name: version_serial
+    type: int
+    nullable: false
+    min_value: 1
+    description: "Monotonically increasing per entity instance"
+
+  - name: "parent_{entity_name}_version_id"
+    type: foreign_key
+    references: "{entity_name}_version"
+    nullable: true
+    description: "Prior version in chain. Null for first version."
+
+  - name: change_set_id
+    type: foreign_key
+    references: change_set
+    nullable: false
+    description: "Change set that produced this version"
+
+  - name: is_active_version
+    type: boolean
+    nullable: false
+    default: false
+    description: "True for the current active version. Exactly one per entity instance."
+
+  - name: approved_for_production_time
+    type: datetime
+    nullable: true
+    description: "When this version was promoted to active"
+
+# Composite unique constraint generated for sibling tables:
+versioning_sibling_constraints:
+  - type: unique_composite
+    fields:
+      - "{entity_name}_id"
+      - version_serial
+    description: "Enforces monotonic version serial per entity instance"
+
+# ============================================================
+# Governance Fields
+# Injected when entity declares governance section with
+# specific fields set to true.
+#
+# Entity YAML example:
+#   governance:
+#     _requires_group: true
+#     _access_classification: true
+#     _retention_policy_id: true
+#     _audit_chain_hash: true
+#
+# Only declared fields are injected.
+# ============================================================
+governance:
+  - name: _requires_group
+    type: varchar
+    max_length: 255
+    nullable: true
+    description: "Group name required for access beyond standard role. Consulted by API authorization layer 2."
+    enabled_by: "_requires_group"
+
+  - name: _access_classification
+    type: enum
+    enum_values:
+      - public
+      - internal
+      - confidential
+      - restricted
+      - regulated
+    nullable: true
+    description: "Data sensitivity level. Consulted by API authorization layer 3 for per-field access decisions."
+    enabled_by: "_access_classification"
+
+  - name: _retention_policy_id
+    type: foreign_key
+    references: retention_policy
+    nullable: true
+    description: "Per-row override of entity-type default retention. Consulted by reaper runners."
+    enabled_by: "_retention_policy_id"
+
+  - name: _audit_chain_hash
+    type: varchar
+    max_length: 128
+    nullable: true
+    description: "Cryptographic hash covering entry contents plus prior entry hash. Tamper-evidence chain. Consulted by audit verification tooling."
+    enabled_by: "_audit_chain_hash"
+
+# ============================================================
+# Observation Governance Fields
+# Injected when entity declares governance section with
+# observation fields set to true.
+#
+# Entity YAML example:
+#   governance:
+#     _observed_time: true
+#     _authority_id: true
+#     _puller_runner_job_id: true
+#
+# Intended for observation_cache_* tables and similar
+# runner-written observation data.
+# ============================================================
+observation:
+  - name: _observed_time
+    type: datetime
+    nullable: false
+    description: "When the observation was sampled from the authority. Used for freshness checks."
+    enabled_by: "_observed_time"
+
+  - name: _authority_id
+    type: foreign_key
+    references: authority
+    nullable: false
+    description: "Source authority that produced this observation."
+    enabled_by: "_authority_id"
+
+  - name: _puller_runner_job_id
+    type: foreign_key
+    references: runner_job
+    nullable: false
+    description: "Runner job that wrote this observation. Audit and debugging trail."
+    enabled_by: "_puller_runner_job_id"
+
+# ============================================================
+# Schema Metadata Governance Fields
+# Injected when entity declares governance section with
+# schema versioning fields set to true.
+#
+# Entity YAML example:
+#   governance:
+#     _schema_version_introduced_id: true
+#     _schema_version_deprecated_id: true
+#
+# Intended for entities that track their own schema lineage
+# (most entities get this through _schema_field rows, but
+# some entities carry it directly).
+# ============================================================
+schema_metadata:
+  - name: _schema_version_introduced_id
+    type: foreign_key
+    references: _schema_version
+    nullable: false
+    description: "Schema version that introduced this entity or field."
+    enabled_by: "_schema_version_introduced_id"
+
+  - name: _schema_version_deprecated_id
+    type: foreign_key
+    references: _schema_version
+    nullable: true
+    description: "Schema version that deprecated this entity or field. Null if not deprecated."
+    enabled_by: "_schema_version_deprecated_id"
+
+# ============================================================
+# Naming Conventions
+# The engine validates all names against these rules.
+# Violations cause the entity file to be rejected.
+# ============================================================
+naming_conventions:
+  table_names:
+    format: "lower_case_with_underscores"
+    form: "singular"
+    examples:
+      valid:
+        - cloud_resource
+        - service_connection
+        - k8s_cluster_node
+        - audit_log_entry
+        - _schema_version
+      invalid:
+        - CloudResource
+        - service_connections
+        - k8sClusterNode
+        - audit-log-entry
+
+  field_names:
+    format: "lower_case_with_underscores"
+    rules:
+      - suffix: "_time"
+        applies_to: "datetime fields"
+        description: "All datetime fields end in _time"
+        examples: ["created_time", "approved_for_production_time", "decommissioned_time"]
+
+      - suffix: "_date"
+        applies_to: "date fields"
+        description: "All date-only fields end in _date"
+        examples: ["expiration_date", "start_date"]
+
+      - prefix: "is_"
+        applies_to: "present-state booleans"
+        description: "Booleans expressing current state"
+        examples: ["is_active", "is_running", "is_required", "is_fulfilled"]
+
+      - prefix: "was_"
+        applies_to: "past-event booleans"
+        description: "Booleans expressing that something happened"
+        examples: ["was_acknowledged", "was_reviewed"]
+
+      - prefix: "_"
+        applies_to: "governance and metadata fields"
+        description: "Underscore prefix reserved for governance, admin, and schema metadata"
+        examples: ["_requires_group", "_access_classification", "_observed_time"]
+
+  foreign_key_names:
+    format: "{referenced_table}_id"
+    role_prefix_when_ambiguous: true
+    examples:
+      standard:
+        - cloud_account_id
+        - service_id
+        - runner_spec_id
+      role_prefixed:
+        - source_service_version_id
+        - destination_service_id
+        - parent_hardware_component_id
+        - approving_ops_user_id
+        - rejecting_ops_user_id
+
+  composite_names:
+    format: "hierarchical prefix, specific to general"
+    description: "Names read as parent_concept_subconcept"
+    examples:
+      - "cloud_resource_security_group_membership"
+      - "service_authority_pointer"
+      - "change_set_field_change"
+      - "evidence_record_compliance_regime_target"
+      - "runner_job_target_machine"
+
+# ============================================================
+# Append-Only Enforcement
+# When entity declares append_only: true, the engine generates
+# REVOKE statements removing UPDATE and DELETE for all roles.
+# ============================================================
+append_only:
+  postgres_revoke_roles:
+    - "PUBLIC"
+    - "opsdb_app_role"
+    - "opsdb_admin_role"
+  description: "No role including substrate operators can UPDATE or DELETE rows. Enforced at DDL level."
+
+# ============================================================
+# Database Roles
+# The engine creates these roles if they do not exist during
+# initial bootstrap. Subsequent applies do not modify roles.
+# ============================================================
+database_roles:
+  - name: opsdb_app_role
+    description: "Application role used by the API server. Full read, INSERT on all tables, UPDATE on non-append-only tables, DELETE only on observation cache tables per retention."
+    grants:
+      - "SELECT ON ALL TABLES"
+      - "INSERT ON ALL TABLES"
+      - "UPDATE ON ALL TABLES"
+      - "DELETE ON observation_cache_metric, observation_cache_state, observation_cache_config"
+
+  - name: opsdb_admin_role
+    description: "Administrative role for substrate operators. Same as app role plus schema modification. Does not bypass append-only on audit_log_entry."
+    grants:
+      - "ALL PRIVILEGES ON ALL TABLES"
+
+  - name: opsdb_readonly_role
+    description: "Read-only role for auditors and reporting. SELECT only."
+    grants:
+      - "SELECT ON ALL TABLES"
+
+  - name: opsdb_runner_role
+    description: "Runner service account role. Same as app role. Individual runner authorization enforced at API layer, not database role layer."
+    grants:
+      - "SELECT ON ALL TABLES"
+      - "INSERT ON ALL TABLES"
+      - "UPDATE ON ALL TABLES"
+      - "DELETE ON observation_cache_metric, observation_cache_state, observation_cache_config"
+      
