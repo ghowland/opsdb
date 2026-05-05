@@ -1,0 +1,38 @@
+
+# === schedule_governance.yaml ===
+name: schedule_governance
+description: "JSON schema for policy of type schedule_governance. Governs schedule management and enforcement."
+discriminator_field: policy_type
+discriminator_value: schedule_governance
+
+fields:
+  - name: max_schedule_drift_seconds
+    type: int
+    min_value: 0
+    max_value: 86400
+    required: true
+    description: "Maximum acceptable drift between scheduled and actual execution time"
+
+  - name: missed_schedule_action
+    type: string
+    allowed_values: [run_immediately, skip_and_log, file_finding, page_on_call]
+    required: true
+    description: "What happens when a scheduled run is missed"
+
+  - name: schedule_change_requires_approval
+    type: boolean
+    required: true
+    description: "Whether modifying schedules requires change set approval"
+
+  - name: minimum_interval_seconds
+    type: int
+    min_value: 1
+    max_value: 86400
+    required: false
+    description: "Minimum allowed interval for rate-based schedules. Prevents resource exhaustion."
+
+  - name: maintenance_window_required
+    type: boolean
+    required: false
+    description: "Whether scheduled operations must fall within declared maintenance windows"
+

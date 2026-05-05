@@ -1,0 +1,54 @@
+
+# === cloud_provision.yaml ===
+name: cloud_provision
+description: "JSON schema for runner_spec of type cloud_provision. Provisions or modifies cloud resources."
+discriminator_field: runner_spec_type
+discriminator_value: cloud_provision
+
+fields:
+  - name: cloud_provider
+    type: string
+    allowed_values: [aws, gcp, azure]
+    required: true
+
+  - name: resource_types
+    type: string
+    max_length: 2048
+    required: true
+    description: "Comma-separated cloud resource types this runner provisions"
+
+  - name: provision_method
+    type: string
+    allowed_values: [sdk_direct, terraform, crossplane, pulumi]
+    required: true
+    description: "How provisioning is performed"
+
+  - name: max_provisions_per_cycle
+    type: int
+    min_value: 1
+    max_value: 1000
+    required: true
+
+  - name: max_cycle_duration_seconds
+    type: int
+    min_value: 30
+    max_value: 7200
+    required: true
+
+  - name: max_retries_per_resource
+    type: int
+    min_value: 0
+    max_value: 5
+    required: true
+
+  - name: destroy_enabled
+    type: boolean
+    required: true
+    description: "Whether this runner is allowed to destroy resources"
+
+  - name: cost_limit_per_cycle_usd
+    type: float
+    min_value: 0
+    required: false
+    description: "Maximum estimated cost of provisioning actions per cycle"
+

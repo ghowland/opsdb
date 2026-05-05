@@ -1,0 +1,44 @@
+
+# === alert_dispatch.yaml ===
+name: alert_dispatch
+description: "JSON schema for runner_spec of type alert_dispatch. Reads alert_fire rows and dispatches notifications through escalation paths."
+discriminator_field: runner_spec_type
+discriminator_value: alert_dispatch
+
+fields:
+  - name: poll_interval_seconds
+    type: int
+    min_value: 5
+    max_value: 300
+    required: true
+    description: "How often to check for new or updated alert_fire rows"
+
+  - name: notification_channels
+    type: string
+    max_length: 2048
+    required: true
+    description: "Comma-separated notification channel types. email, slack, pagerduty, opsgenie."
+
+  - name: escalation_enabled
+    type: boolean
+    required: true
+    description: "Whether to follow escalation paths"
+
+  - name: max_dispatches_per_cycle
+    type: int
+    min_value: 1
+    max_value: 10000
+    required: true
+
+  - name: max_cycle_duration_seconds
+    type: int
+    min_value: 10
+    max_value: 600
+    required: true
+
+  - name: deduplication_window_seconds
+    type: int
+    min_value: 60
+    max_value: 86400
+    required: true
+    description: "Window within which duplicate notifications for the same alert are suppressed"

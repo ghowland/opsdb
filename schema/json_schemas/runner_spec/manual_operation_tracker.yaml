@@ -1,0 +1,50 @@
+
+# === manual_operation_tracker.yaml ===
+name: manual_operation_tracker
+description: "JSON schema for runner_spec of type manual_operation_tracker. Monitors manual operation schedules and files findings when operations are overdue."
+discriminator_field: runner_spec_type
+discriminator_value: manual_operation_tracker
+
+fields:
+  - name: operation_types
+    type: string
+    max_length: 1024
+    required: true
+    description: "Comma-separated manual operation types to track. tape_rotation, vendor_review, keycard_audit, etc."
+
+  - name: overdue_threshold_hours
+    type: int
+    min_value: 1
+    max_value: 8760
+    required: true
+    description: "Hours past scheduled time before filing overdue finding"
+
+  - name: finding_severity
+    type: string
+    allowed_values: [informational, low, medium, high, critical]
+    required: true
+    description: "Severity of overdue finding"
+
+  - name: notification_on_overdue
+    type: boolean
+    required: true
+    description: "Whether to send notification when operation is overdue"
+
+  - name: notification_channel
+    type: string
+    max_length: 255
+    required: false
+    description: "Channel for overdue notifications"
+
+  - name: escalation_after_hours
+    type: int
+    min_value: 1
+    max_value: 720
+    required: false
+    description: "Hours after initial overdue before escalating"
+
+  - name: max_cycle_duration_seconds
+    type: int
+    min_value: 10
+    max_value: 600
+    required: true

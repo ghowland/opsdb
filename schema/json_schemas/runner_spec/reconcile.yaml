@@ -1,0 +1,71 @@
+
+# === reconcile.yaml ===
+name: reconcile
+description: "JSON schema for runner_spec of type reconcile. Compares desired vs observed state and acts to close gaps."
+discriminator_field: runner_spec_type
+discriminator_value: reconcile
+
+fields:
+  - name: desired_state_query
+    type: string
+    max_length: 4096
+    required: true
+    description: "OpsDB search query for desired state entities"
+
+  - name: observed_state_query
+    type: string
+    max_length: 4096
+    required: true
+    description: "OpsDB search query for observed state in observation cache"
+
+  - name: diff_fields
+    type: string
+    max_length: 2048
+    required: true
+    description: "Comma-separated fields to compare between desired and observed"
+
+  - name: ignore_fields
+    type: string
+    max_length: 2048
+    required: false
+    description: "Comma-separated fields to exclude from comparison"
+
+  - name: auto_correct_fields
+    type: string
+    max_length: 2048
+    required: false
+    description: "Comma-separated fields that can be auto-corrected without approval"
+
+  - name: approval_required_fields
+    type: string
+    max_length: 2048
+    required: false
+    description: "Comma-separated fields requiring human approval for correction"
+
+  - name: max_corrections_per_cycle
+    type: int
+    min_value: 1
+    max_value: 10000
+    required: true
+    description: "Maximum corrections in a single cycle"
+
+  - name: max_cycle_duration_seconds
+    type: int
+    min_value: 10
+    max_value: 3600
+    required: true
+    description: "Maximum time for one reconciliation cycle"
+
+  - name: max_retries_per_action
+    type: int
+    min_value: 0
+    max_value: 10
+    required: true
+
+  - name: freshness_threshold_seconds
+    type: int
+    min_value: 1
+    max_value: 86400
+    required: true
+    description: "Maximum age of observed data before skipping comparison"
+

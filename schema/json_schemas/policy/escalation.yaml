@@ -1,0 +1,51 @@
+
+# === escalation.yaml ===
+name: escalation
+description: "JSON schema for policy of type escalation. Governs escalation behavior."
+discriminator_field: policy_type
+discriminator_value: escalation
+
+fields:
+  - name: escalation_timeout_seconds
+    type: int
+    min_value: 60
+    max_value: 86400
+    required: true
+    description: "Seconds before escalation proceeds to next step if not acknowledged"
+
+  - name: max_escalation_rounds
+    type: int
+    min_value: 1
+    max_value: 20
+    required: true
+    description: "Maximum number of times to cycle through escalation steps"
+
+  - name: after_max_rounds_action
+    type: string
+    allowed_values: [continue_last_step, file_finding, page_management, abandon]
+    required: true
+    description: "What happens after all rounds are exhausted"
+
+  - name: business_hours_only
+    type: boolean
+    required: false
+    description: "Whether escalation respects business hours or runs 24/7"
+
+  - name: business_hours_start
+    type: string
+    max_length: 5
+    required: false
+    description: "HH:MM start of business hours in local time"
+
+  - name: business_hours_end
+    type: string
+    max_length: 5
+    required: false
+    description: "HH:MM end of business hours in local time"
+
+  - name: business_hours_timezone
+    type: string
+    max_length: 64
+    required: false
+    description: "Timezone for business hours. America/Los_Angeles, UTC, etc."
+

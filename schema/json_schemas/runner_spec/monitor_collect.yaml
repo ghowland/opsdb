@@ -1,0 +1,45 @@
+
+# === monitor_collect.yaml ===
+name: monitor_collect
+description: "JSON schema for runner_spec of type monitor_collect. Executes monitor checks and writes results."
+discriminator_field: runner_spec_type
+discriminator_value: monitor_collect
+
+fields:
+  - name: monitor_types
+    type: string
+    max_length: 1024
+    required: true
+    description: "Comma-separated monitor types this collector handles. script_local, http_probe, tcp_probe, etc."
+
+  - name: target_entity_type
+    type: string
+    allowed_values: [machine, service, k8s_workload, cloud_resource]
+    required: true
+    description: "What entity type monitors are targeted at"
+
+  - name: max_checks_per_cycle
+    type: int
+    min_value: 1
+    max_value: 100000
+    required: true
+
+  - name: max_cycle_duration_seconds
+    type: int
+    min_value: 10
+    max_value: 3600
+    required: true
+
+  - name: parallel_checks
+    type: int
+    min_value: 1
+    max_value: 1000
+    required: true
+    description: "How many checks to execute concurrently"
+
+  - name: max_retries_per_check
+    type: int
+    min_value: 0
+    max_value: 5
+    required: true
+

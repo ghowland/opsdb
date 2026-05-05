@@ -1,0 +1,55 @@
+
+# === template_generate.yaml ===
+name: template_generate
+description: "JSON schema for runner_spec of type template_generate. Renders templates from OpsDB configuration variables."
+discriminator_field: runner_spec_type
+discriminator_value: template_generate
+
+fields:
+  - name: template_source
+    type: string
+    allowed_values: [opsdb_configuration_variable, git_repo, local_path]
+    required: true
+    description: "Where templates come from"
+
+  - name: template_format
+    type: string
+    allowed_values: [helm_values, config_file, report]
+    required: true
+    description: "What kind of output is rendered"
+
+  - name: output_destination
+    type: string
+    allowed_values: [opsdb_output_var, git_commit, local_file]
+    required: true
+    description: "Where rendered output goes"
+
+  - name: scope_entity_type
+    type: string
+    max_length: 255
+    required: true
+    description: "Entity type providing variable scope"
+
+  - name: scope_query
+    type: string
+    max_length: 4096
+    required: true
+    description: "OpsDB search query for scoping entities"
+
+  - name: resolve_secret_references
+    type: boolean
+    required: true
+    description: "Whether to resolve secret_reference variables from secret backend at render time"
+
+  - name: max_renders_per_cycle
+    type: int
+    min_value: 1
+    max_value: 10000
+    required: true
+
+  - name: max_cycle_duration_seconds
+    type: int
+    min_value: 10
+    max_value: 3600
+    required: true
+

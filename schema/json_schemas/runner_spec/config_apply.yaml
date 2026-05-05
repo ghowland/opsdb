@@ -1,0 +1,56 @@
+
+# === config_apply.yaml ===
+name: config_apply
+description: "JSON schema for runner_spec of type config_apply. Applies configuration to hosts or services."
+discriminator_field: runner_spec_type
+discriminator_value: config_apply
+
+fields:
+  - name: config_source
+    type: string
+    allowed_values: [opsdb_configuration_variable, opsdb_template, external_repo]
+    required: true
+    description: "Where configuration comes from"
+
+  - name: apply_method
+    type: string
+    allowed_values: [ssh_command, salt_state, ansible_playbook, puppet_apply, custom_script]
+    required: true
+    description: "How configuration is applied"
+
+  - name: target_entity_type
+    type: string
+    allowed_values: [machine, host_group, service]
+    required: true
+    description: "What entity type is targeted"
+
+  - name: max_targets_per_cycle
+    type: int
+    min_value: 1
+    max_value: 10000
+    required: true
+
+  - name: max_cycle_duration_seconds
+    type: int
+    min_value: 10
+    max_value: 7200
+    required: true
+
+  - name: max_retries_per_target
+    type: int
+    min_value: 0
+    max_value: 10
+    required: true
+
+  - name: rollback_on_failure
+    type: boolean
+    required: true
+    description: "Whether to attempt rollback when apply fails on a target"
+
+  - name: parallel_targets
+    type: int
+    min_value: 1
+    max_value: 1000
+    required: true
+    description: "How many targets to apply to concurrently"
+

@@ -1,0 +1,49 @@
+
+# === compliance_scan.yaml ===
+name: compliance_scan
+description: "JSON schema for runner_spec of type compliance_scan. Evaluates compliance controls and produces evidence and findings."
+discriminator_field: runner_spec_type
+discriminator_value: compliance_scan
+
+fields:
+  - name: regime_name
+    type: string
+    max_length: 255
+    required: true
+    description: "Compliance regime to scan against"
+
+  - name: controls_to_evaluate
+    type: string
+    max_length: 4096
+    required: false
+    description: "Comma-separated control IDs. Empty means all controls for the regime."
+
+  - name: scope_query
+    type: string
+    max_length: 4096
+    required: true
+    description: "OpsDB search query for entities in scope"
+
+  - name: max_entities_per_cycle
+    type: int
+    min_value: 1
+    max_value: 100000
+    required: true
+
+  - name: max_cycle_duration_seconds
+    type: int
+    min_value: 30
+    max_value: 7200
+    required: true
+
+  - name: finding_severity_default
+    type: string
+    allowed_values: [informational, low, medium, high, critical]
+    required: true
+    description: "Default severity for findings. Individual controls may override."
+
+  - name: auto_file_findings
+    type: boolean
+    required: true
+    description: "Whether to automatically file compliance_finding rows"
+

@@ -1,0 +1,57 @@
+
+# === change_management.yaml ===
+name: change_management
+description: "JSON schema for policy of type change_management. Governs change management behavior for a scope."
+discriminator_field: policy_type
+discriminator_value: change_management
+
+fields:
+  - name: change_freeze_windows
+    type: string
+    max_length: 4096
+    required: false
+    description: "Comma-separated freeze windows. ISO 8601 intervals during which non-emergency changes are blocked."
+
+  - name: max_change_set_age_hours
+    type: int
+    min_value: 1
+    max_value: 8760
+    required: true
+    description: "Hours before an unapproved change set expires"
+
+  - name: emergency_review_window_hours
+    type: int
+    min_value: 1
+    max_value: 720
+    required: true
+    description: "Hours for post-hoc emergency review. Default 72."
+
+  - name: bulk_threshold_field_changes
+    type: int
+    min_value: 1
+    max_value: 100000
+    required: true
+    description: "Number of field changes above which change set is treated as bulk"
+
+  - name: bulk_chunk_size
+    type: int
+    min_value: 100
+    max_value: 10000
+    required: true
+    description: "Validation and apply chunk size for bulk change sets"
+
+  - name: require_ticket_reference
+    type: boolean
+    required: true
+    description: "Whether change sets must link to an external ticket"
+
+  - name: require_reason_text
+    type: boolean
+    required: true
+    description: "Whether change sets must include a reason. Always true in practice."
+
+  - name: sod_submitter_cannot_approve
+    type: boolean
+    required: true
+    description: "Separation of duty: submitter cannot approve their own change set"
+

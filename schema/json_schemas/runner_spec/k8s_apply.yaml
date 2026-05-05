@@ -1,0 +1,59 @@
+
+# === k8s_apply.yaml ===
+name: k8s_apply
+description: "JSON schema for runner_spec of type k8s_apply. Applies Kubernetes manifests to clusters."
+discriminator_field: runner_spec_type
+discriminator_value: k8s_apply
+
+fields:
+  - name: manifest_source
+    type: string
+    allowed_values: [opsdb_template_output, git_repo, helm_chart]
+    required: true
+    description: "Where manifests come from"
+
+  - name: apply_method
+    type: string
+    allowed_values: [kubectl_apply, helm_upgrade, kustomize]
+    required: true
+    description: "How manifests are applied"
+
+  - name: dry_run_first
+    type: boolean
+    required: true
+    description: "Whether to perform a dry run before actual apply"
+
+  - name: wait_for_rollout
+    type: boolean
+    required: true
+    description: "Whether to wait for rollout completion after apply"
+
+  - name: rollout_timeout_seconds
+    type: int
+    min_value: 30
+    max_value: 3600
+    required: true
+    description: "Timeout for rollout completion"
+
+  - name: max_targets_per_cycle
+    type: int
+    min_value: 1
+    max_value: 1000
+    required: true
+
+  - name: max_cycle_duration_seconds
+    type: int
+    min_value: 30
+    max_value: 7200
+    required: true
+
+  - name: max_retries_per_target
+    type: int
+    min_value: 0
+    max_value: 5
+    required: true
+
+  - name: rollback_on_failure
+    type: boolean
+    required: true
+

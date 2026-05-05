@@ -1,0 +1,32 @@
+
+# === scheduler_enforce.yaml ===
+name: scheduler_enforce
+description: "JSON schema for runner_spec of type scheduler_enforce. Ensures scheduled jobs are configured on target substrate."
+discriminator_field: runner_spec_type
+discriminator_value: scheduler_enforce
+
+fields:
+  - name: target_substrate
+    type: string
+    allowed_values: [cron, systemd_timer, k8s_cronjob]
+    required: true
+    description: "Where schedules are enforced"
+
+  - name: reconcile_mode
+    type: string
+    allowed_values: [add_missing, add_and_remove, full_reconcile]
+    required: true
+    description: "How aggressively to reconcile. add_missing only adds. full_reconcile removes unmanaged entries."
+
+  - name: max_targets_per_cycle
+    type: int
+    min_value: 1
+    max_value: 10000
+    required: true
+
+  - name: max_cycle_duration_seconds
+    type: int
+    min_value: 10
+    max_value: 3600
+    required: true
+

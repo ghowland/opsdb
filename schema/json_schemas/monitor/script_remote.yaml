@@ -1,0 +1,64 @@
+
+# === script_remote.yaml ===
+name: script_remote
+description: "JSON schema for monitor of type script_remote. Script executed remotely on the target host via SSH."
+discriminator_field: monitor_type
+discriminator_value: script_remote
+
+fields:
+  - name: script_path
+    type: string
+    max_length: 1024
+    required: true
+    description: "Path to script on the target host"
+
+  - name: script_interpreter
+    type: string
+    allowed_values: [bash, sh, python3, perl, ruby, powershell]
+    required: true
+    description: "Interpreter to execute the script"
+
+  - name: timeout_seconds
+    type: int
+    min_value: 1
+    max_value: 300
+    required: true
+    description: "Maximum execution time including SSH connection"
+
+  - name: expected_exit_code
+    type: int
+    min_value: 0
+    max_value: 255
+    required: true
+    description: "Exit code that indicates healthy"
+
+  - name: arguments
+    type: string
+    max_length: 2048
+    required: false
+    description: "Command-line arguments"
+
+  - name: ssh_user
+    type: string
+    max_length: 255
+    required: true
+    description: "SSH user for remote execution"
+
+  - name: ssh_port
+    type: int
+    min_value: 1
+    max_value: 65535
+    required: false
+    description: "SSH port. Default 22."
+
+  - name: parse_output
+    type: boolean
+    required: false
+    description: "Whether to parse stdout as structured metric data"
+
+  - name: output_format
+    type: string
+    allowed_values: [nagios, prometheus_text, json_kv, plain]
+    required: false
+    description: "Format of parsed output"
+

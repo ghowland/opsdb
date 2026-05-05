@@ -1,0 +1,49 @@
+
+# === data_classification.yaml ===
+name: data_classification
+description: "JSON schema for policy of type data_classification. Defines handling requirements for a data sensitivity level."
+discriminator_field: policy_type
+discriminator_value: data_classification
+
+fields:
+  - name: classification_level
+    type: int
+    min_value: 1
+    max_value: 10
+    required: true
+    description: "Numeric classification level. Higher is more sensitive."
+
+  - name: encryption_at_rest_required
+    type: boolean
+    required: true
+
+  - name: encryption_in_transit_required
+    type: boolean
+    required: true
+
+  - name: access_logging_required
+    type: boolean
+    required: true
+
+  - name: masking_in_logs_required
+    type: boolean
+    required: true
+    description: "Whether values must be masked in application and operational logs"
+
+  - name: retention_max_days
+    type: int
+    min_value: 0
+    max_value: 36500
+    required: false
+    description: "Maximum retention in days. 0 means must be deleted immediately after use."
+
+  - name: cross_border_transfer_restricted
+    type: boolean
+    required: false
+    description: "Whether data may not leave its originating jurisdiction"
+
+  - name: handling_instructions
+    type: string
+    max_length: 4096
+    required: false
+    description: "Human-readable handling instructions for this classification"

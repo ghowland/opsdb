@@ -1,0 +1,56 @@
+
+# === verify_evidence.yaml ===
+name: verify_evidence
+description: "JSON schema for runner_spec of type verify_evidence. Checks that scheduled work happened or state is correct and produces evidence records."
+discriminator_field: runner_spec_type
+discriminator_value: verify_evidence
+
+fields:
+  - name: evidence_type
+    type: string
+    allowed_values: [backup_verification, certificate_validity, compliance_scan, credential_rotation_verification, access_review, physical_inspection, tape_rotation_completed, keycard_revocation_completed, license_renewal_completed, vendor_contract_review_completed]
+    required: true
+    description: "Type of evidence this verifier produces"
+
+  - name: target_entity_type
+    type: string
+    max_length: 255
+    required: true
+    description: "Entity type being verified"
+
+  - name: target_query
+    type: string
+    max_length: 4096
+    required: true
+    description: "OpsDB search query for entities to verify"
+
+  - name: verification_method
+    type: string
+    allowed_values: [query_authority, query_opsdb_cache, check_schedule_completion, check_existence, custom]
+    required: true
+    description: "How verification is performed"
+
+  - name: severity_on_fail
+    type: string
+    allowed_values: [informational, low, medium, high, critical]
+    required: true
+    description: "Compliance finding severity when verification fails"
+
+  - name: max_targets_per_cycle
+    type: int
+    min_value: 1
+    max_value: 100000
+    required: true
+
+  - name: max_cycle_duration_seconds
+    type: int
+    min_value: 10
+    max_value: 3600
+    required: true
+
+  - name: max_retries_per_target
+    type: int
+    min_value: 0
+    max_value: 10
+    required: true
+

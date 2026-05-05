@@ -1,0 +1,71 @@
+
+# === drift_detect.yaml ===
+name: drift_detect
+description: "JSON schema for runner_spec of type drift_detect. Reconciler shape that proposes change sets rather than acting directly."
+discriminator_field: runner_spec_type
+discriminator_value: drift_detect
+
+fields:
+  - name: desired_state_query
+    type: string
+    max_length: 4096
+    required: true
+    description: "OpsDB search query for desired state"
+
+  - name: observed_state_query
+    type: string
+    max_length: 4096
+    required: true
+    description: "OpsDB search query for observed state"
+
+  - name: diff_fields
+    type: string
+    max_length: 2048
+    required: true
+    description: "Comma-separated fields to compare"
+
+  - name: ignore_fields
+    type: string
+    max_length: 2048
+    required: false
+    description: "Comma-separated fields to exclude from comparison"
+
+  - name: propose_correction
+    type: boolean
+    required: true
+    description: "Whether to submit change sets for detected drift"
+
+  - name: file_finding_on_drift
+    type: boolean
+    required: true
+    description: "Whether to file compliance finding on detected drift"
+
+  - name: finding_severity
+    type: string
+    allowed_values: [informational, low, medium, high, critical]
+    required: false
+    description: "Severity of finding when filed"
+
+  - name: max_proposals_per_cycle
+    type: int
+    min_value: 1
+    max_value: 1000
+    required: true
+
+  - name: max_cycle_duration_seconds
+    type: int
+    min_value: 10
+    max_value: 3600
+    required: true
+
+  - name: freshness_threshold_seconds
+    type: int
+    min_value: 1
+    max_value: 86400
+    required: true
+
+  - name: skip_if_pending_change_set
+    type: boolean
+    required: true
+    description: "Whether to skip proposing if a recent change set for the same entity is still pending"
+

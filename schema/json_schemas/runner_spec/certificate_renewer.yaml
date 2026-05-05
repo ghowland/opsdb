@@ -1,0 +1,56 @@
+
+# === certificate_renewer.yaml ===
+name: certificate_renewer
+description: "JSON schema for runner_spec of type certificate_renewer. Renews certificates before expiration."
+discriminator_field: runner_spec_type
+discriminator_value: certificate_renewer
+
+fields:
+  - name: renewal_method
+    type: string
+    allowed_values: [acme_letsencrypt, acme_other, vault_pki, manual_csr, cloud_acm, cloud_managed]
+    required: true
+    description: "How certificates are renewed"
+
+  - name: renewal_threshold_days
+    type: int
+    min_value: 1
+    max_value: 365
+    required: true
+    description: "Days before expiry to begin renewal"
+
+  - name: key_algorithm
+    type: string
+    allowed_values: [rsa_2048, rsa_4096, ec_p256, ec_p384, ed25519]
+    required: true
+    description: "Key algorithm for new certificates"
+
+  - name: deploy_method
+    type: string
+    allowed_values: [k8s_secret, vault_store, file_copy, cloud_acm, custom]
+    required: true
+    description: "How renewed certificate is deployed"
+
+  - name: max_renewals_per_cycle
+    type: int
+    min_value: 1
+    max_value: 1000
+    required: true
+
+  - name: max_cycle_duration_seconds
+    type: int
+    min_value: 30
+    max_value: 3600
+    required: true
+
+  - name: max_retries_per_renewal
+    type: int
+    min_value: 0
+    max_value: 5
+    required: true
+
+  - name: post_renewal_validation
+    type: boolean
+    required: true
+    description: "Whether to validate new certificate after deployment"
+

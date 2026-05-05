@@ -1,0 +1,75 @@
+
+# === http_probe.yaml ===
+name: http_probe
+description: "JSON schema for monitor of type http_probe. HTTP/HTTPS request to an endpoint with response validation."
+discriminator_field: monitor_type
+discriminator_value: http_probe
+
+fields:
+  - name: url
+    type: string
+    max_length: 2048
+    required: true
+    description: "URL to probe"
+
+  - name: method
+    type: string
+    allowed_values: [get, head, post]
+    required: true
+    description: "HTTP method"
+
+  - name: timeout_seconds
+    type: int
+    min_value: 1
+    max_value: 120
+    required: true
+    description: "Request timeout"
+
+  - name: expected_status_codes
+    type: string
+    max_length: 255
+    required: true
+    description: "Comma-separated acceptable HTTP status codes. 200,201,204."
+
+  - name: expected_body_contains
+    type: string
+    max_length: 1024
+    required: false
+    description: "String that must appear in the response body"
+
+  - name: tls_verify
+    type: boolean
+    required: true
+    description: "Whether to verify TLS certificate"
+
+  - name: tls_min_days_remaining
+    type: int
+    min_value: 0
+    max_value: 365
+    required: false
+    description: "Warn if TLS cert expires within this many days"
+
+  - name: headers
+    type: string
+    max_length: 4096
+    required: false
+    description: "Custom request headers as key:value comma-separated"
+
+  - name: request_body
+    type: string
+    max_length: 4096
+    required: false
+    description: "Request body for POST probes"
+
+  - name: follow_redirects
+    type: boolean
+    required: false
+    description: "Whether to follow HTTP redirects"
+
+  - name: max_response_time_ms
+    type: int
+    min_value: 1
+    max_value: 120000
+    required: false
+    description: "Response time threshold for degraded warning"
+

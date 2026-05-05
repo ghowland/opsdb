@@ -1,0 +1,67 @@
+
+# === approval_rule.yaml ===
+name: approval_rule
+description: "JSON schema for policy of type approval_rule. Defines when approval is required and from whom."
+discriminator_field: policy_type
+discriminator_value: approval_rule
+
+fields:
+  - name: match_entity_types
+    type: string
+    max_length: 2048
+    required: false
+    description: "Comma-separated entity types this rule applies to. Empty means all."
+
+  - name: match_field_names
+    type: string
+    max_length: 2048
+    required: false
+    description: "Comma-separated field names that trigger this rule. Empty means any field."
+
+  - name: match_security_zones
+    type: string
+    max_length: 1024
+    required: false
+    description: "Comma-separated security zone names. Rule applies when target entity is in one of these zones."
+
+  - name: match_data_classifications
+    type: string
+    max_length: 1024
+    required: false
+    description: "Comma-separated data classification names. Rule applies when target has one of these classifications."
+
+  - name: match_compliance_regimes
+    type: string
+    max_length: 1024
+    required: false
+    description: "Comma-separated compliance regime names. Rule applies when entity in scope of one of these."
+
+  - name: required_approver_group
+    type: string
+    max_length: 255
+    required: true
+    description: "Name of ops_group whose members can approve"
+
+  - name: required_approver_count
+    type: int
+    min_value: 1
+    max_value: 10
+    required: true
+    description: "How many approvers from the group are needed"
+
+  - name: rejection_behavior
+    type: string
+    allowed_values: [any_rejects_halts, majority_rejects_halts, all_must_reject]
+    required: true
+    description: "How rejections are handled"
+
+  - name: auto_approve_eligible
+    type: boolean
+    required: true
+    description: "Whether this rule can be satisfied by auto-approval policy"
+
+  - name: emergency_reducible
+    type: boolean
+    required: true
+    description: "Whether emergency path can reduce this rule's requirements"
+

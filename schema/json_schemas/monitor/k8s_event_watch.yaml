@@ -1,0 +1,58 @@
+
+# === k8s_event_watch.yaml ===
+name: k8s_event_watch
+description: "JSON schema for monitor of type k8s_event_watch. Watches Kubernetes events and triggers alerts based on event patterns."
+discriminator_field: monitor_type
+discriminator_value: k8s_event_watch
+
+fields:
+  - name: k8s_cluster_authority_id
+    type: int
+    required: true
+    description: "ID of the authority row for the Kubernetes cluster to watch"
+
+  - name: namespace_filter
+    type: string
+    max_length: 255
+    required: false
+    description: "Namespace to watch. Empty or null for all namespaces."
+
+  - name: event_reason_filter
+    type: string
+    max_length: 1024
+    required: false
+    description: "Comma-separated event reasons to match. OOMKilled, BackOff, FailedScheduling, Unhealthy."
+
+  - name: event_type_filter
+    type: string
+    allowed_values: [normal, warning, all]
+    required: true
+    description: "Which event types to watch"
+
+  - name: involved_object_kind_filter
+    type: string
+    max_length: 512
+    required: false
+    description: "Comma-separated object kinds. Pod, Node, Deployment, StatefulSet."
+
+  - name: count_threshold
+    type: int
+    min_value: 1
+    max_value: 10000
+    required: false
+    description: "Number of matching events within window before alerting"
+
+  - name: count_window_seconds
+    type: int
+    min_value: 60
+    max_value: 86400
+    required: false
+    description: "Time window for count_threshold evaluation"
+
+  - name: severity_on_match
+    type: string
+    allowed_values: [info, warning, critical, page]
+    required: true
+    description: "Alert severity when events match"
+    
+    

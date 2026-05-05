@@ -1,0 +1,57 @@
+
+# === tcp_probe.yaml ===
+name: tcp_probe
+description: "JSON schema for monitor of type tcp_probe. TCP connection test to a host and port."
+discriminator_field: monitor_type
+discriminator_value: tcp_probe
+
+fields:
+  - name: host
+    type: string
+    max_length: 512
+    required: true
+    description: "Hostname or IP to connect to"
+
+  - name: port
+    type: int
+    min_value: 1
+    max_value: 65535
+    required: true
+    description: "TCP port to connect to"
+
+  - name: timeout_seconds
+    type: int
+    min_value: 1
+    max_value: 60
+    required: true
+    description: "Connection timeout"
+
+  - name: tls_enabled
+    type: boolean
+    required: false
+    description: "Whether to negotiate TLS after connection"
+
+  - name: tls_verify
+    type: boolean
+    required: false
+    description: "Whether to verify TLS certificate when tls_enabled"
+
+  - name: send_string
+    type: string
+    max_length: 1024
+    required: false
+    description: "String to send after connection. For protocol-level probes."
+
+  - name: expect_string
+    type: string
+    max_length: 1024
+    required: false
+    description: "String expected in response after send"
+
+  - name: max_connect_time_ms
+    type: int
+    min_value: 1
+    max_value: 60000
+    required: false
+    description: "Connection time threshold for degraded warning"
+

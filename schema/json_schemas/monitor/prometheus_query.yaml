@@ -1,0 +1,59 @@
+
+# === prometheus_query.yaml ===
+name: prometheus_query
+description: "JSON schema for monitor of type prometheus_query. Evaluates a PromQL expression against a Prometheus server."
+discriminator_field: monitor_type
+discriminator_value: prometheus_query
+
+fields:
+  - name: prometheus_authority_id
+    type: int
+    required: true
+    description: "ID of the authority row for the Prometheus server to query"
+
+  - name: query_expression
+    type: string
+    max_length: 4096
+    required: true
+    description: "PromQL expression to evaluate"
+
+  - name: evaluation_interval_seconds
+    type: int
+    min_value: 1
+    max_value: 3600
+    required: false
+    description: "Override of monitor collection_interval_seconds for this query"
+
+  - name: warning_threshold
+    type: float
+    required: false
+    description: "Value at which warning level triggers"
+
+  - name: warning_operator
+    type: string
+    allowed_values: [gt, lt, gte, lte, eq, ne]
+    required: false
+
+  - name: critical_threshold
+    type: float
+    required: false
+    description: "Value at which critical level triggers"
+
+  - name: critical_operator
+    type: string
+    allowed_values: [gt, lt, gte, lte, eq, ne]
+    required: false
+
+  - name: for_duration_seconds
+    type: int
+    min_value: 0
+    max_value: 3600
+    required: false
+    description: "How long condition must persist before firing. Prevents flapping."
+
+  - name: labels_to_propagate
+    type: string
+    max_length: 1024
+    required: false
+    description: "Comma-separated label names to include in alert context"
+

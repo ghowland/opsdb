@@ -1,0 +1,51 @@
+
+
+# === retention.yaml ===
+name: retention
+description: "JSON schema for policy of type retention. Defines retention horizons and reaper behavior."
+discriminator_field: policy_type
+discriminator_value: retention
+
+fields:
+  - name: target_entity_type
+    type: string
+    max_length: 255
+    required: true
+    description: "Entity type this retention policy applies to"
+
+  - name: retention_days
+    type: int
+    min_value: 0
+    max_value: 36500
+    required: false
+    description: "Days to retain. Null if count_bounded or infinite."
+
+  - name: retention_count
+    type: int
+    min_value: 0
+    max_value: 10000000
+    required: false
+    description: "Maximum row count. Null if time_bounded or infinite."
+
+  - name: reaper_action
+    type: string
+    allowed_values: [hard_delete, soft_delete, archive, none]
+    required: true
+    description: "What the reaper does when retention is exceeded"
+
+  - name: archive_destination
+    type: string
+    max_length: 1024
+    required: false
+    description: "Where archived rows go. S3 path, cold storage, etc. Required when reaper_action is archive."
+
+  - name: exempt_if_referenced
+    type: boolean
+    required: false
+    description: "Whether rows referenced by non-expired entities are exempt from reaping"
+
+  - name: compliance_hold_override
+    type: boolean
+    required: true
+    description: "Whether compliance hold prevents reaping regardless of retention horizon"
+

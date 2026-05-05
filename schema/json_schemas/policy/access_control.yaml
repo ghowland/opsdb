@@ -1,0 +1,82 @@
+
+# === access_control.yaml ===
+name: access_control
+description: "JSON schema for policy of type access_control. Authorization layer 5 policy rules. Time-of-day, separation of duty, tenure-based, and other constraints."
+discriminator_field: policy_type
+discriminator_value: access_control
+
+fields:
+  - name: rule_type
+    type: string
+    allowed_values: [time_of_day, separation_of_duty, tenure_minimum, ip_restriction, concurrent_session_limit, read_only_window]
+    required: true
+    description: "What kind of access control rule"
+
+  - name: match_roles
+    type: string
+    max_length: 2048
+    required: false
+    description: "Comma-separated role names this rule applies to. Empty means all roles."
+
+  - name: match_operation_classes
+    type: string
+    max_length: 1024
+    required: false
+    description: "Comma-separated operation classes. read, write-direct, write-change-set, change-mgmt-action."
+
+  - name: time_window_start
+    type: string
+    max_length: 5
+    required: false
+    description: "HH:MM start of restricted window for time_of_day rules"
+
+  - name: time_window_end
+    type: string
+    max_length: 5
+    required: false
+    description: "HH:MM end of restricted window"
+
+  - name: time_window_timezone
+    type: string
+    max_length: 64
+    required: false
+    description: "Timezone for time window"
+
+  - name: time_window_action
+    type: string
+    allowed_values: [deny, require_additional_approval, warn]
+    required: false
+    description: "What happens during the restricted window"
+
+  - name: sod_conflicting_action
+    type: string
+    max_length: 512
+    required: false
+    description: "For separation_of_duty: the conflicting action. submit+approve, propose+execute."
+
+  - name: tenure_minimum_days
+    type: int
+    min_value: 0
+    max_value: 3650
+    required: false
+    description: "For tenure_minimum: days of employment required"
+
+  - name: allowed_ip_ranges
+    type: string
+    max_length: 4096
+    required: false
+    description: "For ip_restriction: comma-separated CIDR ranges"
+
+  - name: max_concurrent_sessions
+    type: int
+    min_value: 1
+    max_value: 100
+    required: false
+    description: "For concurrent_session_limit"
+
+  - name: denial_message
+    type: string
+    max_length: 1024
+    required: false
+    description: "Human-readable message returned when this rule denies access"
+

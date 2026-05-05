@@ -1,0 +1,63 @@
+
+# === compliance_scope.yaml ===
+name: compliance_scope
+description: "JSON schema for policy of type compliance_scope. Defines what is in scope for a compliance regime."
+discriminator_field: policy_type
+discriminator_value: compliance_scope
+
+fields:
+  - name: regime_name
+    type: string
+    max_length: 255
+    required: true
+    description: "Compliance regime this scope applies to"
+
+  - name: scope_definition
+    type: string
+    allowed_values: [all_services, tagged_services, specific_services, by_data_classification, by_security_zone]
+    required: true
+    description: "How scope is determined"
+
+  - name: service_tags
+    type: string
+    max_length: 2048
+    required: false
+    description: "Comma-separated tags when scope_definition is tagged_services"
+
+  - name: service_names
+    type: string
+    max_length: 4096
+    required: false
+    description: "Comma-separated service names when scope_definition is specific_services"
+
+  - name: data_classification_names
+    type: string
+    max_length: 1024
+    required: false
+    description: "Comma-separated classifications when scope_definition is by_data_classification"
+
+  - name: security_zone_names
+    type: string
+    max_length: 1024
+    required: false
+    description: "Comma-separated zone names when scope_definition is by_security_zone"
+
+  - name: evidence_retention_days
+    type: int
+    min_value: 1
+    max_value: 36500
+    required: true
+    description: "How long evidence for this scope must be retained"
+
+  - name: audit_frequency_days
+    type: int
+    min_value: 1
+    max_value: 365
+    required: true
+    description: "How often compliance is audited"
+
+  - name: continuous_monitoring_required
+    type: boolean
+    required: true
+    description: "Whether continuous automated monitoring is required beyond periodic audits"
+

@@ -1,0 +1,65 @@
+
+
+# === puller.yaml ===
+name: puller
+description: "JSON schema for runner_spec of type puller. Reads from external authority, writes to observation cache."
+discriminator_field: runner_spec_type
+discriminator_value: puller
+
+fields:
+  - name: authority_id
+    type: int
+    required: true
+    description: "ID of the authority to pull from"
+
+  - name: resource_types
+    type: string
+    max_length: 4096
+    required: true
+    description: "Comma-separated resource types to pull. ec2_instance, k8s_pod, prometheus_metric, etc."
+
+  - name: target_cache_table
+    type: string
+    allowed_values: [observation_cache_metric, observation_cache_state, observation_cache_config]
+    required: true
+    description: "Which observation cache table to write to"
+
+  - name: poll_interval_seconds
+    type: int
+    min_value: 5
+    max_value: 86400
+    required: true
+    description: "How often to poll the authority"
+
+  - name: batch_size
+    type: int
+    min_value: 1
+    max_value: 100000
+    required: true
+    description: "Maximum resources to process per cycle"
+
+  - name: max_cycle_duration_seconds
+    type: int
+    min_value: 10
+    max_value: 3600
+    required: true
+    description: "Maximum time for one pull cycle"
+
+  - name: max_retries_per_resource
+    type: int
+    min_value: 0
+    max_value: 10
+    required: true
+    description: "Retry budget per individual resource query"
+
+  - name: regions
+    type: string
+    max_length: 2048
+    required: false
+    description: "Comma-separated regions or zones to scan. Null for all."
+
+  - name: use_watch_api
+    type: boolean
+    required: false
+    description: "Whether to use watch/streaming API instead of polling where supported"
+

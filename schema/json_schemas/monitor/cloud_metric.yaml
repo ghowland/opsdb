@@ -1,0 +1,72 @@
+
+# === cloud_metric.yaml ===
+name: cloud_metric
+description: "JSON schema for monitor of type cloud_metric. Monitors a cloud provider's native metric (CloudWatch, Cloud Monitoring, Azure Monitor)."
+discriminator_field: monitor_type
+discriminator_value: cloud_metric
+
+fields:
+  - name: cloud_provider
+    type: string
+    allowed_values: [aws, gcp, azure]
+    required: true
+    description: "Which cloud provider"
+
+  - name: metric_namespace
+    type: string
+    max_length: 512
+    required: true
+    description: "Cloud metric namespace. AWS/EC2, compute.googleapis.com, Microsoft.Compute."
+
+  - name: metric_name
+    type: string
+    max_length: 512
+    required: true
+    description: "Metric name within namespace"
+
+  - name: statistic
+    type: string
+    allowed_values: [average, sum, minimum, maximum, sample_count, p50, p90, p95, p99]
+    required: true
+    description: "Aggregation statistic"
+
+  - name: period_seconds
+    type: int
+    min_value: 60
+    max_value: 86400
+    required: true
+    description: "Aggregation period"
+
+  - name: dimensions
+    type: string
+    max_length: 2048
+    required: false
+    description: "Comma-separated dimension filters. key=value pairs."
+
+  - name: warning_threshold
+    type: float
+    required: false
+    description: "Value at which warning triggers"
+
+  - name: warning_operator
+    type: string
+    allowed_values: [gt, lt, gte, lte, eq, ne]
+    required: false
+
+  - name: critical_threshold
+    type: float
+    required: false
+    description: "Value at which critical triggers"
+
+  - name: critical_operator
+    type: string
+    allowed_values: [gt, lt, gte, lte, eq, ne]
+    required: false
+
+  - name: evaluation_periods
+    type: int
+    min_value: 1
+    max_value: 100
+    required: false
+    description: "Number of consecutive periods condition must hold before firing"
+

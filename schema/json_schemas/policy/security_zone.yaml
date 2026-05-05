@@ -1,0 +1,51 @@
+
+# === security_zone.yaml ===
+name: security_zone
+description: "JSON schema for policy of type security_zone. Defines required controls and threat model for a security zone."
+discriminator_field: policy_type
+discriminator_value: security_zone
+
+fields:
+  - name: zone_level
+    type: int
+    min_value: 1
+    max_value: 10
+    required: true
+    description: "Numeric security level. Higher is more restricted."
+
+  - name: required_controls
+    type: string
+    max_length: 4096
+    required: true
+    description: "Comma-separated required controls. encryption_at_rest, encryption_in_transit, mfa_required, audit_logging, network_segmentation, vulnerability_scanning."
+
+  - name: allowed_ingress_zones
+    type: string
+    max_length: 2048
+    required: false
+    description: "Comma-separated zone names allowed to send traffic into this zone"
+
+  - name: allowed_egress_zones
+    type: string
+    max_length: 2048
+    required: false
+    description: "Comma-separated zone names this zone can send traffic to"
+
+  - name: threat_model_summary
+    type: string
+    max_length: 4096
+    required: false
+    description: "Summary of threat model. Assumed adversary capabilities and attack vectors."
+
+  - name: change_approval_escalation
+    type: boolean
+    required: true
+    description: "Whether changes to entities in this zone require additional approval beyond standard"
+
+  - name: access_review_interval_days
+    type: int
+    min_value: 1
+    max_value: 365
+    required: true
+    description: "How often access to entities in this zone must be reviewed"
+
