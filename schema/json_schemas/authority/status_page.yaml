@@ -1,0 +1,30 @@
+
+# === status_page.yaml ===
+name: status_page
+description: "JSON schema for authority of type status_page"
+discriminator_field: authority_type
+discriminator_value: status_page
+
+fields:
+  - name: provider_type
+    type: string
+    allowed_values:
+      - statuspage_io
+      - betteruptime
+      - instatus
+      - cachet
+      - custom
+    required: true
+    description: "Status page provider"
+
+  - name: page_id
+    type: string
+    max_length: 255
+    required: true
+    description: "Status page identifier"
+
+  - name: public_url
+    type: string
+    max_length: 1024
+    required: false
+    description: "Public-facing status page URL"

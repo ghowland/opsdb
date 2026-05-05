@@ -1,0 +1,33 @@
+
+# === wiki.yaml ===
+name: wiki
+description: "JSON schema for authority of type wiki"
+discriminator_field: authority_type
+discriminator_value: wiki
+
+fields:
+  - name: wiki_type
+    type: string
+    allowed_values:
+      - confluence
+      - notion
+      - mediawiki
+      - gitbook
+      - mkdocs
+      - docusaurus
+      - bookstack
+    required: true
+    description: "Wiki platform"
+
+  - name: space_key
+    type: string
+    max_length: 255
+    required: false
+    description: "Default space or workspace identifier"
+
+  - name: api_version
+    type: string
+    max_length: 50
+    required: false
+    description: "API version for programmatic access"
+

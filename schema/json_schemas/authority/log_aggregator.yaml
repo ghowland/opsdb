@@ -1,0 +1,50 @@
+
+# === log_aggregator.yaml ===
+name: log_aggregator
+description: "JSON schema for authority of type log_aggregator"
+discriminator_field: authority_type
+discriminator_value: log_aggregator
+
+fields:
+  - name: aggregator_type
+    type: string
+    allowed_values:
+      - elasticsearch
+      - opensearch
+      - loki
+      - splunk
+      - datadog_logs
+      - cloudwatch_logs
+      - stackdriver
+    required: true
+    description: "Log aggregation platform"
+
+  - name: version
+    type: string
+    max_length: 50
+    required: false
+    description: "Platform version"
+
+  - name: retention_days
+    type: int
+    min_value: 1
+    max_value: 3650
+    required: true
+    description: "Log retention period"
+
+  - name: index_pattern
+    type: string
+    max_length: 512
+    required: false
+    description: "Default index or stream pattern"
+
+  - name: query_language
+    type: string
+    allowed_values:
+      - lucene
+      - logql
+      - spl
+      - insights
+    required: false
+    description: "Primary query language"
+

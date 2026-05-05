@@ -1,0 +1,37 @@
+
+# === chat_platform.yaml ===
+name: chat_platform
+description: "JSON schema for authority of type chat_platform"
+discriminator_field: authority_type
+discriminator_value: chat_platform
+
+fields:
+  - name: platform_type
+    type: string
+    allowed_values:
+      - slack
+      - msteams
+      - discord
+      - mattermost
+      - google_chat
+    required: true
+    description: "Chat platform"
+
+  - name: workspace_id
+    type: string
+    max_length: 255
+    required: false
+    description: "Workspace or team identifier"
+
+  - name: default_channel
+    type: string
+    max_length: 255
+    required: false
+    description: "Default channel for operational notifications"
+
+  - name: bot_user_id
+    type: string
+    max_length: 255
+    required: false
+    description: "Bot user identifier for automated posting"
+

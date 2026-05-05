@@ -1,0 +1,38 @@
+
+# === dashboard_platform.yaml ===
+name: dashboard_platform
+description: "JSON schema for authority of type dashboard_platform"
+discriminator_field: authority_type
+discriminator_value: dashboard_platform
+
+fields:
+  - name: platform_type
+    type: string
+    allowed_values:
+      - grafana
+      - datadog
+      - kibana
+      - cloudwatch
+      - newrelic
+      - dynatrace
+    required: true
+    description: "Dashboard platform"
+
+  - name: version
+    type: string
+    max_length: 50
+    required: false
+    description: "Platform version"
+
+  - name: default_org_id
+    type: string
+    max_length: 255
+    required: false
+    description: "Default organization or account scope"
+
+  - name: api_key_path
+    type: string
+    max_length: 512
+    required: false
+    description: "Vault path or env var name for API key. Never the key itself."
+

@@ -1,0 +1,39 @@
+
+# === ticketing_system.yaml ===
+name: ticketing_system
+description: "JSON schema for authority of type ticketing_system"
+discriminator_field: authority_type
+discriminator_value: ticketing_system
+
+fields:
+  - name: system_type
+    type: string
+    allowed_values:
+      - jira
+      - linear
+      - servicenow
+      - github_issues
+      - gitlab_issues
+      - asana
+      - shortcut
+    required: true
+    description: "Ticketing platform"
+
+  - name: project_key
+    type: string
+    max_length: 255
+    required: false
+    description: "Default project or workspace for operational tickets"
+
+  - name: api_version
+    type: string
+    max_length: 50
+    required: false
+    description: "Platform API version"
+
+  - name: ops_ticket_type
+    type: string
+    max_length: 255
+    required: false
+    description: "Issue type or category used for operational tickets"
+

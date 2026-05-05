@@ -1,0 +1,33 @@
+# === artifact_registry.yaml ===
+name: artifact_registry
+description: "JSON schema for authority of type artifact_registry"
+discriminator_field: authority_type
+discriminator_value: artifact_registry
+
+fields:
+  - name: registry_type
+    type: string
+    allowed_values:
+      - nexus
+      - artifactory
+      - github_packages
+      - gitlab_packages
+      - pypi
+      - npm
+      - maven_central
+    required: true
+    description: "Artifact registry platform"
+
+  - name: default_repository
+    type: string
+    max_length: 255
+    required: false
+    description: "Default repository within the registry"
+
+  - name: retention_policy
+    type: string
+    max_length: 512
+    required: false
+    description: "How long artifacts are retained"
+    
+

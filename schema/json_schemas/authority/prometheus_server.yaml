@@ -1,0 +1,44 @@
+
+# === prometheus_server.yaml ===
+name: prometheus_server
+description: "JSON schema for authority of type prometheus_server"
+discriminator_field: authority_type
+discriminator_value: prometheus_server
+
+fields:
+  - name: scrape_interval_default_seconds
+    type: int
+    min_value: 1
+    max_value: 3600
+    required: true
+    description: "Default scrape interval"
+
+  - name: retention_days
+    type: int
+    min_value: 1
+    max_value: 3650
+    required: true
+    description: "How long data is retained"
+
+  - name: version
+    type: string
+    max_length: 50
+    required: true
+    description: "Prometheus version"
+
+  - name: federation_enabled
+    type: boolean
+    required: false
+    description: "Whether federation is enabled"
+
+  - name: remote_write_enabled
+    type: boolean
+    required: false
+    description: "Whether remote write is configured"
+
+  - name: alertmanager_url
+    type: string
+    max_length: 1024
+    required: false
+    description: "Associated Alertmanager endpoint"
+

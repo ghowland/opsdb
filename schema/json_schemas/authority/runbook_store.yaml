@@ -1,0 +1,33 @@
+
+# === runbook_store.yaml ===
+name: runbook_store
+description: "JSON schema for authority of type runbook_store"
+discriminator_field: authority_type
+discriminator_value: runbook_store
+
+fields:
+  - name: store_type
+    type: string
+    allowed_values:
+      - confluence
+      - notion
+      - github_wiki
+      - mkdocs
+      - gitbook
+      - bookstack
+      - custom
+    required: true
+    description: "Runbook storage platform"
+
+  - name: root_path
+    type: string
+    max_length: 1024
+    required: false
+    description: "Root path or space where runbooks live"
+
+  - name: naming_convention
+    type: string
+    max_length: 512
+    required: false
+    description: "How runbooks are named. service-name/scenario format."
+

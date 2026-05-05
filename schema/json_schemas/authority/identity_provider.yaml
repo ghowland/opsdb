@@ -1,0 +1,47 @@
+
+# === identity_provider.yaml ===
+name: identity_provider
+description: "JSON schema for authority of type identity_provider"
+discriminator_field: authority_type
+discriminator_value: identity_provider
+
+fields:
+  - name: provider_type
+    type: string
+    allowed_values:
+      - okta
+      - azure_ad
+      - google_workspace
+      - ldap
+      - keycloak
+      - auth0
+      - ping_identity
+    required: true
+    description: "Identity provider platform"
+
+  - name: tenant_id
+    type: string
+    max_length: 255
+    required: false
+    description: "Tenant or domain identifier"
+
+  - name: protocol
+    type: string
+    allowed_values:
+      - oidc
+      - saml
+      - ldap
+      - scim
+    required: true
+    description: "Primary authentication protocol"
+
+  - name: scim_enabled
+    type: boolean
+    required: false
+    description: "Whether SCIM provisioning is enabled"
+
+  - name: mfa_required
+    type: boolean
+    required: false
+    description: "Whether MFA is enforced at this provider"
+

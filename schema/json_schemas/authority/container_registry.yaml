@@ -1,0 +1,39 @@
+
+
+# === container_registry.yaml ===
+name: container_registry
+description: "JSON schema for authority of type container_registry"
+discriminator_field: authority_type
+discriminator_value: container_registry
+
+fields:
+  - name: registry_type
+    type: string
+    allowed_values:
+      - ecr
+      - gcr
+      - acr
+      - dockerhub
+      - harbor
+      - ghcr
+      - quay
+      - gitlab_registry
+    required: true
+    description: "Container registry platform"
+
+  - name: default_namespace
+    type: string
+    max_length: 255
+    required: false
+    description: "Default image namespace or project"
+
+  - name: image_signing_required
+    type: boolean
+    required: false
+    description: "Whether image signatures are required for production use"
+
+  - name: vulnerability_scanning_enabled
+    type: boolean
+    required: false
+    description: "Whether images are scanned for vulnerabilities on push"
+
