@@ -1,0 +1,63 @@
+
+# === _schema_relationship.yaml ===
+name: _schema_relationship
+description: "Registry of relationships between entities. One row per foreign key. Enables schema introspection, dependency graph queries, and named join path resolution."
+category: schema-meta
+versioned: false
+soft_delete: false
+hierarchical: false
+
+fields:
+  - name: source__schema_entity_type_id
+    type: foreign_key
+    references: _schema_entity_type
+    nullable: false
+    description: "Entity containing the foreign key"
+
+  - name: source__schema_field_id
+    type: foreign_key
+    references: _schema_field
+    nullable: false
+    description: "Field that is the foreign key"
+
+  - name: target__schema_entity_type_id
+    type: foreign_key
+    references: _schema_entity_type
+    nullable: false
+    description: "Entity being referenced"
+
+  - name: cardinality
+    type: enum
+    enum_values:
+      - one_to_one
+      - one_to_many
+      - many_to_many
+    nullable: false
+    description: "Relationship cardinality. many_to_many for bridge tables detected by having exactly two non-self FKs."
+
+  - name: on_delete_action
+    type: enum
+    enum_values:
+      - cascade
+      - restrict
+      - set_null
+    nullable: false
+    description: "What happens to referencing rows when referenced row is deleted"
+
+  - name: description
+    type: text
+    nullable: true
+    description: "Relationship description"
+
+indexes:
+  - fields: [source__schema_entity_type_id]
+  - fields: [target__schema_entity_type_id]
+  - fields: [source__schema_entity_type_id, source__schema_field_id]
+    unique: true
+  - fields: [cardinality]
+
+governance:
+  _schema_version_introduced_id: true
+  _schema_version_deprecated_id: true
+
+

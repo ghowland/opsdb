@@ -1,0 +1,46 @@
+
+# === _schema_change_set.yaml ===
+name: _schema_change_set
+description: "Schema evolution change set. Records each schema modification with attribution, approval, and rationale. Chains to parent for history."
+category: schema-meta
+versioned: false
+soft_delete: false
+hierarchical: true
+
+fields:
+  - name: _schema_version_id
+    type: foreign_key
+    references: _schema_version
+    nullable: false
+    description: "Schema version this change set produced"
+
+  - name: proposed_by_ops_user_id
+    type: foreign_key
+    references: ops_user
+    nullable: false
+    description: "Who proposed this schema change"
+
+  - name: approved_by_ops_user_role_id
+    type: foreign_key
+    references: ops_user_role
+    nullable: false
+    description: "Role that approved. Typically schema steward."
+
+  - name: reason_text
+    type: text
+    nullable: false
+    description: "Why this schema change was made"
+
+  - name: applied_time
+    type: datetime
+    nullable: false
+    description: "When this schema change was applied"
+
+indexes:
+  - fields: [_schema_version_id]
+  - fields: [proposed_by_ops_user_id]
+  - fields: [approved_by_ops_user_role_id]
+  - fields: [applied_time]
+
+governance: {}
+

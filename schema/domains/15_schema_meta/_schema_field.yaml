@@ -1,0 +1,87 @@
+
+# === _schema_field.yaml ===
+name: _schema_field
+description: "Registry of fields in the schema. One row per field per entity, including injected reserved and governance fields. Queryable through the API. The API reads this table to know what fields exist and what their types and constraints are."
+category: schema-meta
+versioned: false
+soft_delete: false
+hierarchical: false
+
+fields:
+  - name: _schema_entity_type_id
+    type: foreign_key
+    references: _schema_entity_type
+    nullable: false
+    description: "Entity this field belongs to"
+
+  - name: field_name
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "Field name as it exists in the database"
+
+  - name: field_type
+    type: enum
+    enum_values:
+      - int
+      - float
+      - varchar
+      - text
+      - json
+      - boolean
+      - datetime
+      - enum
+      - foreign_key
+    nullable: false
+    description: "Schema type of this field"
+
+  - name: is_nullable
+    type: boolean
+    nullable: false
+    description: "Whether this field allows NULL"
+
+  - name: is_primary_key
+    type: boolean
+    nullable: false
+    default: false
+    description: "Whether this field is the primary key"
+
+  - name: is_foreign_key
+    type: boolean
+    nullable: false
+    default: false
+    description: "Whether this field is a foreign key"
+
+  - name: foreign_key_target__schema_entity_type_id
+    type: foreign_key
+    references: _schema_entity_type
+    nullable: true
+    description: "Target entity type for foreign key fields. Null for non-FK fields."
+
+  - name: default_value_text
+    type: text
+    nullable: true
+    description: "Default value as text. Null if no default."
+
+  - name: constraint_data_json
+    type: json
+    json_type_discriminator: field_type
+    nullable: true
+    description: "Field constraints. Numeric ranges, length bounds, enum values, precision. Structured per field type."
+
+  - name: description
+    type: text
+    nullable: true
+    description: "Field description from YAML file"
+
+indexes:
+  - fields: [_schema_entity_type_id]
+  - fields: [_schema_entity_type_id, field_name]
+    unique: true
+  - fields: [field_type]
+  - fields: [is_foreign_key]
+
+governance:
+  _schema_version_introduced_id: true
+  _schema_version_deprecated_id: true
+

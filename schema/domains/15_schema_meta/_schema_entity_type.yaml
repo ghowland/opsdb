@@ -1,0 +1,29 @@
+
+# === _schema_entity_type.yaml ===
+name: _schema_entity_type
+description: "Registry of entity types in the schema. One row per table. Queryable through the API like any other data. Populated by schema engine on apply."
+category: schema-meta
+versioned: false
+soft_delete: false
+hierarchical: false
+
+fields:
+  - name: table_name
+    type: varchar
+    max_length: 255
+    nullable: false
+    unique: true
+    description: "Entity table name as it exists in the database"
+
+  - name: description
+    type: text
+    nullable: true
+    description: "Entity description from YAML file"
+
+indexes:
+  - fields: [table_name]
+
+governance:
+  _schema_version_introduced_id: true
+  _schema_version_deprecated_id: true
+

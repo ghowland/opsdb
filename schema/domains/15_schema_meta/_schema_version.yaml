@@ -1,0 +1,47 @@
+# === _schema_version.yaml ===
+name: _schema_version
+description: "Canonical schema version. Linear chain of schema versions. Exactly one row has is_current=true at any time. Populated by schema engine on apply."
+category: schema-meta
+versioned: false
+soft_delete: false
+hierarchical: true
+
+fields:
+  - name: version_serial
+    type: int
+    nullable: false
+    min_value: 1
+    max_value: 2147483647
+    description: "Monotonically increasing version number"
+    unique: true
+
+  - name: version_label
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "Human-readable version label. 2026.05.05.01 format."
+    unique: true
+
+  - name: description
+    type: text
+    nullable: true
+    description: "What changed in this version"
+
+  - name: released_time
+    type: datetime
+    nullable: false
+    description: "When this version was applied to the database"
+
+  - name: is_current
+    type: boolean
+    nullable: false
+    default: false
+    description: "True for exactly one row — the active schema version"
+
+indexes:
+  - fields: [is_current]
+  - fields: [version_serial]
+  - fields: [released_time]
+
+governance: {}
+
