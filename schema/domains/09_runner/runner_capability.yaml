@@ -1,0 +1,44 @@
+
+# === runner_capability.yaml ===
+name: runner_capability
+description: "Declared runner capability. What this runner can do in the world. Used by authorization layer 4 and metric emission validation."
+category: runner
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: runner_spec_id
+    type: foreign_key
+    references: runner_spec
+    nullable: false
+    description: "Runner spec declaring this capability"
+
+  - name: capability_name
+    type: enum
+    enum_values:
+      - yum_install
+      - k8s_apply
+      - ec2_provision
+      - template_render
+      - secret_resolve
+      - prometheus_query
+      - tape_verify
+      - keycard_revoke
+      - license_check
+    nullable: false
+    description: "Named capability"
+
+  - name: capability_data_json
+    type: json
+    json_type_discriminator: capability_name
+    nullable: true
+    description: "Capability-specific constraints and parameters"
+
+indexes:
+  - fields: [runner_spec_id]
+  - fields: [runner_spec_id, capability_name]
+    unique: true
+
+governance: {}
+

@@ -1,0 +1,76 @@
+
+# === runner_job.yaml ===
+name: runner_job
+description: "Runtime record of a runner execution cycle. Observation-only — written by the runner at the end of each cycle."
+category: runner
+versioned: false
+soft_delete: false
+hierarchical: false
+
+fields:
+  - name: runner_spec_id
+    type: foreign_key
+    references: runner_spec
+    nullable: false
+    description: "Which runner spec executed"
+
+  - name: runner_instance_id
+    type: foreign_key
+    references: runner_instance
+    nullable: false
+    description: "Which runner instance executed this job"
+
+  - name: scheduled_time
+    type: datetime
+    nullable: true
+    description: "When this job was scheduled to run"
+
+  - name: started_time
+    type: datetime
+    nullable: true
+    description: "When execution began"
+
+  - name: finished_time
+    type: datetime
+    nullable: true
+    description: "When execution completed"
+
+  - name: job_status
+    type: enum
+    enum_values:
+      - pending
+      - running
+      - succeeded
+      - failed
+      - cancelled
+      - timeout
+    nullable: false
+    description: "Outcome of this job"
+
+  - name: job_input_data_json
+    type: json
+    json_type_discriminator: job_status
+    nullable: false
+    description: "Summary of inputs this job consumed"
+
+  - name: job_output_data_json
+    type: json
+    json_type_discriminator: job_status
+    nullable: true
+    description: "Summary of outputs this job produced"
+
+  - name: job_log_text
+    type: text
+    nullable: true
+    description: "Stdout/stderr summary from execution"
+
+indexes:
+  - fields: [runner_spec_id]
+  - fields: [runner_instance_id]
+  - fields: [job_status]
+  - fields: [started_time]
+  - fields: [runner_spec_id, job_status]
+
+governance:
+  _retention_policy_id: true
+

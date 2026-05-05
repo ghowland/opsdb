@@ -1,0 +1,40 @@
+
+# === runner_job_target_service.yaml ===
+name: runner_job_target_service
+description: "Bridge: runner job to service with per-target status."
+category: runner
+versioned: false
+soft_delete: false
+hierarchical: false
+
+fields:
+  - name: runner_job_id
+    type: foreign_key
+    references: runner_job
+    nullable: false
+    description: "Runner job"
+
+  - name: service_id
+    type: foreign_key
+    references: service
+    nullable: false
+    description: "Target service"
+
+  - name: per_target_status
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "Outcome for this specific target"
+
+  - name: per_target_data_json
+    type: json
+    json_type_discriminator: per_target_status
+    nullable: true
+    description: "Target-specific detail"
+
+indexes:
+  - fields: [runner_job_id]
+  - fields: [service_id]
+
+governance: {}
+

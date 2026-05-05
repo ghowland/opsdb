@@ -1,0 +1,30 @@
+
+# === runner_cloud_account_target.yaml ===
+name: runner_cloud_account_target
+description: "Bridge: runner spec to cloud account. Declares which cloud accounts this runner is authorized to act on."
+category: runner
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: runner_spec_id
+    type: foreign_key
+    references: runner_spec
+    nullable: false
+    description: "Runner spec"
+
+  - name: cloud_account_id
+    type: foreign_key
+    references: cloud_account
+    nullable: false
+    description: "Target cloud account"
+
+indexes:
+  - fields: [runner_spec_id]
+  - fields: [cloud_account_id]
+  - fields: [runner_spec_id, cloud_account_id]
+    unique: true
+
+governance: {}
+

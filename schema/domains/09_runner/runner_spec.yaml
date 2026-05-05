@@ -1,0 +1,69 @@
+# === runner_spec.yaml ===
+name: runner_spec
+description: "Runner kind specification. Defines what a runner does, how it is configured, and what type it is. Versioned through runner_spec_version sibling with runner_data_json typed payload."
+category: runner
+versioned: true
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: site_id
+    type: foreign_key
+    references: site
+    nullable: false
+    description: "Owning site"
+
+  - name: name
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "Runner spec name"
+    must_be_unique_within:
+      - site_id
+
+  - name: runner_spec_type
+    type: enum
+    enum_values:
+      - config_apply
+      - template_generate
+      - k8s_apply
+      - cloud_provision
+      - monitor_collect
+      - alert_dispatch
+      - drift_detect
+      - verify_evidence
+      - reconcile
+      - scheduler_enforce
+      - puller
+      - compliance_scan
+      - credential_rotator
+      - certificate_renewer
+      - manual_operation_tracker
+    nullable: false
+    description: "Discriminator for runner_data_json in version sibling"
+
+  - name: description
+    type: text
+    nullable: true
+    description: "What this runner does"
+
+  - name: runner_image_reference
+    type: varchar
+    max_length: 1024
+    nullable: false
+    description: "Container image, binary path, or repo locator for runner code"
+
+  - name: runner_entrypoint
+    type: varchar
+    max_length: 512
+    nullable: true
+    description: "Optional entrypoint override within image or binary"
+
+indexes:
+  - fields: [site_id]
+  - fields: [runner_spec_type]
+
+governance:
+  _requires_group: true
+  _access_classification: true
+

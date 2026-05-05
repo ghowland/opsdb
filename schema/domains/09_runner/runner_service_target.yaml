@@ -1,0 +1,30 @@
+
+# === runner_service_target.yaml ===
+name: runner_service_target
+description: "Bridge: runner spec to service. Declares which services this runner is authorized to act on."
+category: runner
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: runner_spec_id
+    type: foreign_key
+    references: runner_spec
+    nullable: false
+    description: "Runner spec"
+
+  - name: service_id
+    type: foreign_key
+    references: service
+    nullable: false
+    description: "Target service"
+
+indexes:
+  - fields: [runner_spec_id]
+  - fields: [service_id]
+  - fields: [runner_spec_id, service_id]
+    unique: true
+
+governance: {}
+

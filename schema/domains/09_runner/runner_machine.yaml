@@ -1,0 +1,37 @@
+
+# === runner_machine.yaml ===
+name: runner_machine
+description: "Bridge: machine to runner spec. Where a runner is deployed and how much capacity it has."
+category: runner
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: machine_id
+    type: foreign_key
+    references: machine
+    nullable: false
+    description: "Machine hosting this runner"
+
+  - name: runner_spec_id
+    type: foreign_key
+    references: runner_spec
+    nullable: false
+    description: "Runner spec deployed on this machine"
+
+  - name: capacity_concurrent_jobs
+    type: int
+    nullable: false
+    min_value: 1
+    max_value: 1000
+    description: "Maximum concurrent jobs this runner instance can execute"
+
+indexes:
+  - fields: [machine_id]
+  - fields: [runner_spec_id]
+  - fields: [machine_id, runner_spec_id]
+    unique: true
+
+governance: {}
+

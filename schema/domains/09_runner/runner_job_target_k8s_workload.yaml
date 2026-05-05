@@ -1,0 +1,40 @@
+
+# === runner_job_target_k8s_workload.yaml ===
+name: runner_job_target_k8s_workload
+description: "Bridge: runner job to Kubernetes workload with per-target status."
+category: runner
+versioned: false
+soft_delete: false
+hierarchical: false
+
+fields:
+  - name: runner_job_id
+    type: foreign_key
+    references: runner_job
+    nullable: false
+    description: "Runner job"
+
+  - name: k8s_workload_id
+    type: foreign_key
+    references: k8s_workload
+    nullable: false
+    description: "Target workload"
+
+  - name: per_target_status
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "Outcome for this specific target"
+
+  - name: per_target_data_json
+    type: json
+    json_type_discriminator: per_target_status
+    nullable: true
+    description: "Target-specific detail"
+
+indexes:
+  - fields: [runner_job_id]
+  - fields: [k8s_workload_id]
+
+governance: {}
+

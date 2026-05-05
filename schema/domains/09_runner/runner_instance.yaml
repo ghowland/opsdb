@@ -1,0 +1,47 @@
+
+# === runner_instance.yaml ===
+name: runner_instance
+description: "Live runner process. Observation-only — records that a runner process is currently running."
+category: runner
+versioned: false
+soft_delete: false
+hierarchical: false
+
+fields:
+  - name: runner_machine_id
+    type: foreign_key
+    references: runner_machine
+    nullable: false
+    description: "Runner machine deployment this instance belongs to"
+
+  - name: external_id
+    type: varchar
+    max_length: 512
+    nullable: false
+    description: "PID, container ID, or pod UID"
+
+  - name: is_running
+    type: boolean
+    nullable: false
+    default: true
+    description: "Whether this instance is currently running"
+
+  - name: started_time
+    type: datetime
+    nullable: true
+    description: "When this instance started"
+
+  - name: stopped_time
+    type: datetime
+    nullable: true
+    description: "When this instance stopped. Null if still running."
+
+indexes:
+  - fields: [runner_machine_id]
+  - fields: [external_id]
+
+governance:
+  _observed_time: true
+  _authority_id: true
+  _puller_runner_job_id: true
+

@@ -1,0 +1,48 @@
+
+# === runner_job_output_var.yaml ===
+name: runner_job_output_var
+description: "Discrete output variable from a runner job. Typed key-value produced by a runner for downstream consumption by other runners."
+category: runner
+versioned: false
+soft_delete: false
+hierarchical: false
+
+fields:
+  - name: runner_job_id
+    type: foreign_key
+    references: runner_job
+    nullable: false
+    description: "Runner job that produced this output"
+
+  - name: var_name
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "Output variable name"
+
+  - name: var_value
+    type: text
+    nullable: false
+    description: "Output variable value"
+
+  - name: var_type
+    type: enum
+    enum_values:
+      - string
+      - int
+      - float
+      - bool
+      - json
+    nullable: false
+    description: "Type of output value"
+
+indexes:
+  - fields: [runner_job_id]
+  - fields: [runner_job_id, var_name]
+    unique: true
+
+governance:
+  _retention_policy_id: true
+
+  
+  
