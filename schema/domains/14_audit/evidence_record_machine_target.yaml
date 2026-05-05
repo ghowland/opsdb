@@ -1,0 +1,40 @@
+
+# === evidence_record_machine_target.yaml ===
+name: evidence_record_machine_target
+description: "Bridge: evidence record to machine with per-target status."
+category: audit
+versioned: false
+soft_delete: false
+hierarchical: false
+
+fields:
+  - name: evidence_record_id
+    type: foreign_key
+    references: evidence_record
+    nullable: false
+    description: "Evidence record"
+
+  - name: machine_id
+    type: foreign_key
+    references: machine
+    nullable: false
+    description: "Machine this evidence applies to"
+
+  - name: per_target_status
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "Outcome for this specific machine"
+
+  - name: per_target_data_json
+    type: json
+    json_type_discriminator: per_target_status
+    nullable: true
+    description: "Target-specific evidence detail"
+
+indexes:
+  - fields: [evidence_record_id]
+  - fields: [machine_id]
+
+governance: {}
+

@@ -1,0 +1,82 @@
+
+# === evidence_record.yaml ===
+name: evidence_record
+description: "Verification outcome from a runner or human. Backup verified, certificate valid, compliance scanned, credential rotated, access reviewed, physical inspection completed, tape rotation completed, keycard revoked, license renewed, vendor contract reviewed."
+category: audit
+versioned: false
+soft_delete: false
+hierarchical: false
+
+fields:
+  - name: site_id
+    type: foreign_key
+    references: site
+    nullable: false
+    description: "Site context"
+
+  - name: evidence_record_type
+    type: enum
+    enum_values:
+      - backup_verification
+      - certificate_validity
+      - compliance_scan
+      - credential_rotation_verification
+      - access_review
+      - physical_inspection
+      - tape_rotation_completed
+      - keycard_revocation_completed
+      - license_renewal_completed
+      - vendor_contract_review_completed
+    nullable: false
+    description: "Discriminator for evidence_record_data_json"
+
+  - name: evidence_record_data_json
+    type: json
+    json_type_discriminator: evidence_record_type
+    nullable: false
+    description: "Type-specific evidence detail"
+
+  - name: produced_by_runner_job_id
+    type: foreign_key
+    references: runner_job
+    nullable: true
+    description: "Runner job that produced this evidence. Null if human-produced."
+
+  - name: produced_by_ops_user_id
+    type: foreign_key
+    references: ops_user
+    nullable: true
+    description: "Human who produced this evidence. Null if runner-produced."
+
+  - name: evidence_status
+    type: enum
+    enum_values:
+      - passed
+      - failed
+      - warning
+      - partial
+    nullable: false
+    description: "Overall outcome of this verification"
+
+  - name: observed_time
+    type: datetime
+    nullable: false
+    description: "When the verification observation was made"
+
+  - name: retention_horizon_time
+    type: datetime
+    nullable: true
+    description: "When this evidence record may be reaped. Null for indefinite retention."
+
+indexes:
+  - fields: [site_id]
+  - fields: [evidence_record_type]
+  - fields: [evidence_status]
+  - fields: [produced_by_runner_job_id]
+  - fields: [produced_by_ops_user_id]
+  - fields: [observed_time]
+  - fields: [evidence_record_type, evidence_status]
+
+governance:
+  _retention_policy_id: true
+

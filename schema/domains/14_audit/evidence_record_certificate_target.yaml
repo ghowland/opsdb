@@ -1,0 +1,41 @@
+
+# === evidence_record_certificate_target.yaml ===
+name: evidence_record_certificate_target
+description: "Bridge: evidence record to certificate with per-target status. Certificate entity referenced externally."
+category: audit
+versioned: false
+soft_delete: false
+hierarchical: false
+
+fields:
+  - name: evidence_record_id
+    type: foreign_key
+    references: evidence_record
+    nullable: false
+    description: "Evidence record"
+
+  - name: certificate_id
+    type: int
+    nullable: false
+    min_value: 1
+    max_value: 2147483647
+    description: "FK to certificate entity (externally referenced)"
+
+  - name: per_target_status
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "Outcome for this specific certificate"
+
+  - name: per_target_data_json
+    type: json
+    json_type_discriminator: per_target_status
+    nullable: true
+    description: "Target-specific evidence detail"
+
+indexes:
+  - fields: [evidence_record_id]
+  - fields: [certificate_id]
+
+governance: {}
+

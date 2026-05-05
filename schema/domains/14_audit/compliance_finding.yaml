@@ -1,0 +1,100 @@
+
+# === compliance_finding.yaml ===
+name: compliance_finding
+description: "Filed compliance gap or observation. Created by verifier runners, compliance scanners, or humans. Tracks severity, status, and resolution through change sets."
+category: audit
+versioned: false
+soft_delete: false
+hierarchical: false
+
+fields:
+  - name: site_id
+    type: foreign_key
+    references: site
+    nullable: false
+    description: "Site context"
+
+  - name: compliance_regime_id
+    type: foreign_key
+    references: compliance_regime
+    nullable: false
+    description: "Compliance regime this finding relates to"
+
+  - name: finding_severity
+    type: enum
+    enum_values:
+      - informational
+      - low
+      - medium
+      - high
+      - critical
+    nullable: false
+    description: "Severity of the finding"
+
+  - name: finding_title
+    type: varchar
+    max_length: 512
+    nullable: false
+    description: "Short finding title"
+
+  - name: finding_description
+    type: text
+    nullable: false
+    description: "Detailed description of the finding, what was expected, what was observed"
+
+  - name: filed_by_ops_user_id
+    type: foreign_key
+    references: ops_user
+    nullable: true
+    description: "Human who filed. Null when automated."
+
+  - name: filed_by_evidence_record_id
+    type: foreign_key
+    references: evidence_record
+    nullable: true
+    description: "Evidence record that triggered filing. Null when human-filed."
+
+  - name: finding_status
+    type: enum
+    enum_values:
+      - open
+      - accepted
+      - mitigating
+      - resolved
+      - accepted_risk
+    nullable: false
+    description: "Current finding status"
+
+  - name: resolution_change_set_id
+    type: foreign_key
+    references: change_set
+    nullable: true
+    description: "Change set that resolved this finding. Null while unresolved."
+
+  - name: resolution_text
+    type: text
+    nullable: true
+    description: "How the finding was resolved or why risk was accepted"
+
+  - name: filed_time
+    type: datetime
+    nullable: false
+    description: "When finding was filed"
+
+  - name: resolved_time
+    type: datetime
+    nullable: true
+    description: "When finding was resolved. Null while open."
+
+indexes:
+  - fields: [site_id]
+  - fields: [compliance_regime_id]
+  - fields: [finding_severity]
+  - fields: [finding_status]
+  - fields: [filed_by_ops_user_id]
+  - fields: [filed_by_evidence_record_id]
+  - fields: [compliance_regime_id, finding_status]
+  - fields: [filed_time]
+
+governance:
+  _access_classification: true

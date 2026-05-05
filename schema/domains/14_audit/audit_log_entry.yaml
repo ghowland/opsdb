@@ -1,0 +1,117 @@
+# === audit_log_entry.yaml ===
+name: audit_log_entry
+description: "Append-only record of every API action. Full attribution, structured detail, tamper-evidence chain. No UPDATE or DELETE permitted for any role — enforced at DDL level."
+category: audit
+versioned: false
+soft_delete: false
+hierarchical: false
+append_only: true
+
+fields:
+  - name: site_id
+    type: foreign_key
+    references: site
+    nullable: false
+    description: "Site context"
+
+  - name: acting_ops_user_id
+    type: foreign_key
+    references: ops_user
+    nullable: true
+    description: "Human who performed the action. Null for runner-only actions."
+
+  - name: acting_service_account_id
+    type: int
+    nullable: true
+    min_value: 1
+    max_value: 2147483647
+    description: "Runner service account that performed the action. Null for human-only actions. Both populated for web-mediated actions."
+
+  - name: api_endpoint
+    type: varchar
+    max_length: 512
+    nullable: false
+    description: "API endpoint called"
+
+  - name: http_method
+    type: varchar
+    max_length: 10
+    nullable: false
+    description: "HTTP method used"
+
+  - name: action_type
+    type: enum
+    enum_values:
+      - read
+      - create
+      - update
+      - delete
+      - approve
+      - reject
+      - change_set_submit
+      - schema_change
+    nullable: false
+    description: "Structured operation class"
+
+  - name: target_entity_type
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "Entity type targeted by this action"
+
+  - name: target_entity_id
+    type: int
+    nullable: false
+    min_value: 0
+    max_value: 2147483647
+    description: "ID of entity targeted. 0 for multi-target or search operations."
+
+  - name: request_data_summary
+    type: json
+    json_type_discriminator: action_type
+    nullable: true
+    description: "Structured summary of request. Full values in version siblings and cache tables."
+
+  - name: response_status
+    type: int
+    nullable: false
+    min_value: 100
+    max_value: 599
+    description: "HTTP response status code"
+
+  - name: response_data_summary
+    type: json
+    json_type_discriminator: action_type
+    nullable: true
+    description: "Structured summary of response"
+
+  - name: client_ip_address
+    type: varchar
+    max_length: 45
+    nullable: true
+    description: "Client IP address (IPv4 or IPv6)"
+
+  - name: client_user_agent
+    type: varchar
+    max_length: 1024
+    nullable: true
+    description: "Client user agent string"
+
+  - name: acted_time
+    type: datetime
+    nullable: false
+    description: "API-supplied high-precision timestamp. Client-supplied time recorded in request_data_summary, not used here."
+
+indexes:
+  - fields: [site_id]
+  - fields: [acting_ops_user_id]
+  - fields: [acting_service_account_id]
+  - fields: [action_type]
+  - fields: [target_entity_type, target_entity_id]
+  - fields: [acted_time]
+  - fields: [action_type, acted_time]
+  - fields: [target_entity_type, acted_time]
+
+governance:
+  _audit_chain_hash: true
+

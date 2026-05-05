@@ -1,0 +1,31 @@
+
+
+# === compliance_finding_target_service.yaml ===
+name: compliance_finding_target_service
+description: "Bridge: compliance finding to service. Scopes a finding to specific affected services."
+category: audit
+versioned: false
+soft_delete: false
+hierarchical: false
+
+fields:
+  - name: compliance_finding_id
+    type: foreign_key
+    references: compliance_finding
+    nullable: false
+    description: "Compliance finding"
+
+  - name: service_id
+    type: foreign_key
+    references: service
+    nullable: false
+    description: "Affected service"
+
+indexes:
+  - fields: [compliance_finding_id]
+  - fields: [service_id]
+  - fields: [compliance_finding_id, service_id]
+    unique: true
+
+governance: {}
+
