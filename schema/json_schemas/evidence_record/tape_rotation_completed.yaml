@@ -1,0 +1,44 @@
+
+# === tape_rotation_completed.yaml ===
+name: tape_rotation_completed
+description: "JSON schema for evidence_record of type tape_rotation_completed"
+discriminator_field: evidence_record_type
+discriminator_value: tape_rotation_completed
+
+fields:
+  - name: tape_set_identifier
+    type: string
+    max_length: 255
+    required: true
+    description: "Identifier of the tape set rotated"
+
+  - name: tapes_rotated_count
+    type: int
+    min_value: 1
+    max_value: 10000
+    required: true
+    description: "Number of tapes rotated"
+
+  - name: rotation_destination
+    type: string
+    allowed_values: [offsite_vault, onsite_safe, courier_pickup, destruction]
+    required: true
+    description: "Where tapes were sent"
+
+  - name: courier_tracking_number
+    type: string
+    max_length: 255
+    required: false
+    description: "Tracking number if shipped via courier"
+
+  - name: chain_of_custody_verified
+    type: boolean
+    required: true
+    description: "Whether chain of custody documentation was completed"
+
+  - name: operator_name
+    type: string
+    max_length: 512
+    required: true
+    description: "Who performed the rotation"
+

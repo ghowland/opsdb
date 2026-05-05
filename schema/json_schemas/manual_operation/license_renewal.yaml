@@ -1,0 +1,62 @@
+
+# === license_renewal.yaml ===
+name: license_renewal
+description: "JSON schema for manual_operation of type license_renewal"
+discriminator_field: manual_operation_type
+discriminator_value: license_renewal
+
+fields:
+  - name: license_name
+    type: string
+    max_length: 512
+    required: true
+    description: "Software or service license name"
+
+  - name: vendor_name
+    type: string
+    max_length: 512
+    required: true
+    description: "License vendor"
+
+  - name: current_expiry_time
+    type: string
+    max_length: 30
+    required: true
+    description: "ISO 8601 current expiration date"
+
+  - name: renewal_lead_time_days
+    type: int
+    min_value: 1
+    max_value: 365
+    required: true
+    description: "Days before expiry to begin renewal process"
+
+  - name: procurement_contact
+    type: string
+    max_length: 512
+    required: false
+    description: "Who to contact for procurement"
+
+  - name: budget_code
+    type: string
+    max_length: 255
+    required: false
+    description: "Budget or cost center code for renewal"
+
+  - name: estimated_cost_currency
+    type: string
+    max_length: 3
+    required: false
+    description: "ISO 4217 currency code"
+
+  - name: estimated_cost_amount
+    type: float
+    required: false
+    description: "Estimated renewal cost"
+
+  - name: instructions
+    type: string
+    max_length: 4096
+    required: false
+    description: "Renewal procedure"
+

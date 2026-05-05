@@ -1,0 +1,62 @@
+
+# === license_renewal_completed.yaml ===
+name: license_renewal_completed
+description: "JSON schema for evidence_record of type license_renewal_completed"
+discriminator_field: evidence_record_type
+discriminator_value: license_renewal_completed
+
+fields:
+  - name: license_name
+    type: string
+    max_length: 512
+    required: true
+    description: "Software or service license name"
+
+  - name: vendor_name
+    type: string
+    max_length: 512
+    required: true
+    description: "License vendor"
+
+  - name: license_key_or_id
+    type: string
+    max_length: 512
+    required: false
+    description: "License identifier. Not the key itself if sensitive."
+
+  - name: previous_expiry_time
+    type: string
+    max_length: 30
+    required: true
+    description: "ISO 8601 when the old license expired or would have expired"
+
+  - name: new_expiry_time
+    type: string
+    max_length: 30
+    required: true
+    description: "ISO 8601 new expiration date"
+
+  - name: renewal_cost_currency
+    type: string
+    max_length: 3
+    required: false
+    description: "ISO 4217 currency code"
+
+  - name: renewal_cost_amount
+    type: float
+    required: false
+    description: "Renewal cost"
+
+  - name: seat_count
+    type: int
+    min_value: 0
+    max_value: 1000000
+    required: false
+    description: "Number of seats or units licensed"
+
+  - name: renewed_by
+    type: string
+    max_length: 512
+    required: true
+    description: "Who performed the renewal"
+

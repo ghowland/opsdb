@@ -1,0 +1,60 @@
+
+# === backup_verification.yaml ===
+name: backup_verification
+description: "JSON schema for evidence_record of type backup_verification"
+discriminator_field: evidence_record_type
+discriminator_value: backup_verification
+
+fields:
+  - name: backup_type
+    type: string
+    allowed_values: [full, incremental, differential, snapshot, logical_dump, wal_archive]
+    required: true
+    description: "What kind of backup was verified"
+
+  - name: backup_tool
+    type: string
+    max_length: 255
+    required: true
+    description: "Tool that produced the backup. pg_dump, velero, restic, aws_backup, etc."
+
+  - name: backup_completed_time
+    type: string
+    max_length: 30
+    required: true
+    description: "ISO 8601 timestamp when backup completed"
+
+  - name: backup_size_bytes
+    type: int
+    min_value: 0
+    required: false
+    description: "Size of backup artifact"
+
+  - name: restore_tested
+    type: boolean
+    required: true
+    description: "Whether a test restore was performed"
+
+  - name: restore_duration_seconds
+    type: int
+    min_value: 0
+    required: false
+    description: "How long the test restore took. Null if not tested."
+
+  - name: restore_checksum_matched
+    type: boolean
+    required: false
+    description: "Whether restored data checksum matched source. Null if not tested."
+
+  - name: backup_location
+    type: string
+    max_length: 1024
+    required: true
+    description: "Where the backup artifact is stored. S3 path, NFS path, etc."
+
+  - name: retention_expiry_time
+    type: string
+    max_length: 30
+    required: false
+    description: "When this backup expires per retention policy"
+

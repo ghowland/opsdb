@@ -1,0 +1,49 @@
+
+# === keycard_audit.yaml ===
+name: keycard_audit
+description: "JSON schema for manual_operation of type keycard_audit"
+discriminator_field: manual_operation_type
+discriminator_value: keycard_audit
+
+fields:
+  - name: facility_name
+    type: string
+    max_length: 512
+    required: true
+    description: "Facility where keycards are audited"
+
+  - name: access_zones_in_scope
+    type: string
+    max_length: 2048
+    required: true
+    description: "Comma-separated access zones to audit"
+
+  - name: expected_active_card_count
+    type: int
+    min_value: 0
+    max_value: 100000
+    required: false
+    description: "Expected number of active keycards for comparison"
+
+  - name: check_terminated_employees
+    type: boolean
+    required: true
+    description: "Whether to cross-reference against terminated employee list"
+
+  - name: check_transferred_employees
+    type: boolean
+    required: true
+    description: "Whether to verify transferred employees have correct zone access"
+
+  - name: access_control_system
+    type: string
+    max_length: 255
+    required: true
+    description: "Name of the physical access control system to audit against"
+
+  - name: instructions
+    type: string
+    max_length: 4096
+    required: false
+    description: "Audit procedure"
+

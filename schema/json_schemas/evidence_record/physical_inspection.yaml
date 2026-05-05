@@ -1,0 +1,60 @@
+
+# === physical_inspection.yaml ===
+name: physical_inspection
+description: "JSON schema for evidence_record of type physical_inspection"
+discriminator_field: evidence_record_type
+discriminator_value: physical_inspection
+
+fields:
+  - name: inspection_type
+    type: string
+    allowed_values: [datacenter_walkthrough, rack_audit, cable_audit, environmental_check, fire_suppression_check, physical_security_check]
+    required: true
+    description: "What kind of physical inspection"
+
+  - name: location_name
+    type: string
+    max_length: 512
+    required: true
+    description: "Where the inspection occurred"
+
+  - name: inspector_name
+    type: string
+    max_length: 512
+    required: true
+    description: "Who performed the inspection"
+
+  - name: items_inspected
+    type: int
+    min_value: 0
+    max_value: 100000
+    required: true
+    description: "Number of items or areas inspected"
+
+  - name: issues_found
+    type: int
+    min_value: 0
+    max_value: 10000
+    required: true
+    description: "Number of issues identified"
+
+  - name: issues_remediated_on_site
+    type: int
+    min_value: 0
+    max_value: 10000
+    required: false
+    description: "Issues fixed during the inspection"
+
+  - name: issues_requiring_followup
+    type: int
+    min_value: 0
+    max_value: 10000
+    required: false
+    description: "Issues requiring later remediation"
+
+  - name: notes
+    type: string
+    max_length: 4096
+    required: false
+    description: "Free-form inspection notes"
+

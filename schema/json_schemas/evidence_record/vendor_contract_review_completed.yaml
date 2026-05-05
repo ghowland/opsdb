@@ -1,0 +1,83 @@
+
+# === vendor_contract_review_completed.yaml ===
+name: vendor_contract_review_completed
+description: "JSON schema for evidence_record of type vendor_contract_review_completed"
+discriminator_field: evidence_record_type
+discriminator_value: vendor_contract_review_completed
+
+fields:
+  - name: vendor_name
+    type: string
+    max_length: 512
+    required: true
+    description: "Vendor name"
+
+  - name: contract_identifier
+    type: string
+    max_length: 512
+    required: true
+    description: "Contract number or identifier"
+
+  - name: contract_type
+    type: string
+    allowed_values: [saas_subscription, support_agreement, managed_service, hardware_maintenance, consulting, data_processing_agreement, nda]
+    required: true
+    description: "Type of contract"
+
+  - name: contract_start_time
+    type: string
+    max_length: 30
+    required: true
+    description: "ISO 8601 contract start date"
+
+  - name: contract_end_time
+    type: string
+    max_length: 30
+    required: true
+    description: "ISO 8601 contract end date"
+
+  - name: auto_renewal
+    type: boolean
+    required: true
+    description: "Whether the contract auto-renews"
+
+  - name: cancellation_notice_days
+    type: int
+    min_value: 0
+    max_value: 365
+    required: false
+    description: "Days of notice required for cancellation"
+
+  - name: annual_cost_currency
+    type: string
+    max_length: 3
+    required: false
+    description: "ISO 4217 currency code"
+
+  - name: annual_cost_amount
+    type: float
+    required: false
+    description: "Annual contract cost"
+
+  - name: sla_terms_summary
+    type: string
+    max_length: 4096
+    required: false
+    description: "Summary of SLA terms. Full contract stays with vendor."
+
+  - name: data_handling_reviewed
+    type: boolean
+    required: true
+    description: "Whether data handling and privacy terms were reviewed"
+
+  - name: security_reviewed
+    type: boolean
+    required: true
+    description: "Whether vendor security posture was reviewed"
+
+  - name: reviewer_name
+    type: string
+    max_length: 512
+    required: true
+    description: "Who performed the review"
+

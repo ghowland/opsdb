@@ -1,0 +1,48 @@
+
+# === vendor_review.yaml ===
+name: vendor_review
+description: "JSON schema for manual_operation of type vendor_review"
+discriminator_field: manual_operation_type
+discriminator_value: vendor_review
+
+fields:
+  - name: vendor_name
+    type: string
+    max_length: 512
+    required: true
+    description: "Vendor to review"
+
+  - name: contract_identifier
+    type: string
+    max_length: 512
+    required: true
+    description: "Contract number or identifier"
+
+  - name: review_areas
+    type: string
+    max_length: 2048
+    required: true
+    description: "Comma-separated areas to review. security, data_handling, sla_compliance, cost, service_quality."
+
+  - name: requires_security_assessment
+    type: boolean
+    required: true
+    description: "Whether a security posture assessment is required"
+
+  - name: requires_data_handling_review
+    type: boolean
+    required: true
+    description: "Whether data handling and privacy terms must be reviewed"
+
+  - name: escalation_contact
+    type: string
+    max_length: 512
+    required: false
+    description: "Who to contact if issues are found"
+
+  - name: instructions
+    type: string
+    max_length: 4096
+    required: false
+    description: "Review procedure and checklist"
+

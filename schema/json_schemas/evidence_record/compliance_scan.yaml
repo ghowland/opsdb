@@ -1,0 +1,57 @@
+
+# === compliance_scan.yaml ===
+name: compliance_scan
+description: "JSON schema for evidence_record of type compliance_scan"
+discriminator_field: evidence_record_type
+discriminator_value: compliance_scan
+
+fields:
+  - name: regime_name
+    type: string
+    max_length: 255
+    required: true
+    description: "Compliance regime scanned against. soc2_type2, pci_dss, etc."
+
+  - name: controls_evaluated
+    type: int
+    min_value: 0
+    max_value: 10000
+    required: true
+    description: "Number of controls evaluated"
+
+  - name: controls_passed
+    type: int
+    min_value: 0
+    max_value: 10000
+    required: true
+
+  - name: controls_failed
+    type: int
+    min_value: 0
+    max_value: 10000
+    required: true
+
+  - name: controls_not_applicable
+    type: int
+    min_value: 0
+    max_value: 10000
+    required: false
+
+  - name: findings_filed_count
+    type: int
+    min_value: 0
+    max_value: 10000
+    required: true
+    description: "Number of compliance_finding rows filed from this scan"
+
+  - name: scan_scope_summary
+    type: string
+    max_length: 4096
+    required: true
+    description: "What was in scope for this scan. Services, data classifications, entity types."
+
+  - name: scan_duration_seconds
+    type: int
+    min_value: 0
+    required: false
+

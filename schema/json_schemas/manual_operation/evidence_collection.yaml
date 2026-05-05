@@ -1,0 +1,62 @@
+
+# === evidence_collection.yaml ===
+name: evidence_collection
+description: "JSON schema for manual_operation of type evidence_collection"
+discriminator_field: manual_operation_type
+discriminator_value: evidence_collection
+
+fields:
+  - name: compliance_regime_name
+    type: string
+    max_length: 255
+    required: true
+    description: "Which compliance regime this evidence supports"
+
+  - name: control_identifiers
+    type: string
+    max_length: 2048
+    required: true
+    description: "Comma-separated control IDs requiring evidence. CC6.1, CC7.2, etc."
+
+  - name: evidence_types_required
+    type: string
+    max_length: 2048
+    required: true
+    description: "Comma-separated types of evidence needed. screenshots, exports, attestations, logs."
+
+  - name: collection_sources
+    type: string
+    max_length: 2048
+    required: true
+    description: "Comma-separated systems to collect evidence from"
+
+  - name: audit_period_start
+    type: string
+    max_length: 30
+    required: true
+    description: "ISO 8601 start of audit period"
+
+  - name: audit_period_end
+    type: string
+    max_length: 30
+    required: true
+    description: "ISO 8601 end of audit period"
+
+  - name: due_date
+    type: string
+    max_length: 30
+    required: true
+    description: "ISO 8601 deadline for evidence submission"
+
+  - name: auditor_name
+    type: string
+    max_length: 512
+    required: false
+    description: "External auditor requesting the evidence"
+
+  - name: instructions
+    type: string
+    max_length: 4096
+    required: false
+    description: "Collection procedure and formatting requirements"
+

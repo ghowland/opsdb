@@ -1,0 +1,73 @@
+
+# === access_review.yaml ===
+name: access_review
+description: "JSON schema for evidence_record of type access_review"
+discriminator_field: evidence_record_type
+discriminator_value: access_review
+
+fields:
+  - name: review_scope
+    type: string
+    allowed_values: [all_users, privileged_users, service_accounts, external_accounts, specific_group]
+    required: true
+    description: "What population was reviewed"
+
+  - name: scope_detail
+    type: string
+    max_length: 1024
+    required: false
+    description: "Specific group or filter criteria when review_scope is specific_group"
+
+  - name: accounts_reviewed
+    type: int
+    min_value: 0
+    max_value: 100000
+    required: true
+    description: "Number of accounts reviewed"
+
+  - name: accounts_active_confirmed
+    type: int
+    min_value: 0
+    max_value: 100000
+    required: true
+    description: "Accounts confirmed as correctly active"
+
+  - name: accounts_deactivated
+    type: int
+    min_value: 0
+    max_value: 100000
+    required: true
+    description: "Accounts deactivated as a result of review"
+
+  - name: accounts_permissions_modified
+    type: int
+    min_value: 0
+    max_value: 100000
+    required: true
+    description: "Accounts whose permissions were modified"
+
+  - name: accounts_flagged_for_followup
+    type: int
+    min_value: 0
+    max_value: 100000
+    required: false
+    description: "Accounts requiring additional investigation"
+
+  - name: reviewer_name
+    type: string
+    max_length: 512
+    required: true
+    description: "Who performed the review"
+
+  - name: review_period_start
+    type: string
+    max_length: 30
+    required: true
+    description: "ISO 8601 start of review period"
+
+  - name: review_period_end
+    type: string
+    max_length: 30
+    required: true
+    description: "ISO 8601 end of review period"
+

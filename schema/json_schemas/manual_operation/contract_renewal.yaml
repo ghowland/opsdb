@@ -1,0 +1,67 @@
+# === contract_renewal.yaml ===
+name: contract_renewal
+description: "JSON schema for manual_operation of type contract_renewal"
+discriminator_field: manual_operation_type
+discriminator_value: contract_renewal
+
+fields:
+  - name: vendor_name
+    type: string
+    max_length: 512
+    required: true
+    description: "Vendor name"
+
+  - name: contract_identifier
+    type: string
+    max_length: 512
+    required: true
+    description: "Contract number or identifier"
+
+  - name: contract_type
+    type: string
+    allowed_values: [saas_subscription, support_agreement, managed_service, hardware_maintenance, consulting, data_processing_agreement, nda]
+    required: true
+    description: "Type of contract"
+
+  - name: current_end_time
+    type: string
+    max_length: 30
+    required: true
+    description: "ISO 8601 current contract end date"
+
+  - name: auto_renews
+    type: boolean
+    required: true
+    description: "Whether the contract auto-renews"
+
+  - name: cancellation_notice_days
+    type: int
+    min_value: 0
+    max_value: 365
+    required: false
+    description: "Days of notice required for cancellation or non-renewal"
+
+  - name: renewal_lead_time_days
+    type: int
+    min_value: 1
+    max_value: 365
+    required: true
+    description: "Days before end date to begin renewal process"
+
+  - name: legal_review_required
+    type: boolean
+    required: true
+    description: "Whether legal must review before renewal"
+
+  - name: procurement_contact
+    type: string
+    max_length: 512
+    required: false
+    description: "Who to contact for procurement"
+
+  - name: instructions
+    type: string
+    max_length: 4096
+    required: false
+    description: "Renewal procedure and negotiation notes"
+

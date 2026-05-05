@@ -1,0 +1,50 @@
+
+# === tape_rotation.yaml ===
+name: tape_rotation
+description: "JSON schema for manual_operation of type tape_rotation"
+discriminator_field: manual_operation_type
+discriminator_value: tape_rotation
+
+fields:
+  - name: tape_set_identifier
+    type: string
+    max_length: 255
+    required: true
+    description: "Which tape set this rotation covers"
+
+  - name: expected_tape_count
+    type: int
+    min_value: 1
+    max_value: 10000
+    required: true
+    description: "Number of tapes expected in each rotation"
+
+  - name: rotation_destination
+    type: string
+    allowed_values: [offsite_vault, onsite_safe, courier_pickup, destruction]
+    required: true
+    description: "Where tapes go after rotation"
+
+  - name: courier_vendor
+    type: string
+    max_length: 255
+    required: false
+    description: "Courier company if shipped offsite"
+
+  - name: requires_chain_of_custody
+    type: boolean
+    required: true
+    description: "Whether chain of custody documentation is required"
+
+  - name: storage_location_name
+    type: string
+    max_length: 512
+    required: true
+    description: "Where current tapes are stored before rotation"
+
+  - name: instructions
+    type: string
+    max_length: 4096
+    required: false
+    description: "Step-by-step rotation instructions"
+

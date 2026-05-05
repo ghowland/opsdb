@@ -1,0 +1,74 @@
+
+# === certificate_validity.yaml ===
+name: certificate_validity
+description: "JSON schema for evidence_record of type certificate_validity"
+discriminator_field: evidence_record_type
+discriminator_value: certificate_validity
+
+fields:
+  - name: certificate_subject
+    type: string
+    max_length: 1024
+    required: true
+    description: "Certificate subject or common name"
+
+  - name: certificate_issuer
+    type: string
+    max_length: 1024
+    required: true
+    description: "Certificate issuer"
+
+  - name: serial_number
+    type: string
+    max_length: 255
+    required: true
+    description: "Certificate serial number"
+
+  - name: not_before_time
+    type: string
+    max_length: 30
+    required: true
+    description: "ISO 8601 validity start"
+
+  - name: not_after_time
+    type: string
+    max_length: 30
+    required: true
+    description: "ISO 8601 expiration"
+
+  - name: days_until_expiry
+    type: int
+    required: true
+    description: "Days remaining until expiration at time of check"
+
+  - name: key_algorithm
+    type: string
+    allowed_values: [rsa_2048, rsa_4096, ec_p256, ec_p384, ed25519]
+    required: true
+    description: "Key algorithm and strength"
+
+  - name: san_count
+    type: int
+    min_value: 0
+    max_value: 1000
+    required: false
+    description: "Number of Subject Alternative Names"
+
+  - name: chain_valid
+    type: boolean
+    required: true
+    description: "Whether the full certificate chain validates"
+
+  - name: chain_depth
+    type: int
+    min_value: 1
+    max_value: 10
+    required: false
+    description: "Number of certificates in the chain"
+
+  - name: endpoint_checked
+    type: string
+    max_length: 1024
+    required: false
+    description: "Endpoint where certificate was observed. host:port or URL."
+

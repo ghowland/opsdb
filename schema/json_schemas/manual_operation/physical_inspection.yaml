@@ -1,0 +1,55 @@
+
+# === physical_inspection.yaml ===
+name: physical_inspection
+description: "JSON schema for manual_operation of type physical_inspection"
+discriminator_field: manual_operation_type
+discriminator_value: physical_inspection
+
+fields:
+  - name: inspection_type
+    type: string
+    allowed_values: [datacenter_walkthrough, rack_audit, cable_audit, environmental_check, fire_suppression_check, physical_security_check]
+    required: true
+    description: "What kind of inspection"
+
+  - name: facility_name
+    type: string
+    max_length: 512
+    required: true
+    description: "Facility to inspect"
+
+  - name: areas_in_scope
+    type: string
+    max_length: 2048
+    required: true
+    description: "Comma-separated areas or zones to inspect"
+
+  - name: checklist_items
+    type: string
+    max_length: 4096
+    required: true
+    description: "Comma-separated checklist items to verify"
+
+  - name: requires_escort
+    type: boolean
+    required: false
+    description: "Whether facility escort is required"
+
+  - name: access_requirements
+    type: string
+    max_length: 1024
+    required: false
+    description: "Badges, clearances, or appointments needed"
+
+  - name: photo_documentation_required
+    type: boolean
+    required: false
+    description: "Whether photos are required as evidence"
+
+  - name: instructions
+    type: string
+    max_length: 4096
+    required: false
+    description: "Inspection procedure"
+    
+    

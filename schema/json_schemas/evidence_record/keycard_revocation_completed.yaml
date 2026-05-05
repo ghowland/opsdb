@@ -1,0 +1,54 @@
+
+# === keycard_revocation_completed.yaml ===
+name: keycard_revocation_completed
+description: "JSON schema for evidence_record of type keycard_revocation_completed"
+discriminator_field: evidence_record_type
+discriminator_value: keycard_revocation_completed
+
+fields:
+  - name: employee_name
+    type: string
+    max_length: 512
+    required: true
+    description: "Employee whose keycard was revoked"
+
+  - name: employee_id
+    type: string
+    max_length: 255
+    required: true
+    description: "Employee identifier"
+
+  - name: keycard_id
+    type: string
+    max_length: 255
+    required: true
+    description: "Keycard identifier"
+
+  - name: revocation_reason
+    type: string
+    allowed_values: [termination, transfer, lost_card, compromised, role_change, leave_of_absence]
+    required: true
+    description: "Why the keycard was revoked"
+
+  - name: access_zones_revoked
+    type: string
+    max_length: 2048
+    required: true
+    description: "Comma-separated list of access zones the keycard was revoked from"
+
+  - name: physical_card_collected
+    type: boolean
+    required: true
+    description: "Whether the physical card was collected"
+
+  - name: system_deactivation_confirmed
+    type: boolean
+    required: true
+    description: "Whether the card was deactivated in the access control system"
+
+  - name: operator_name
+    type: string
+    max_length: 512
+    required: true
+    description: "Who performed the revocation"
+
