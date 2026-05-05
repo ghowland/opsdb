@@ -1,0 +1,78 @@
+
+# === megavisor_instance.yaml ===
+name: megavisor_instance
+description: "Unified substrate hierarchy node. Self-FK chain spans bare metal to VM to container to pod to cloud compute. Walk parent chain to find full substrate ancestry."
+category: substrate
+versioned: false
+soft_delete: true
+hierarchical: true
+
+fields:
+  - name: megavisor_id
+    type: foreign_key
+    references: megavisor
+    nullable: false
+    description: "Which megavisor technology"
+
+  - name: hardware_set_instance_id
+    type: foreign_key
+    references: hardware_set_instance
+    nullable: true
+    description: "Set only at bare-metal root of hierarchy"
+
+  - name: cloud_resource_id
+    type: foreign_key
+    references: cloud_resource
+    nullable: true
+    description: "Set when this instance is cloud compute"
+
+  - name: location_id
+    type: foreign_key
+    references: location
+    nullable: false
+    description: "Cached for query speed. Resolved from parent chain."
+
+  - name: external_id
+    type: varchar
+    max_length: 512
+    nullable: false
+    description: "VM UUID, container ID, pod UID, EC2 instance ID, etc."
+
+  - name: hostname
+    type: varchar
+    max_length: 512
+    nullable: false
+    description: "Hostname of this instance"
+
+  - name: ip_primary
+    type: varchar
+    max_length: 45
+    nullable: false
+    description: "Primary IP address (IPv4 or IPv6)"
+
+  - name: is_running
+    type: boolean
+    nullable: false
+    default: true
+    description: "Whether this instance is currently running"
+
+  - name: provisioned_time
+    type: datetime
+    nullable: true
+    description: "When this instance was provisioned"
+
+  - name: decommissioned_time
+    type: datetime
+    nullable: true
+    description: "When this instance was decommissioned. Null if active."
+
+indexes:
+  - fields: [megavisor_id]
+  - fields: [location_id]
+  - fields: [external_id]
+    unique: true
+  - fields: [hostname]
+
+governance:
+  _access_classification: true
+

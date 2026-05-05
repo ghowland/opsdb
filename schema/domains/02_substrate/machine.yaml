@@ -1,0 +1,61 @@
+
+
+# === machine.yaml ===
+name: machine
+description: "Configured host. A megavisor instance with an OS platform, assigned to a host group, under management."
+category: substrate
+versioned: true
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: megavisor_instance_id
+    type: foreign_key
+    references: megavisor_instance
+    nullable: false
+    description: "Underlying substrate instance"
+
+  - name: fqdn
+    type: varchar
+    max_length: 512
+    nullable: false
+    unique: true
+    description: "Fully qualified domain name"
+
+  - name: host_group_id
+    type: foreign_key
+    references: host_group
+    nullable: false
+    description: "Host role assignment. Single host group per machine."
+
+  - name: platform_id
+    type: foreign_key
+    references: platform
+    nullable: false
+    description: "OS image build running on this machine"
+
+  - name: is_under_management
+    type: boolean
+    nullable: false
+    default: true
+    description: "Kill switch. When false, runners skip this machine."
+
+  - name: bootstrapped_time
+    type: datetime
+    nullable: true
+    description: "When this machine completed bootstrap"
+
+  - name: last_converged_time
+    type: datetime
+    nullable: true
+    description: "When configuration was last confirmed converged"
+
+indexes:
+  - fields: [host_group_id]
+  - fields: [platform_id]
+  - fields: [megavisor_instance_id]
+
+governance:
+  _access_classification: true
+  _retention_policy_id: true
+  

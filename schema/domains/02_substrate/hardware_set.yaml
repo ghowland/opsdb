@@ -1,0 +1,26 @@
+
+# === hardware_set.yaml ===
+name: hardware_set
+description: "Hardware specification. A bill of materials defining a server or device configuration."
+category: substrate
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: name
+    type: varchar
+    max_length: 255
+    nullable: false
+    unique: true
+    description: "Unique hardware set name"
+
+  - name: description
+    type: text
+    nullable: true
+    description: "Purpose and specifications of this hardware set"
+
+indexes: []
+
+governance: {}
+

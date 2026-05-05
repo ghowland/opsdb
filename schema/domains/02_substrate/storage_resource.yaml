@@ -1,0 +1,56 @@
+
+# === storage_resource.yaml ===
+name: storage_resource
+description: "Storage abstraction over physical and cloud storage. EBS, S3, GCS, Azure Blob, NFS, Ceph, local disk, iSCSI."
+category: substrate
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: cloud_resource_id
+    type: foreign_key
+    references: cloud_resource
+    nullable: true
+    description: "Set if cloud-backed storage"
+
+  - name: hardware_set_instance_id
+    type: foreign_key
+    references: hardware_set_instance
+    nullable: true
+    description: "Set if physical-backed storage"
+
+  - name: storage_resource_type
+    type: enum
+    enum_values:
+      - ebs
+      - s3
+      - gcs
+      - azure_blob
+      - nfs_export
+      - ceph_rbd
+      - local_disk
+      - iscsi
+    nullable: false
+    description: "Storage backend type"
+
+  - name: size_bytes
+    type: int
+    nullable: false
+    min_value: 0
+    max_value: 9999999999999999
+    description: "Storage capacity in bytes"
+
+  - name: storage_data_json
+    type: json
+    json_type_discriminator: storage_resource_type
+    nullable: false
+    description: "Backend-specific configuration (IOPS, replication, tier)"
+
+indexes:
+  - fields: [storage_resource_type]
+  - fields: [cloud_resource_id]
+  - fields: [hardware_set_instance_id]
+
+governance: {}
+

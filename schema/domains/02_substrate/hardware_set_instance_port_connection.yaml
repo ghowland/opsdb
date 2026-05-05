@@ -1,0 +1,46 @@
+
+# === hardware_set_instance_port_connection.yaml ===
+name: hardware_set_instance_port_connection
+description: "Cable or peering record between two hardware set instance ports. Physical layer connectivity."
+category: substrate
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: source_hardware_set_instance_id
+    type: foreign_key
+    references: hardware_set_instance
+    nullable: false
+    description: "Source side of connection"
+
+  - name: source_hardware_port_id
+    type: foreign_key
+    references: hardware_port
+    nullable: false
+    description: "Port on source instance"
+
+  - name: destination_hardware_set_instance_id
+    type: foreign_key
+    references: hardware_set_instance
+    nullable: false
+    description: "Destination side of connection"
+
+  - name: destination_hardware_port_id
+    type: foreign_key
+    references: hardware_port
+    nullable: false
+    description: "Port on destination instance"
+
+  - name: cable_label
+    type: varchar
+    max_length: 255
+    nullable: true
+    description: "Physical cable label for tracing"
+
+indexes:
+  - fields: [source_hardware_set_instance_id, source_hardware_port_id]
+  - fields: [destination_hardware_set_instance_id, destination_hardware_port_id]
+
+governance: {}
+

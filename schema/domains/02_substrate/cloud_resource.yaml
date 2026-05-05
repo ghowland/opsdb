@@ -1,0 +1,96 @@
+
+# === cloud_resource.yaml ===
+name: cloud_resource
+description: "Generic cloud resource with provider-specific typed payload. EC2, GCE, RDS, S3, IAM roles, VPCs, load balancers, DNS zones, etc."
+category: substrate
+versioned: true
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: cloud_account_id
+    type: foreign_key
+    references: cloud_account
+    nullable: false
+    description: "Owning cloud account"
+
+  - name: location_id
+    type: foreign_key
+    references: location
+    nullable: false
+    description: "Cloud region or availability zone"
+
+  - name: cloud_resource_type
+    type: enum
+    enum_values:
+      - ec2_instance
+      - gce_instance
+      - azure_vm
+      - s3_bucket
+      - gcs_bucket
+      - azure_blob_container
+      - rds_database
+      - cloud_sql_instance
+      - azure_sql
+      - lambda_function
+      - cloud_run_service
+      - azure_function
+      - vpc
+      - vnet
+      - cloud_network
+      - load_balancer
+      - application_gateway
+      - cloud_lb
+      - cloudfront_distribution
+      - cloud_cdn
+      - azure_cdn
+      - iam_role
+      - service_account
+      - azure_service_principal
+      - route53_zone
+      - cloud_dns_zone
+      - azure_dns_zone
+      - cloudwatch_log_group
+      - cloud_logging_bucket
+      - log_analytics_workspace
+    nullable: false
+    description: "Discriminator for cloud_data_json"
+
+  - name: external_id
+    type: varchar
+    max_length: 512
+    nullable: false
+    unique: true
+    description: "ARN, resource ID, or self-link"
+
+  - name: name
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "Resource display name"
+
+  - name: cloud_data_json
+    type: json
+    json_type_discriminator: cloud_resource_type
+    nullable: false
+    description: "Provider-specific payload validated against registered schema"
+
+  - name: provisioned_time
+    type: datetime
+    nullable: true
+    description: "When resource was provisioned"
+
+  - name: decommissioned_time
+    type: datetime
+    nullable: true
+    description: "When resource was decommissioned. Null if active."
+
+indexes:
+  - fields: [cloud_account_id, cloud_resource_type]
+  - fields: [cloud_resource_type]
+  - fields: [location_id]
+
+governance:
+  _access_classification: true
+  _retention_policy_id: true
+

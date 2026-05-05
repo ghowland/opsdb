@@ -1,0 +1,57 @@
+
+# === hardware_component.yaml ===
+name: hardware_component
+description: "Physical hardware part. Chassis, motherboard, CPU, RAM, disk, PSU, NIC, HBA, fan, GPU."
+category: substrate
+versioned: false
+soft_delete: true
+hierarchical: true
+
+fields:
+  - name: name
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "Component name or label"
+
+  - name: manufacturer
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "Hardware manufacturer"
+
+  - name: model
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "Manufacturer model identifier"
+
+  - name: hardware_component_type
+    type: enum
+    enum_values:
+      - chassis
+      - motherboard
+      - cpu
+      - ram
+      - disk
+      - psu
+      - nic
+      - hba
+      - fan
+      - gpu
+    nullable: false
+    description: "Classification of hardware part"
+
+  - name: rack_unit_height
+    type: int
+    nullable: true
+    min_value: 1
+    max_value: 100
+    description: "Rack units tall. Chassis-class components only."
+
+indexes:
+  - fields: [hardware_component_type]
+  - fields: [manufacturer, model]
+
+governance: {}
+

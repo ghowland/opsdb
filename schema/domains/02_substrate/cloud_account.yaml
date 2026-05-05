@@ -1,0 +1,41 @@
+# === cloud_account.yaml ===
+name: cloud_account
+description: "Cloud provider account. AWS account, Azure tenant, GCP project."
+category: substrate
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: cloud_provider_id
+    type: foreign_key
+    references: cloud_provider
+    nullable: false
+    description: "Which cloud provider"
+
+  - name: site_id
+    type: foreign_key
+    references: site
+    nullable: false
+    description: "Owning site"
+
+  - name: name
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "Account display name"
+
+  - name: account_external_id
+    type: varchar
+    max_length: 255
+    nullable: false
+    unique: true
+    description: "AWS account ID, Azure tenant ID, GCP project ID"
+
+indexes:
+  - fields: [cloud_provider_id]
+  - fields: [site_id]
+
+governance:
+  _access_classification: true
+

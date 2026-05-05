@@ -1,0 +1,55 @@
+
+# === hardware_set_instance.yaml ===
+name: hardware_set_instance
+description: "Physical instance of a hardware set installed in a location. A specific server in a specific rack."
+category: substrate
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: hardware_set_id
+    type: foreign_key
+    references: hardware_set
+    nullable: false
+    description: "Hardware set specification this instance realizes"
+
+  - name: location_id
+    type: foreign_key
+    references: location
+    nullable: false
+    description: "Physical location (rack, cage, datacenter)"
+
+  - name: rack_unit_mount_height
+    type: int
+    nullable: false
+    min_value: 1
+    max_value: 100
+    description: "Absolute rack unit position"
+
+  - name: serial_number
+    type: varchar
+    max_length: 255
+    nullable: false
+    unique: true
+    description: "Manufacturer serial number"
+
+  - name: asset_tag
+    type: varchar
+    max_length: 255
+    nullable: false
+    unique: true
+    description: "Organization asset tracking tag"
+
+  - name: decommissioned_time
+    type: datetime
+    nullable: true
+    description: "When this hardware was decommissioned. Null if active."
+
+indexes:
+  - fields: [hardware_set_id]
+  - fields: [location_id]
+
+governance:
+  _access_classification: true
+

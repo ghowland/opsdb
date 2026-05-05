@@ -1,0 +1,27 @@
+
+# === cloud_provider.yaml ===
+name: cloud_provider
+description: "Cloud vendor identity. AWS, Azure, GCP, Digital Ocean, Hetzner, Oracle."
+category: substrate
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: name
+    type: enum
+    enum_values:
+      - aws
+      - azure
+      - gcp
+      - digital_ocean
+      - hetzner
+      - oracle
+    nullable: false
+    description: "Cloud provider name"
+    unique: true
+
+indexes: []
+
+governance: {}
+

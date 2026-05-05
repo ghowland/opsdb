@@ -1,0 +1,53 @@
+
+# === platform.yaml ===
+name: platform
+description: "OS image build. Defines an operating system version and architecture approved for use."
+category: substrate
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: name
+    type: varchar
+    max_length: 255
+    nullable: false
+    unique: true
+    description: "Platform name. ubuntu_2204_x86_64, rhel_9_arm64, etc."
+
+  - name: os_family
+    type: enum
+    enum_values:
+      - linux
+      - windows
+      - freebsd
+      - darwin
+    nullable: false
+    description: "Operating system family"
+
+  - name: os_version
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "OS version string"
+
+  - name: architecture
+    type: enum
+    enum_values:
+      - x86_64
+      - arm64
+      - riscv64
+    nullable: false
+    description: "CPU architecture"
+
+  - name: is_approved_for_production
+    type: boolean
+    nullable: false
+    default: false
+    description: "Whether this platform is approved for production use"
+
+indexes:
+  - fields: [os_family]
+  - fields: [os_family, architecture]
+
+governance: {}

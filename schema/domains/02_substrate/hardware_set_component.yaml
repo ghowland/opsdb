@@ -1,0 +1,35 @@
+
+# === hardware_set_component.yaml ===
+name: hardware_set_component
+description: "Bridge: hardware set to component with position label. Defines what goes where in a hardware set."
+category: substrate
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: hardware_set_id
+    type: foreign_key
+    references: hardware_set
+    nullable: false
+    description: "Hardware set"
+
+  - name: hardware_component_id
+    type: foreign_key
+    references: hardware_component
+    nullable: false
+    description: "Component in this set"
+
+  - name: position_label
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "Position within hardware set. cpu_0, ram_slot_3, disk_bay_1, etc."
+
+indexes:
+  - fields: [hardware_set_id, position_label]
+    unique: true
+  - fields: [hardware_set_id]
+
+governance: {}
+

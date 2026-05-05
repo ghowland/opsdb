@@ -1,0 +1,49 @@
+
+# === megavisor.yaml ===
+name: megavisor
+description: "Abstraction over hosting technology. Bare metal, KVM, VMware, Xen, Hyper-V, Docker, containerd, kubelet, Firecracker, EC2, GCE, Azure VM, Lambda, Cloud Run, Fargate."
+category: substrate
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: name
+    type: varchar
+    max_length: 255
+    nullable: false
+    unique: true
+    description: "Megavisor name"
+
+  - name: megavisor_type
+    type: enum
+    enum_values:
+      - bare_metal
+      - kvm
+      - vmware
+      - xen
+      - hyperv
+      - docker
+      - containerd
+      - kubelet
+      - firecracker
+      - ec2
+      - gce
+      - azure_vm
+      - lambda
+      - cloudrun
+      - fargate
+    nullable: false
+    description: "Hosting technology type"
+
+  - name: version
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "Technology version"
+
+indexes:
+  - fields: [megavisor_type]
+
+governance: {}
+

@@ -1,0 +1,66 @@
+
+# === hardware_port.yaml ===
+name: hardware_port
+description: "Connection point on a hardware component. Network, power, serial, storage, management."
+category: substrate
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: hardware_component_id
+    type: foreign_key
+    references: hardware_component
+    nullable: false
+    description: "Component this port belongs to"
+
+  - name: name
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "Port name or label"
+
+  - name: media_type
+    type: enum
+    enum_values:
+      - rj45
+      - fiber
+      - sfp
+      - db9
+      - c13
+      - c19
+      - usb
+      - hdmi
+    nullable: false
+    description: "Physical connector type"
+
+  - name: resource_type
+    type: enum
+    enum_values:
+      - network
+      - power_110
+      - power_220
+      - serial
+      - video
+      - kvm
+      - storage
+      - management
+    nullable: false
+    description: "What this port carries"
+
+  - name: direction
+    type: enum
+    enum_values:
+      - provider
+      - consumer
+      - bidirectional
+    nullable: false
+    description: "Port direction for connection validation"
+
+indexes:
+  - fields: [hardware_component_id]
+  - fields: [hardware_component_id, name]
+    unique: true
+
+governance: {}
+
