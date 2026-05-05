@@ -1,0 +1,24 @@
+
+
+# === int.yaml ===
+name: int
+description: "JSON schema for configuration_variable of type int"
+discriminator_field: variable_type
+discriminator_value: int
+
+fields:
+  - name: min_value
+    type: int
+    required: false
+    description: "Minimum allowed value inclusive"
+
+  - name: max_value
+    type: int
+    required: false
+    description: "Maximum allowed value inclusive"
+
+  - name: unit
+    type: string
+    max_length: 64
+    required: false
+    description: "Unit of measurement. bytes, seconds, count, percent, etc."

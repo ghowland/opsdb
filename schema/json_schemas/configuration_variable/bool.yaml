@@ -1,0 +1,20 @@
+
+# === bool.yaml ===
+name: bool
+description: "JSON schema for configuration_variable of type bool"
+discriminator_field: variable_type
+discriminator_value: bool
+
+fields:
+  - name: true_label
+    type: string
+    max_length: 64
+    required: false
+    description: "Human-readable label for the true state. enabled, active, on."
+
+  - name: false_label
+    type: string
+    max_length: 64
+    required: false
+    description: "Human-readable label for the false state. disabled, inactive, off."
+

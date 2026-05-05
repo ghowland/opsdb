@@ -1,0 +1,31 @@
+
+# === string.yaml ===
+name: string
+description: "JSON schema for configuration_variable of type string"
+discriminator_field: variable_type
+discriminator_value: string
+
+fields:
+  - name: max_length
+    type: int
+    min_value: 1
+    max_value: 1048576
+    required: false
+    description: "Maximum length constraint on the string value"
+
+  - name: min_length
+    type: int
+    min_value: 0
+    max_value: 1048576
+    required: false
+    description: "Minimum length constraint on the string value"
+
+  - name: allowed_values
+    type: list
+    required: false
+    description: "If set, value must be one of these strings"
+
+  - name: multiline
+    type: boolean
+    required: false
+    description: "Whether this variable is expected to contain newlines"

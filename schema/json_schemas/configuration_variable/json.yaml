@@ -1,0 +1,30 @@
+
+# === json.yaml ===
+name: json
+description: "JSON schema for configuration_variable of type json. Used when the variable value is a structured JSON document too complex for scalar types."
+discriminator_field: variable_type
+discriminator_value: json
+
+fields:
+  - name: max_size_bytes
+    type: int
+    min_value: 1
+    max_value: 10485760
+    required: false
+    description: "Maximum size of the JSON document in bytes"
+
+  - name: expected_structure
+    type: string
+    allowed_values:
+      - object
+      - array
+      - any
+    required: false
+    description: "Expected top-level JSON structure"
+
+  - name: schema_reference
+    type: string
+    max_length: 1024
+    required: false
+    description: "Reference to a registered JSON schema that validates the document structure"
+

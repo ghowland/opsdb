@@ -1,0 +1,32 @@
+
+
+# === float.yaml ===
+name: float
+description: "JSON schema for configuration_variable of type float"
+discriminator_field: variable_type
+discriminator_value: float
+
+fields:
+  - name: min_value
+    type: float
+    required: false
+    description: "Minimum allowed value inclusive"
+
+  - name: max_value
+    type: float
+    required: false
+    description: "Maximum allowed value inclusive"
+
+  - name: precision_decimal_places
+    type: int
+    min_value: 0
+    max_value: 15
+    required: false
+    description: "Maximum decimal places"
+
+  - name: unit
+    type: string
+    max_length: 64
+    required: false
+    description: "Unit of measurement. ratio, percentage, milliseconds, etc."
+
