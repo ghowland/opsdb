@@ -56,6 +56,8 @@ This creates one operational loop for three user classes:
 - automation
 - auditors
 
+![Fig. 1: OpsDB as a Closed Operational Loop — operate, govern, and evidence through the same motion.](docs/figures/opsdb_01_operational_loop.png)
+
 ## Why this exists
 
 Most organizations operate through a patchwork of:
@@ -78,6 +80,8 @@ OpsDB is meant to provide a single operational grammar across all of that:
 - query later
 
 That applies to cloud resources, Kubernetes operations, internal systems, manual procedures, and compliance-relevant activity.
+
+![Fig. 2: Definitions Become Runtime Control — schema definitions become live runtime behavior through the loader, database, and metadata path.](docs/figures/opsdb_02_schema_to_runtime.png)
 
 ## Current status
 
@@ -136,3 +140,33 @@ It is the beginning of an implementation, not the completion of one.
 ## In one sentence
 
 OpsDB is a skeleton implementation of a unified operations, automation, and audit control plane, intended to show what the project should look like in real code before it fully exists as working software.
+
+![Fig. 1: OpsDB as a Closed Operational Loop — operate, govern, and evidence through the same motion.](docs/figures/opsdb_01_operational_loop.png)
+
+
+# OpsDB Explanatory Diagrams
+
+## Change Management
+
+![Fig. 3: Governed Change as Staged Motion — intent, approval, execution, and version history are separate visible stages.](docs/figures/opsdb_03_governed_change_flow.png)
+
+## Provenance Through Time
+
+![Fig. 4: Provenance Through Time — one action becomes a queryable timeline instead of a reconstructed story.](docs/figures/opsdb_04_provenance_timeline.png)
+
+## Automation Shift
+
+![Fig. 5: Automation Topology Shift — runners coordinate through OpsDB state instead of calling each other directly.](docs/figures/opsdb_05_automation_topology.png)
+
+## One Operational Grammar Across Domains
+
+![Fig. 6: One Operational Grammar Across Domains — cloud, Kubernetes, internal systems, manual procedures, and audit all fit one operational model.](docs/figures/opsdb_06_operational_landscape.png)
+
+## The API Gate as a Control Membrane
+
+![Fig. 7: The API Gate as a Control Membrane — many callers cross one ordered boundary before durable state can change.](docs/figures/opsdb_07_api_membrane.png)
+
+## Operations and Audit as One System
+
+![Fig. 8: Operations and Audit as One System — operational events produce evidence as a native property of execution.](docs/figures/opsdb_08_operations_audit_unified.png)
+
