@@ -1,0 +1,55 @@
+
+# === location.yaml ===
+name: location
+description: "Hierarchical physical or logical location. Regions, datacenters, cages, rows, racks, cloud regions, cloud zones, offices, desks."
+category: identity
+versioned: false
+soft_delete: true
+hierarchical: true
+
+fields:
+  - name: site_id
+    type: foreign_key
+    references: site
+    nullable: false
+    description: "Owning site"
+
+  - name: name
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "Location name within parent context"
+
+  - name: location_type
+    type: enum
+    enum_values:
+      - region
+      - datacenter
+      - cage
+      - row
+      - rack
+      - cloud_region
+      - cloud_zone
+      - office
+      - desk
+    nullable: false
+    description: "Classification of this location level"
+
+  - name: latitude
+    type: float
+    nullable: true
+    description: "Geographic latitude. Resolved by walking up hierarchy if not set."
+
+  - name: longitude
+    type: float
+    nullable: true
+    description: "Geographic longitude. Resolved by walking up hierarchy if not set."
+
+indexes:
+  - fields: [site_id, location_type]
+  - fields: [site_id, name]
+    unique: true
+
+governance:
+  _access_classification: true
+

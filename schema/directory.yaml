@@ -1,0 +1,173 @@
+# OpsDB Schema Directory
+# All entity files listed in dependency order.
+# FK targets must load before FK sources.
+
+imports:
+  # 01_identity
+  - domains/01_identity/site.yaml
+  - domains/01_identity/location.yaml
+  - domains/01_identity/ops_user.yaml
+  - domains/01_identity/ops_group.yaml
+  - domains/01_identity/ops_group_member.yaml
+  - domains/01_identity/ops_user_role.yaml
+  - domains/01_identity/ops_user_role_member.yaml
+
+  # 02_substrate
+  - domains/02_substrate/hardware_component.yaml
+  - domains/02_substrate/hardware_port.yaml
+  - domains/02_substrate/hardware_set.yaml
+  - domains/02_substrate/hardware_set_component.yaml
+  - domains/02_substrate/hardware_set_instance.yaml
+  - domains/02_substrate/hardware_set_instance_port_connection.yaml
+  - domains/02_substrate/megavisor.yaml
+  - domains/02_substrate/megavisor_instance.yaml
+  - domains/02_substrate/cloud_provider.yaml
+  - domains/02_substrate/cloud_account.yaml
+  - domains/02_substrate/cloud_resource.yaml
+  - domains/02_substrate/storage_resource.yaml
+  - domains/02_substrate/platform.yaml
+  - domains/02_substrate/machine.yaml
+
+  # 03_service
+  - domains/03_service/package.yaml
+  - domains/03_service/package_interface.yaml
+  - domains/03_service/package_connection.yaml
+  - domains/03_service/host_group.yaml
+  - domains/03_service/service.yaml
+  - domains/03_service/service_package.yaml
+  - domains/03_service/service_interface_mount.yaml
+  - domains/03_service/service_connection.yaml
+  - domains/03_service/host_group_machine.yaml
+  - domains/03_service/host_group_package.yaml
+  - domains/03_service/site_location.yaml
+  - domains/03_service/service_level.yaml
+  - domains/03_service/service_level_metric.yaml
+
+  # 04_kubernetes
+  - domains/04_kubernetes/k8s_cluster.yaml
+  - domains/04_kubernetes/k8s_cluster_node.yaml
+  - domains/04_kubernetes/k8s_namespace.yaml
+  - domains/04_kubernetes/k8s_workload.yaml
+  - domains/04_kubernetes/k8s_pod.yaml
+  - domains/04_kubernetes/k8s_helm_release.yaml
+  - domains/04_kubernetes/k8s_config_map.yaml
+  - domains/04_kubernetes/k8s_secret_reference.yaml
+  - domains/04_kubernetes/k8s_service.yaml
+
+  # 05_authority
+  - domains/05_authority/authority.yaml
+  - domains/05_authority/authority_pointer.yaml
+  - domains/05_authority/service_authority_pointer.yaml
+  - domains/05_authority/machine_authority_pointer.yaml
+  - domains/05_authority/k8s_cluster_authority_pointer.yaml
+  - domains/05_authority/cloud_resource_authority_pointer.yaml
+
+  # 06_schedule
+  - domains/06_schedule/manual_operation.yaml
+  - domains/06_schedule/schedule.yaml
+  - domains/06_schedule/runner_schedule.yaml
+  - domains/06_schedule/credential_rotation_schedule.yaml
+  - domains/06_schedule/certificate_expiration_schedule.yaml
+  - domains/06_schedule/compliance_audit_schedule.yaml
+  - domains/06_schedule/manual_operation_schedule.yaml
+
+  # 07_policy
+  - domains/07_policy/security_zone.yaml
+  - domains/07_policy/security_zone_membership_service.yaml
+  - domains/07_policy/security_zone_membership_machine.yaml
+  - domains/07_policy/security_zone_membership_k8s_namespace.yaml
+  - domains/07_policy/data_classification.yaml
+  - domains/07_policy/retention_policy.yaml
+  - domains/07_policy/escalation_path.yaml
+  - domains/07_policy/escalation_step.yaml
+  - domains/07_policy/service_escalation_path.yaml
+  - domains/07_policy/policy.yaml
+  - domains/07_policy/service_policy.yaml
+  - domains/07_policy/machine_policy.yaml
+  - domains/07_policy/k8s_namespace_policy.yaml
+  - domains/07_policy/cloud_account_policy.yaml
+  - domains/07_policy/approval_rule.yaml
+  - domains/07_policy/change_management_rule.yaml
+  - domains/07_policy/compliance_regime.yaml
+  - domains/07_policy/compliance_scope_service.yaml
+  - domains/07_policy/compliance_scope_data_classification.yaml
+
+  # 08_docs
+  - domains/08_docs/runbook_reference.yaml
+  - domains/08_docs/service_runbook_reference.yaml
+  - domains/08_docs/dashboard_reference.yaml
+  - domains/08_docs/service_dashboard_reference.yaml
+  - domains/08_docs/service_ownership.yaml
+  - domains/08_docs/machine_ownership.yaml
+  - domains/08_docs/k8s_cluster_ownership.yaml
+  - domains/08_docs/cloud_resource_ownership.yaml
+  - domains/08_docs/service_stakeholder.yaml
+
+  # 09_runner
+  - domains/09_runner/runner_spec.yaml
+  - domains/09_runner/runner_capability.yaml
+  - domains/09_runner/runner_machine.yaml
+  - domains/09_runner/runner_instance.yaml
+  - domains/09_runner/runner_service_target.yaml
+  - domains/09_runner/runner_host_group_target.yaml
+  - domains/09_runner/runner_k8s_namespace_target.yaml
+  - domains/09_runner/runner_cloud_account_target.yaml
+  - domains/09_runner/runner_job.yaml
+  - domains/09_runner/runner_job_target_machine.yaml
+  - domains/09_runner/runner_job_target_service.yaml
+  - domains/09_runner/runner_job_target_k8s_workload.yaml
+  - domains/09_runner/runner_job_target_cloud_resource.yaml
+  - domains/09_runner/runner_job_output_var.yaml
+
+  # 10_monitoring
+  - domains/10_monitoring/monitor.yaml
+  - domains/10_monitoring/monitor_machine_target.yaml
+  - domains/10_monitoring/monitor_service_target.yaml
+  - domains/10_monitoring/monitor_k8s_workload_target.yaml
+  - domains/10_monitoring/monitor_cloud_resource_target.yaml
+  - domains/10_monitoring/prometheus_config.yaml
+  - domains/10_monitoring/prometheus_scrape_target.yaml
+  - domains/10_monitoring/monitor_level.yaml
+  - domains/10_monitoring/alert.yaml
+  - domains/10_monitoring/alert_dependency.yaml
+  - domains/10_monitoring/alert_fire.yaml
+  - domains/10_monitoring/on_call_schedule.yaml
+  - domains/10_monitoring/on_call_assignment.yaml
+
+  # 11_observation
+  - domains/11_observation/observation_cache_metric.yaml
+  - domains/11_observation/observation_cache_state.yaml
+  - domains/11_observation/observation_cache_config.yaml
+
+  # 12_config
+  - domains/12_config/configuration_variable.yaml
+
+  # 13_change_mgmt
+  - domains/13_change_mgmt/change_set.yaml
+  - domains/13_change_mgmt/change_set_field_change.yaml
+  - domains/13_change_mgmt/change_set_approval_required.yaml
+  - domains/13_change_mgmt/change_set_approval.yaml
+  - domains/13_change_mgmt/change_set_rejection.yaml
+  - domains/13_change_mgmt/change_set_validation.yaml
+  - domains/13_change_mgmt/change_set_emergency_review.yaml
+  - domains/13_change_mgmt/change_set_bulk_membership.yaml
+
+  # 14_audit
+  - domains/14_audit/audit_log_entry.yaml
+  - domains/14_audit/evidence_record.yaml
+  - domains/14_audit/evidence_record_service_target.yaml
+  - domains/14_audit/evidence_record_machine_target.yaml
+  - domains/14_audit/evidence_record_credential_target.yaml
+  - domains/14_audit/evidence_record_certificate_target.yaml
+  - domains/14_audit/evidence_record_compliance_regime_target.yaml
+  - domains/14_audit/evidence_record_manual_operation_target.yaml
+  - domains/14_audit/compliance_finding.yaml
+  - domains/14_audit/compliance_finding_target_service.yaml
+
+  # 15_schema_meta
+  - domains/15_schema_meta/_schema_version.yaml
+  - domains/15_schema_meta/_schema_change_set.yaml
+  - domains/15_schema_meta/_schema_entity_type.yaml
+  - domains/15_schema_meta/_schema_field.yaml
+  - domains/15_schema_meta/_schema_relationship.yaml
+  

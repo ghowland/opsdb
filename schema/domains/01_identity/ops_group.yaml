@@ -1,0 +1,33 @@
+
+# === ops_group.yaml ===
+name: ops_group
+description: "Access policy grouping. Used for authorization layer 2 per-entity governance."
+category: identity
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: site_id
+    type: foreign_key
+    references: site
+    nullable: false
+    description: "Site this group belongs to"
+
+  - name: name
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "Unique group name within site"
+    must_be_unique_within:
+      - site_id
+
+  - name: description
+    type: text
+    nullable: true
+    description: "Purpose of this group"
+
+indexes:
+  - fields: [site_id]
+
+governance: {}

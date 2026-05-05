@@ -1,0 +1,643 @@
+# OpsDB Meta-Schema Definition
+#
+# This file defines what constitutes a valid entity YAML file.
+# The schema engine validates every entity file against this
+# meta-schema before processing. Any key, type, modifier,
+# constraint, or pattern not declared here is rejected.
+#
+# This is the one hardcoded structural definition in the system.
+# Everything else derives from entity YAML files validated
+# against this meta-schema.
+
+# ============================================================
+# Version
+# ============================================================
+meta_schema_version: 1
+description: "OpsDB entity file meta-schema. Closed vocabulary."
+
+# ============================================================
+# Allowed Top-Level Keys
+# Any key in an entity YAML file not in this list causes
+# the file to be rejected.
+# ============================================================
+allowed_top_level_keys:
+  - name
+  - description
+  - category
+  - versioned
+  - soft_delete
+  - hierarchical
+  - append_only
+  - fields
+  - indexes
+  - governance
+
+# ============================================================
+# Top-Level Key Definitions
+# ============================================================
+top_level_key_definitions:
+  name:
+    type: string
+    required: true
+    description: "Entity name. Becomes table name. Singular, lower_case_with_underscores."
+    validation:
+      pattern: "lowercase_underscore"
+      min_length: 2
+      max_length: 128
+      must_be_singular: true
+      no_leading_underscore_unless_schema_meta: true
+
+  description:
+    type: string
+    required: false
+    description: "Human-readable description of the entity."
+    validation:
+      max_length: 1024
+
+  category:
+    type: string
+    required: true
+    description: "Top-level domain category for organization."
+    allowed_values:
+      - identity
+      - substrate
+      - service
+      - k8s
+      - authority
+      - schedule
+      - policy
+      - docs
+      - runner
+      - monitor
+      - observation
+      - config-vars
+      - change-mgmt
+      - audit
+      - schema-meta
+
+  versioned:
+    type: boolean
+    required: false
+    default: false
+    description: "When true, engine generates {name}_version sibling table with versioning fields."
+
+  soft_delete:
+    type: boolean
+    required: false
+    default: true
+    description: "When true, engine injects is_active boolean. Rows are never physically deleted."
+
+  hierarchical:
+    type: boolean
+    required: false
+    default: false
+    description: "When true, engine injects parent_{name}_id self-referencing FK."
+
+  append_only:
+    type: boolean
+    required: false
+    default: false
+    description: "When true, engine generates REVOKE UPDATE and DELETE for all roles. Currently audit_log_entry only."
+
+  fields:
+    type: list
+    required: true
+    element_type: field_definition
+    min_count: 1
+    description: "List of field definitions. Reserved fields (id, created_time, updated_time, is_active, parent_*_id) must NOT appear here — they are injected by the engine."
+
+  indexes:
+    type: list
+    required: false
+    element_type: index_definition
+    description: "List of index definitions beyond primary key and FK indexes."
+
+  governance:
+    type: map
+    required: false
+    element_type: boolean
+    description: "Map of governance field names to enabled/disabled. Only recognized governance fields accepted."
+    allowed_keys:
+      - _requires_group
+      - _access_classification
+      - _retention_policy_id
+      - _audit_chain_hash
+      - _observed_time
+      - _authority_id
+      - _puller_runner_job_id
+      - _schema_version_introduced_id
+      - _schema_version_deprecated_id
+
+# ============================================================
+# The Nine Types
+# These are the only field types permitted. No others accepted.
+# ============================================================
+allowed_types:
+  - name: int
+    postgres_type: "INTEGER"
+    description: "Signed integer"
+    allowed_constraints:
+      - min_value
+      - max_value
+    allowed_modifiers:
+      - nullable
+      - default
+      - unique
+      - must_be_unique_within
+
+  - name: float
+    postgres_type: "DOUBLE PRECISION"
+    description: "Floating-point number"
+    allowed_constraints:
+      - min_value
+      - max_value
+      - precision_decimal_places
+    allowed_modifiers:
+      - nullable
+      - default
+      - unique
+      - must_be_unique_within
+
+  - name: varchar
+    postgres_type: "VARCHAR({max_length})"
+    description: "Bounded-length character string"
+    required_constraints:
+      - max_length
+    allowed_constraints:
+      - min_length
+    allowed_modifiers:
+      - nullable
+      - default
+      - unique
+      - must_be_unique_within
+
+  - name: text
+    postgres_type: "TEXT"
+    description: "Long-form character string"
+    allowed_constraints:
+      - max_length
+    allowed_modifiers:
+      - nullable
+      - default
+      - unique
+
+  - name: boolean
+    postgres_type: "BOOLEAN"
+    description: "True or false"
+    allowed_constraints: []
+    allowed_modifiers:
+      - nullable
+      - default
+
+  - name: datetime
+    postgres_type: "TIMESTAMP WITHOUT TIME ZONE"
+    description: "High-precision timestamp"
+    allowed_constraints: []
+    allowed_modifiers:
+      - nullable
+    forbidden_modifiers:
+      - default
+
+  - name: json
+    postgres_type: "JSONB"
+    description: "Typed payload validated at API layer against registered schema"
+    required_constraints:
+      - json_type_discriminator
+    allowed_constraints: []
+    allowed_modifiers:
+      - nullable
+    forbidden_modifiers:
+      - default
+
+  - name: enum
+    postgres_type: "VARCHAR(255)"
+    description: "Closed set of allowed values enforced via CHECK constraint"
+    required_constraints:
+      - enum_values
+    allowed_constraints: []
+    allowed_modifiers:
+      - nullable
+      - default
+      - unique
+      - must_be_unique_within
+
+  - name: foreign_key
+    postgres_type: "INTEGER"
+    description: "Reference to id field of another entity"
+    required_constraints:
+      - references
+    allowed_constraints: []
+    allowed_modifiers:
+      - nullable
+    forbidden_modifiers:
+      - default
+      - unique
+
+# ============================================================
+# Field Definition Schema
+# Every field in an entity's fields list must conform to this.
+# ============================================================
+field_definition:
+  allowed_keys:
+    - name
+    - type
+    - nullable
+    - description
+    - default
+    - unique
+    - references
+    - max_length
+    - min_length
+    - max_value
+    - min_value
+    - precision_decimal_places
+    - enum_values
+    - json_type_discriminator
+    - must_be_unique_within
+
+  required_keys:
+    - name
+    - type
+
+  key_definitions:
+    name:
+      type: string
+      description: "Field name. lower_case_with_underscores."
+      validation:
+        pattern: "lowercase_underscore"
+        min_length: 2
+        max_length: 128
+        must_not_be_reserved: true
+
+    type:
+      type: string
+      description: "One of the nine allowed types."
+      allowed_values:
+        - int
+        - float
+        - varchar
+        - text
+        - boolean
+        - datetime
+        - json
+        - enum
+        - foreign_key
+
+    nullable:
+      type: boolean
+      description: "Whether field allows NULL. Default false."
+      default: false
+
+    description:
+      type: string
+      description: "Human-readable field description."
+      validation:
+        max_length: 1024
+
+    default:
+      type: literal
+      description: "Literal default value. Not permitted on foreign_key, datetime, or json types."
+      validation:
+        must_be_literal: true
+        no_expressions: true
+        no_function_calls: true
+        no_computed_values: true
+
+    unique:
+      type: boolean
+      description: "Whether field values must be unique across all rows."
+      default: false
+
+    references:
+      type: string
+      description: "Target entity name for foreign_key type. Required for foreign_key, forbidden for all others."
+      validation:
+        must_reference_known_entity: true
+        entity_must_be_loaded_before_this_file: true
+
+    max_length:
+      type: int
+      description: "Maximum character length. Required for varchar, optional for text."
+      validation:
+        min_value: 1
+        max_value: 65535
+
+    min_length:
+      type: int
+      description: "Minimum character length. Optional for varchar."
+      validation:
+        min_value: 0
+        must_be_less_than_or_equal_to_max_length: true
+
+    max_value:
+      type: number
+      description: "Maximum numeric value (inclusive). For int and float."
+
+    min_value:
+      type: number
+      description: "Minimum numeric value (inclusive). For int and float."
+      validation:
+        must_be_less_than_or_equal_to_max_value: true
+
+    precision_decimal_places:
+      type: int
+      description: "Maximum decimal places for float."
+      validation:
+        min_value: 0
+        max_value: 15
+
+    enum_values:
+      type: list
+      element_type: string
+      description: "Closed list of permitted values. Required for enum type."
+      validation:
+        min_count: 1
+        max_count: 256
+        elements_must_be_lowercase_underscore: true
+        no_duplicates: true
+
+    json_type_discriminator:
+      type: string
+      description: "Name of sibling field whose value determines which JSON schema validates this payload. Required for json type."
+      validation:
+        must_reference_field_in_same_entity: true
+        referenced_field_must_be_enum_type: true
+
+    must_be_unique_within:
+      type: list
+      element_type: string
+      description: "Other field names forming composite uniqueness scope. Engine generates composite unique index."
+      validation:
+        elements_must_reference_fields_in_same_entity: true
+        min_count: 1
+
+# ============================================================
+# Index Definition Schema
+# ============================================================
+index_definition:
+  allowed_keys:
+    - fields
+    - unique
+    - description
+
+  required_keys:
+    - fields
+
+  key_definitions:
+    fields:
+      type: list
+      element_type: string
+      description: "Ordered list of field names in the index."
+      validation:
+        min_count: 1
+        max_count: 8
+        elements_must_reference_fields_in_same_entity: true
+
+    unique:
+      type: boolean
+      description: "Whether this is a unique index."
+      default: false
+
+    description:
+      type: string
+      description: "Purpose of this index."
+      validation:
+        max_length: 512
+
+# ============================================================
+# Governance Definition Schema
+# ============================================================
+governance_definition:
+  description: "Map of governance field names to boolean enabled flags."
+  allowed_keys:
+    - _requires_group
+    - _access_classification
+    - _retention_policy_id
+    - _audit_chain_hash
+    - _observed_time
+    - _authority_id
+    - _puller_runner_job_id
+    - _schema_version_introduced_id
+    - _schema_version_deprecated_id
+  all_values_must_be: boolean
+
+  # Validation groups: some governance fields only make sense together
+  field_groups:
+    observation_fields:
+      description: "Observation governance fields should be declared together."
+      fields:
+        - _observed_time
+        - _authority_id
+        - _puller_runner_job_id
+      rule: "If any observation field is enabled, all three should be enabled. Engine warns if partial."
+
+    schema_tracking_fields:
+      description: "Schema versioning fields should be declared together."
+      fields:
+        - _schema_version_introduced_id
+        - _schema_version_deprecated_id
+      rule: "If introduced is enabled, deprecated should also be enabled. Engine warns if partial."
+
+# ============================================================
+# Forbidden Patterns
+# The engine scans entity files for these patterns and rejects
+# any file containing them. Each forbidden pattern has a
+# rationale and an alternative approach.
+# ============================================================
+forbidden_patterns:
+  - name: regex
+    description: "Regular expression patterns in any field constraint or validation"
+    detection: "Any key containing 'regex', 'pattern' (except naming pattern validation in this meta-schema), 'regexp', or values containing regex metacharacters used as constraints"
+    rationale: "DoS vector via catastrophic backtracking. Dialect variation across implementations. Unpredictable edge cases. Embedded mini-language in schema."
+    alternative: "Enum sets for closed value lists. Length bounds for size constraints. Anchored LIKE patterns at API semantic validation layer for prefix/suffix matching."
+
+  - name: embedded_logic
+    description: "Expressions, function calls, computed values, conditionals in any field"
+    detection: "Values containing parentheses as function calls, arithmetic operators as expressions, NOW(), CURRENT_TIMESTAMP, previous_value, or any non-literal default"
+    rationale: "Transforms knowable data layer into unknowable logic layer. Loader must parse not evaluate."
+    alternative: "Literal defaults only. Computed values handled by engine injection for reserved fields or by API/runner logic at write time."
+
+  - name: conditional_constraints
+    description: "Cross-field invariants expressed in schema (if X then Y must be set)"
+    detection: "Keys containing 'if', 'when', 'condition', 'depends_on', 'required_if', 'required_when', 'required_unless'"
+    rationale: "Cross-field invariants change at organizational pace, not schema pace. Schema is hot-path bound validation. Invariants are policy evaluation."
+    alternative: "Policy data rows of type semantic_invariant evaluated at API step 5 (policy evaluation)."
+
+  - name: inheritance
+    description: "Entity extending or inheriting from another entity"
+    detection: "Keys containing 'extends', 'inherits', 'parent_entity', 'base_class', 'abstract', 'mixin', 'trait'"
+    rationale: "Creates coupling between entity definitions. Changes to parent cascade unpredictably. Reserved fields are the controlled exception via engine injection."
+    alternative: "Each entity declares its own fields independently. Common patterns are injected mechanically by the engine based on entity-level flags."
+
+  - name: templating
+    description: "Template variables, parameterized files, macros in entity definitions"
+    detection: "Values containing '{{', '}}', '{%', '%}', '${', '$(' or keys containing 'template', 'parameter', 'macro', 'variable' used for schema parameterization"
+    rationale: "Variation across environments handled by OpsDB runtime configuration, not different schemas. One schema per OpsDB."
+    alternative: "Single schema deployed to all substrates. Per-environment variation expressed as different data rows in different DOS substrates."
+
+  - name: imports_within_entity
+    description: "Entity file importing or referencing other entity files"
+    detection: "Keys containing 'import', 'include', 'require', '$ref' (in schema-definition context), 'source' used for file inclusion"
+    rationale: "Entity files must be self-contained and independently readable. Only directory.yaml imports."
+    alternative: "Each entity file declares everything about that entity. Shared patterns via engine injection from conventions/reserved.yaml."
+
+  - name: field_deletion_markers
+    description: "Markers indicating a field should be deleted from the schema"
+    detection: "Keys containing 'deleted', 'removed', 'drop', 'remove_field'"
+    rationale: "Field deletion breaks history, version rows, and audit log entries. Storage cost of tombstone fields is the price of stable schema."
+    alternative: "Deprecation via _schema_version_deprecated_id. Field remains in schema and database. New code stops using it. Old code keeps working."
+
+  - name: type_change_markers
+    description: "Markers indicating a field type should change"
+    detection: "Keys containing 'migrate_type', 'change_type', 'convert_to', 'cast_to'"
+    rationale: "Type changes break every consumer that depends on the original type."
+    alternative: "Duplication pattern: add new field with new type, begin double-writing, migrate readers, deprecate old field. Old field remains as tombstone."
+
+  - name: rename_markers
+    description: "Markers indicating a field or entity should be renamed"
+    detection: "Keys containing 'rename_to', 'renamed_from', 'alias', 'previous_name'"
+    rationale: "Renames break every consumer. A rename is a deletion plus an addition, and deletion is forbidden."
+    alternative: "Duplication pattern: add new field with new name, begin double-writing, migrate readers, deprecate old field."
+
+# ============================================================
+# Evolution Rules
+# The engine enforces these when comparing desired (YAML)
+# against current (database) state during apply.
+# ============================================================
+evolution_rules:
+  allowed:
+    - name: add_nullable_field
+      description: "New field with nullable: true"
+      rationale: "Existing rows have NULL for new field. No data conflict."
+
+    - name: add_non_nullable_field_with_default
+      description: "New field with nullable: false and default specified"
+      rationale: "Engine backfills existing rows with default value."
+
+    - name: add_enum_value
+      description: "New value added to enum_values list"
+      rationale: "Existing rows hold previous values which remain valid."
+
+    - name: widen_numeric_max
+      description: "max_value increased"
+      rationale: "Existing values still within new wider range."
+
+    - name: widen_numeric_min
+      description: "min_value decreased"
+      rationale: "Existing values still within new wider range."
+
+    - name: widen_max_length
+      description: "max_length increased on varchar"
+      rationale: "Existing strings still within new wider bound."
+
+    - name: widen_min_length
+      description: "min_length decreased on varchar"
+      rationale: "Existing strings still satisfy new looser minimum."
+
+    - name: add_entity
+      description: "New entity YAML file"
+      rationale: "Entirely additive. No impact on existing entities."
+
+    - name: add_index
+      description: "New index on existing fields"
+      rationale: "Improves query performance. Does not affect data validity."
+
+    - name: add_approval_rule_reference
+      description: "New approval rule referencing existing entities"
+      rationale: "Tightens governance for new changes. Existing rows unaffected."
+
+    - name: enable_governance_field
+      description: "New governance field enabled in entity's governance section"
+      rationale: "Adds nullable column. Existing rows have NULL."
+
+    - name: enable_versioning
+      description: "Entity changed from versioned: false to versioned: true"
+      rationale: "Generates new sibling table. No existing data affected."
+
+  forbidden:
+    - name: delete_field
+      error_template: "Field deletion forbidden. Mark deprecated via _schema_version_deprecated_id. Field: {entity}.{field}"
+      alternative: "Deprecate. Column and data remain. Tombstone forever."
+
+    - name: delete_entity
+      error_template: "Entity deletion forbidden. Mark deprecated. Entity: {entity}"
+      alternative: "Deprecate. Table and data remain."
+
+    - name: rename_field
+      error_template: "Field rename forbidden. Add new field, deprecate old. Detected: {entity}.{old_field} missing, {entity}.{new_field} added with same type."
+      alternative: "Duplication pattern."
+      detection: "Field disappeared and new field with same type appeared in same entity."
+
+    - name: change_type
+      error_template: "Type change forbidden. Use duplication pattern. Field: {entity}.{field} was {old_type} now {new_type}"
+      alternative: "Add new field with new type, double-write, migrate readers, deprecate old."
+
+    - name: narrow_max_value
+      error_template: "Narrowing numeric range forbidden. Existing rows may hold values above new maximum. Field: {entity}.{field}"
+      alternative: "Widening only. If narrower range needed, use duplication pattern."
+
+    - name: narrow_min_value
+      error_template: "Narrowing numeric range forbidden. Existing rows may hold values below new minimum. Field: {entity}.{field}"
+      alternative: "Widening only."
+
+    - name: narrow_max_length
+      error_template: "Narrowing length forbidden. Existing values may exceed new maximum. Field: {entity}.{field}"
+      alternative: "Widening only."
+
+    - name: narrow_min_length
+      error_template: "Narrowing length forbidden. Existing values may fall below new minimum. Field: {entity}.{field}"
+      alternative: "Widening only."
+
+    - name: remove_enum_value
+      error_template: "Enum value removal forbidden. Existing rows may hold removed value. Field: {entity}.{field}, removed: {value}"
+      alternative: "Duplication pattern with new field of narrower set."
+
+    - name: add_unique_to_existing
+      error_template: "Adding uniqueness to existing field forbidden. Existing rows may violate. Field: {entity}.{field}"
+      alternative: "Duplication pattern."
+
+    - name: remove_versioning
+      error_template: "Cannot remove versioning. Sibling table {entity}_version contains historical data."
+      alternative: "Versioning is permanent once enabled."
+
+    - name: remove_soft_delete
+      error_template: "Cannot remove soft delete. Existing rows may use is_active=false."
+      alternative: "Soft delete is permanent once enabled."
+
+    - name: remove_hierarchical
+      error_template: "Cannot remove hierarchical. Existing rows may use parent_{entity}_id."
+      alternative: "Hierarchical is permanent once enabled."
+
+    - name: remove_append_only
+      error_template: "Cannot remove append-only. Constraint exists at DDL level for data integrity."
+      alternative: "Append-only is permanent once enabled."
+
+# ============================================================
+# Reserved Field Names
+# These names cannot be used in entity field definitions.
+# The engine injects them based on entity-level flags.
+# ============================================================
+reserved_field_names:
+  - id
+  - created_time
+  - updated_time
+  - is_active
+  # Pattern-based reserves (engine checks with entity name substituted):
+  - "parent_{entity_name}_id"
+  # Versioning sibling field names:
+  - version_serial
+  - "parent_{entity_name}_version_id"
+  - change_set_id
+  - is_active_version
+  - approved_for_production_time
+  # Governance field names:
+  - _requires_group
+  - _access_classification
+  - _retention_policy_id
+  - _audit_chain_hash
+  - _observed_time
+  - _authority_id
+  - _puller_runner_job_id
+  - _schema_version_introduced_id
+  - _schema_version_deprecated_id
+  

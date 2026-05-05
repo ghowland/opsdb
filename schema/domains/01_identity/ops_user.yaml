@@ -1,0 +1,45 @@
+
+# === ops_user.yaml ===
+name: ops_user
+description: "Operational identity within a site. Maps to IdP identity."
+category: identity
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: site_id
+    type: foreign_key
+    references: site
+    nullable: false
+    description: "Site this user belongs to"
+
+  - name: username
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "Unique username within site"
+    must_be_unique_within:
+      - site_id
+
+  - name: fullname
+    type: varchar
+    max_length: 512
+    nullable: false
+    description: "Display name"
+
+  - name: email
+    type: varchar
+    max_length: 512
+    nullable: false
+    description: "Contact email address"
+    must_be_unique_within:
+      - site_id
+
+indexes:
+  - fields: [site_id]
+
+governance:
+  _access_classification: true
+
+

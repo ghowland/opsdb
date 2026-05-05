@@ -1,0 +1,33 @@
+# === site.yaml ===
+name: site
+description: "DOS scope within OpsDB. Top-level organizational boundary."
+category: identity
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: name
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "Unique site name"
+    unique: true
+
+  - name: description
+    type: text
+    nullable: true
+    description: "Human-readable site description"
+
+  - name: domain
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "FQDN suffix for this site"
+
+indexes: []
+
+governance:
+  _requires_group: true
+  _access_classification: true
+

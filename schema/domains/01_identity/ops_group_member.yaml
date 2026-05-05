@@ -1,0 +1,31 @@
+
+
+# === ops_group_member.yaml ===
+name: ops_group_member
+description: "Bridge: group to user membership."
+category: identity
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: ops_group_id
+    type: foreign_key
+    references: ops_group
+    nullable: false
+    description: "Group"
+
+  - name: ops_user_id
+    type: foreign_key
+    references: ops_user
+    nullable: false
+    description: "Member user"
+
+indexes:
+  - fields: [ops_group_id, ops_user_id]
+    unique: true
+  - fields: [ops_user_id]
+
+governance: {}
+
+
