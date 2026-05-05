@@ -1,0 +1,30 @@
+
+# === monitor_machine_target.yaml ===
+name: monitor_machine_target
+description: "Bridge: monitor to machine. Applies a monitor to a specific machine."
+category: monitor
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: monitor_id
+    type: foreign_key
+    references: monitor
+    nullable: false
+    description: "Monitor"
+
+  - name: machine_id
+    type: foreign_key
+    references: machine
+    nullable: false
+    description: "Target machine"
+
+indexes:
+  - fields: [monitor_id]
+  - fields: [machine_id]
+  - fields: [monitor_id, machine_id]
+    unique: true
+
+governance: {}
+

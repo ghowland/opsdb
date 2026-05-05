@@ -1,0 +1,55 @@
+
+# === monitor_level.yaml ===
+name: monitor_level
+description: "Condition-action grouping within a monitor. Multiple levels with the same name AND together. Defines what condition triggers what action."
+category: monitor
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: monitor_id
+    type: foreign_key
+    references: monitor
+    nullable: false
+    description: "Monitor this level belongs to"
+
+  - name: name
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "Level name. Levels with same name AND together."
+
+  - name: condition_expression
+    type: text
+    nullable: false
+    description: "PromQL or comparator expression for this condition"
+
+  - name: condition_data_json
+    type: json
+    json_type_discriminator: name
+    nullable: true
+    description: "Structured condition parameters"
+
+  - name: action_type
+    type: enum
+    enum_values:
+      - set_state
+      - set_trigger
+      - set_alert
+    nullable: false
+    description: "What happens when condition is met"
+
+  - name: action_target_id
+    type: int
+    nullable: false
+    min_value: 1
+    max_value: 2147483647
+    description: "Target of the action. Polymorphic by action_type."
+
+indexes:
+  - fields: [monitor_id]
+  - fields: [monitor_id, name]
+
+governance: {}
+

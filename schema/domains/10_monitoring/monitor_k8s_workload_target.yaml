@@ -1,0 +1,30 @@
+
+# === monitor_k8s_workload_target.yaml ===
+name: monitor_k8s_workload_target
+description: "Bridge: monitor to Kubernetes workload. Applies a monitor to a specific workload."
+category: monitor
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: monitor_id
+    type: foreign_key
+    references: monitor
+    nullable: false
+    description: "Monitor"
+
+  - name: k8s_workload_id
+    type: foreign_key
+    references: k8s_workload
+    nullable: false
+    description: "Target workload"
+
+indexes:
+  - fields: [monitor_id]
+  - fields: [k8s_workload_id]
+  - fields: [monitor_id, k8s_workload_id]
+    unique: true
+
+governance: {}
+

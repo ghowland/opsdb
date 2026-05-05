@@ -1,0 +1,34 @@
+
+# === prometheus_config.yaml ===
+name: prometheus_config
+description: "Prometheus server configuration owned by an authority. Optionally scoped to a service."
+category: monitor
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: authority_id
+    type: foreign_key
+    references: authority
+    nullable: false
+    description: "Prometheus server authority"
+
+  - name: service_id
+    type: foreign_key
+    references: service
+    nullable: true
+    description: "Service scope. Null if global configuration."
+
+  - name: config_data_json
+    type: json
+    json_type_discriminator: authority_id
+    nullable: false
+    description: "Prometheus configuration details"
+
+indexes:
+  - fields: [authority_id]
+  - fields: [service_id]
+
+governance: {}
+

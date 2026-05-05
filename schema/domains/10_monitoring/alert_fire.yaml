@@ -1,0 +1,65 @@
+
+# === alert_fire.yaml ===
+name: alert_fire
+description: "Specific firing instance of an alert. Observation-only — records that an alert is currently or was recently firing."
+category: monitor
+versioned: false
+soft_delete: false
+hierarchical: false
+
+fields:
+  - name: alert_id
+    type: foreign_key
+    references: alert
+    nullable: false
+    description: "Which alert fired"
+
+  - name: fired_time
+    type: datetime
+    nullable: false
+    description: "When the alert fired"
+
+  - name: cleared_time
+    type: datetime
+    nullable: true
+    description: "When the alert cleared. Null if still firing."
+
+  - name: is_acknowledged
+    type: boolean
+    nullable: false
+    default: false
+    description: "Whether someone has acknowledged this firing"
+
+  - name: acknowledging_ops_user_id
+    type: foreign_key
+    references: ops_user
+    nullable: true
+    description: "Who acknowledged. Null if not acknowledged."
+
+  - name: acknowledged_time
+    type: datetime
+    nullable: true
+    description: "When acknowledged"
+
+  - name: acknowledge_suppression_until_time
+    type: datetime
+    nullable: true
+    description: "Suppress re-notification until this time"
+
+  - name: alert_fire_data_json
+    type: json
+    json_type_discriminator: alert_id
+    nullable: true
+    description: "Firing-specific context. Labels, values, affected instances."
+
+indexes:
+  - fields: [alert_id]
+  - fields: [fired_time]
+  - fields: [alert_id, fired_time]
+  - fields: [is_acknowledged]
+
+governance:
+  _observed_time: true
+  _authority_id: true
+  _puller_runner_job_id: true
+

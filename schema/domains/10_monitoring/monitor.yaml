@@ -1,0 +1,56 @@
+
+# === monitor.yaml ===
+name: monitor
+description: "Check definition owned by a package. Script, Prometheus query, HTTP probe, TCP probe, cloud metric, K8s event watch."
+category: monitor
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: package_version_id
+    type: foreign_key
+    references: package
+    nullable: false
+    description: "Package version that owns this monitor"
+
+  - name: name
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "Monitor name"
+    must_be_unique_within:
+      - package_version_id
+
+  - name: monitor_type
+    type: enum
+    enum_values:
+      - script_local
+      - script_remote
+      - prometheus_query
+      - http_probe
+      - tcp_probe
+      - cloud_metric
+      - k8s_event_watch
+    nullable: false
+    description: "Discriminator for monitor_data_json"
+
+  - name: monitor_data_json
+    type: json
+    json_type_discriminator: monitor_type
+    nullable: false
+    description: "Type-specific monitor specification"
+
+  - name: collection_interval_seconds
+    type: int
+    nullable: false
+    min_value: 1
+    max_value: 86400
+    description: "How often this monitor runs"
+
+indexes:
+  - fields: [package_version_id]
+  - fields: [monitor_type]
+
+governance: {}
+

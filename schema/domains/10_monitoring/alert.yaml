@@ -1,0 +1,46 @@
+
+# === alert.yaml ===
+name: alert
+description: "Named alert condition with severity, scoped to a service. Defines what constitutes an alertable condition."
+category: monitor
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: service_id
+    type: foreign_key
+    references: service
+    nullable: false
+    description: "Service this alert is scoped to"
+
+  - name: name
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "Alert name"
+    must_be_unique_within:
+      - service_id
+
+  - name: description
+    type: text
+    nullable: true
+    description: "What this alert means and what to do about it"
+
+  - name: alert_severity
+    type: enum
+    enum_values:
+      - info
+      - warning
+      - critical
+      - page
+    nullable: false
+    description: "Alert severity level"
+
+indexes:
+  - fields: [service_id]
+  - fields: [alert_severity]
+  - fields: [service_id, alert_severity]
+
+governance: {}
+

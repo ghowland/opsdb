@@ -1,0 +1,43 @@
+
+# === on_call_assignment.yaml ===
+name: on_call_assignment
+description: "Specific on-call assignment over a time window. Observation-only — records who is on call when."
+category: monitor
+versioned: false
+soft_delete: false
+hierarchical: false
+
+fields:
+  - name: on_call_schedule_id
+    type: foreign_key
+    references: on_call_schedule
+    nullable: false
+    description: "On-call schedule this assignment belongs to"
+
+  - name: ops_user_id
+    type: foreign_key
+    references: ops_user
+    nullable: false
+    description: "User on call during this window"
+
+  - name: on_call_start_time
+    type: datetime
+    nullable: false
+    description: "Start of on-call window"
+
+  - name: on_call_stop_time
+    type: datetime
+    nullable: false
+    description: "End of on-call window"
+
+indexes:
+  - fields: [on_call_schedule_id]
+  - fields: [ops_user_id]
+  - fields: [on_call_schedule_id, on_call_start_time]
+  - fields: [on_call_start_time, on_call_stop_time]
+
+governance:
+  _observed_time: true
+  _authority_id: true
+  _puller_runner_job_id: true
+  

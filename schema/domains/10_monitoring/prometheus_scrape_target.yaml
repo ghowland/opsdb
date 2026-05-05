@@ -1,0 +1,48 @@
+
+# === prometheus_scrape_target.yaml ===
+name: prometheus_scrape_target
+description: "Scrape target within a Prometheus configuration. What is being scraped, how often, at what path."
+category: monitor
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: prometheus_config_id
+    type: foreign_key
+    references: prometheus_config
+    nullable: false
+    description: "Prometheus config this target belongs to"
+
+  - name: target_url
+    type: varchar
+    max_length: 1024
+    nullable: false
+    description: "Scrape target URL"
+
+  - name: scrape_interval_seconds
+    type: int
+    nullable: false
+    min_value: 1
+    max_value: 3600
+    description: "How often this target is scraped"
+
+  - name: metrics_path
+    type: varchar
+    max_length: 512
+    nullable: false
+    description: "Metrics endpoint path. Typically /metrics."
+
+  - name: scrape_data_json
+    type: json
+    json_type_discriminator: metrics_path
+    nullable: true
+    description: "Additional scrape configuration. Labels, params, TLS settings."
+
+indexes:
+  - fields: [prometheus_config_id]
+  - fields: [prometheus_config_id, target_url]
+    unique: true
+
+governance: {}
+

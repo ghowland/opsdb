@@ -1,0 +1,36 @@
+
+# === on_call_schedule.yaml ===
+name: on_call_schedule
+description: "On-call schedule linking a role to a schedule definition. Defines which role is on call according to which schedule."
+category: monitor
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: ops_user_role_id
+    type: foreign_key
+    references: ops_user_role
+    nullable: false
+    description: "Role that is on call"
+
+  - name: schedule_id
+    type: foreign_key
+    references: schedule
+    nullable: false
+    description: "Schedule governing the rotation"
+
+  - name: rotation_data_json
+    type: json
+    json_type_discriminator: schedule_id
+    nullable: true
+    description: "Rotation-specific configuration. Handoff times, override rules."
+
+indexes:
+  - fields: [ops_user_role_id]
+  - fields: [schedule_id]
+  - fields: [ops_user_role_id, schedule_id]
+    unique: true
+
+governance: {}
+

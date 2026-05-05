@@ -1,0 +1,30 @@
+
+# === alert_dependency.yaml ===
+name: alert_dependency
+description: "Suppression relationship between alerts. When parent alert is firing, child alert is suppressed."
+category: monitor
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: parent_alert_id
+    type: foreign_key
+    references: alert
+    nullable: false
+    description: "Alert whose firing suppresses the child"
+
+  - name: child_alert_id
+    type: foreign_key
+    references: alert
+    nullable: false
+    description: "Alert suppressed when parent fires"
+
+indexes:
+  - fields: [parent_alert_id]
+  - fields: [child_alert_id]
+  - fields: [parent_alert_id, child_alert_id]
+    unique: true
+
+governance: {}
+
