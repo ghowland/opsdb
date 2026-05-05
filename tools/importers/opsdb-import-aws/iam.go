@@ -1,13 +1,19 @@
 
-// === importers/opsdb-import-gcp/iam.go ===
-package gcp
 
-// ImportGCPIAM reads GCP IAM service accounts from GCP API.
-func ImportGCPIAM(config *GCPImportConfig) ([]Observation, error) {
-	// TODO: for each project:
-	//   list service accounts
-	//   for each: get keys count, bindings count
-	//   MapGCPServiceAccount for each
+// === importers/opsdb-import-aws/iam.go ===
+package aws
+
+// ImportIAM reads IAM roles from AWS API.
+// IAM is global (not regional). Handles pagination.
+func ImportIAM(config *ImportConfig) ([]Observation, error) {
+	// TODO: paginate ListRoles
+	// TODO: for each role:
+	//   ListAttachedRolePolicies for attached policy count
+	//   GetRole for trust policy document
+	//   summarize trust policy (principals, not full JSON)
+	//   call MapIAMRole
+	//   append to results
+	// TODO: optionally import IAM users if configured
 	return nil, nil
 }
 

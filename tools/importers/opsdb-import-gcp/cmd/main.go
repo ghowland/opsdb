@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	gcp "github.com/ghowland/opsdb/tools/importers/opsdb-import-gcp"
 	runner "github.com/ghowland/opsdb/tools/opsdb-runner-lib"
 )
 
@@ -56,7 +57,7 @@ func main() {
 			maxDuration = 120
 		}
 
-		importConfig := &GCPImportConfig{
+		importConfig := &gcp.GCPImportConfig{
 			Projects:      projects,
 			ResourceTypes: resourceTypes,
 			BatchSize:     batchSize,
@@ -81,7 +82,7 @@ func main() {
 			continue
 		}
 
-		var allObservations []Observation
+		var allObservations []gcp.Observation
 		resourceTypeCounts := make(map[string]int)
 		var errors []string
 		cycleStart := time.Now()
@@ -93,20 +94,20 @@ func main() {
 				break
 			}
 
-			var obs []Observation
+			var obs []gcp.Observation
 			var importErr error
 
 			switch rt {
 			case "gce":
-				obs, importErr = ImportGCE(importConfig)
+				obs, importErr = gcp.ImportGCE(importConfig)
 			case "cloudsql":
-				obs, importErr = ImportCloudSQL(importConfig)
+				obs, importErr = gcp.ImportCloudSQL(importConfig)
 			case "gcs":
-				obs, importErr = ImportGCS(importConfig)
+				obs, importErr = gcp.ImportGCS(importConfig)
 			case "gke":
-				obs, importErr = ImportGKE(importConfig)
+				obs, importErr = gcp.ImportGKE(importConfig)
 			case "iam":
-				obs, importErr = ImportIAM(importConfig)
+				obs, importErr = gcp.ImportIAM(importConfig)
 			default:
 				config.Logger.Warn("unknown resource type, skipping",
 					runner.Field("resource_type", rt))
@@ -179,21 +180,4 @@ func main() {
 
 	config.Logger.Info("GCP importer shutting down")
 	os.Exit(0)
-}
-
-// GCPImportConfig holds GCP importer cycle configuration.
-type GCPImportConfig struct {
-	Projects      []string
-	ResourceTypes []string
-	BatchSize     int
-}
-
-// Observation is the GCP importer observation structure.
-type Observation struct {
-	EntityType  string
-	EntityID    string
-	StateKey    string
-	Value       string
-	DataJSON    map[string]interface{}
-	AuthorityID int
 }

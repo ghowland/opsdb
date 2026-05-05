@@ -1,6 +1,13 @@
 package gcp
 
-import "fmt"
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"cloud.google.com/go/storage"
+	"google.golang.org/api/iterator"
+)
 
 // ImportGCS reads GCS buckets from the GCP API across all configured projects.
 // For each bucket, fetches versioning, lifecycle, encryption, and access
@@ -30,41 +37,95 @@ func ImportGCS(config *GCPImportConfig) ([]Observation, error) {
 
 // gcsBucket holds the raw fields read from the GCP Cloud Storage API.
 type gcsBucket struct {
-	Name                  string
-	Location              string
-	LocationType          string // region, dual-region, multi-region
-	StorageClass          string // STANDARD, NEARLINE, COLDLINE, ARCHIVE
-	VersioningEnabled     bool
-	LifecycleRuleCount    int
-	EncryptionType        string // google-managed, cmek, csek
-	CMEKKeyName           string // KMS key name if CMEK
-	UniformBucketAccess   bool
-	PublicAccessPrevention string // enforced, inherited
-	RetentionPolicyDays   int    // 0 if no retention policy
-	LoggingEnabled        bool
-	CreationTime          string
-	SelfLink              string
+	Name                   string
+	Location               string
+	LocationType           string
+	StorageClass           string
+	VersioningEnabled      bool
+	LifecycleRuleCount     int
+	EncryptionType         string
+	CMEKKeyName            string
+	UniformBucketAccess    bool
+	PublicAccessPrevention  string
+	RetentionPolicyDays    int
+	LoggingEnabled         bool
+	CreationTime           string
+	SelfLink               string
 }
 
-// listGCSBuckets reads all GCS buckets in a project and fetches per-bucket details.
+// listGCSBuckets reads all GCS buckets in a project and extracts per-bucket details.
 func listGCSBuckets(project string) ([]gcsBucket, error) {
-	// TODO: create storage service client using application default credentials
-	// TODO: call buckets.List(project)
-	// TODO: handle pagination via NextPageToken
-	// TODO: for each bucket in response:
-	//   extract Name, Location, LocationType, StorageClass,
-	//   Versioning.Enabled,
-	//   len(Lifecycle.Rule) for rule count,
-	//   Encryption (determine type: default = google-managed,
-	//     DefaultKmsKeyName set = cmek),
-	//   IamConfiguration.UniformBucketLevelAccess.Enabled,
-	//   IamConfiguration.PublicAccessPrevention,
-	//   RetentionPolicy.RetentionPeriod (convert seconds to days),
-	//   Logging != nil for logging enabled,
-	//   TimeCreated, SelfLink
-	// TODO: handle AccessDenied gracefully per bucket
-	// TODO: return buckets
-	return nil, nil
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	client, err := storage.NewClient(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("creating storage client: %w", err)
+	}
+	defer client.Close()
+
+	var buckets []gcsBucket
+
+	it := client.Buckets(ctx, project)
+	for {
+		attrs, err := it.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return buckets, fmt.Errorf("iterating buckets: %w", err)
+		}
+
+		b := gcsBucket{
+			Name:         attrs.Name,
+			Location:     attrs.Location,
+			LocationType: attrs.LocationType,
+			StorageClass: attrs.StorageClass,
+			CreationTime: attrs.Created.Format(time.RFC3339),
+		}
+
+		// Versioning.
+		b.VersioningEnabled = attrs.VersioningEnabled
+
+		// Lifecycle rules — count only, individual rules are bucket config detail.
+		b.LifecycleRuleCount = len(attrs.Lifecycle.Rules)
+
+		// Encryption type.
+		if attrs.Encryption != nil && attrs.Encryption.DefaultKMSKeyName != "" {
+			b.EncryptionType = "cmek"
+			b.CMEKKeyName = attrs.Encryption.DefaultKMSKeyName
+		} else {
+			b.EncryptionType = "google_managed"
+		}
+
+		// Uniform bucket-level access.
+		b.UniformBucketAccess = attrs.UniformBucketLevelAccess.Enabled
+
+		// Public access prevention.
+		switch attrs.PublicAccessPrevention {
+		case storage.PublicAccessPreventionEnforced:
+			b.PublicAccessPrevention = "enforced"
+		case storage.PublicAccessPreventionInherited:
+			b.PublicAccessPrevention = "inherited"
+		default:
+			b.PublicAccessPrevention = "unspecified"
+		}
+
+		// Retention policy — convert duration to days.
+		if attrs.RetentionPolicy != nil && attrs.RetentionPolicy.RetentionPeriod > 0 {
+			b.RetentionPolicyDays = int(attrs.RetentionPolicy.RetentionPeriod.Hours() / 24)
+		}
+
+		// Logging.
+		b.LoggingEnabled = attrs.Logging != nil && attrs.Logging.LogBucket != ""
+
+		// SelfLink is not directly on BucketAttrs; construct from name.
+		b.SelfLink = fmt.Sprintf("https://storage.googleapis.com/storage/v1/b/%s", attrs.Name)
+
+		buckets = append(buckets, b)
+	}
+
+	return buckets, nil
 }
 
 // MapGCSBucket transforms a raw GCP Cloud Storage bucket into an OpsDB observation.
@@ -80,7 +141,7 @@ func MapGCSBucket(project string, bucket gcsBucket) Observation {
 		"storage_class":            bucket.StorageClass,
 		"is_versioning_enabled":    bucket.VersioningEnabled,
 		"lifecycle_rule_count":     bucket.LifecycleRuleCount,
-		"encryption_type":          bucket.EncryptionType,
+		"encryption_type":         bucket.EncryptionType,
 		"is_uniform_bucket_access": bucket.UniformBucketAccess,
 		"public_access_prevention": bucket.PublicAccessPrevention,
 		"is_logging_enabled":       bucket.LoggingEnabled,

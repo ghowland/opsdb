@@ -1,6 +1,12 @@
 package gcp
 
-import "fmt"
+import (
+	"context"
+	"fmt"
+	"time"
+
+	sqladmin "google.golang.org/api/sqladmin/v1beta4"
+)
 
 // ImportCloudSQL reads Cloud SQL instances from the GCP API across all
 // configured projects. Maps each instance to an observation targeting
@@ -29,35 +35,92 @@ func ImportCloudSQL(config *GCPImportConfig) ([]Observation, error) {
 
 // cloudSQLInstance holds the raw fields read from the GCP Cloud SQL API.
 type cloudSQLInstance struct {
-	Name             string
-	DatabaseVersion  string
-	Tier             string
-	Region           string
-	State            string
-	IPAddresses      []string
-	StorageSizeGB    int
-	AutoResize       bool
-	BackupEnabled    bool
-	HAEnabled        bool
+	Name              string
+	DatabaseVersion   string
+	Tier              string
+	Region            string
+	State             string
+	IPAddresses       []string
+	StorageSizeGB     int
+	AutoResize        bool
+	BackupEnabled     bool
+	HAEnabled         bool
 	MaintenanceWindow string
-	SelfLink         string
+	SelfLink          string
 }
 
 // listCloudSQLInstances reads all Cloud SQL instances in a project via the GCP API.
 func listCloudSQLInstances(project string) ([]cloudSQLInstance, error) {
-	// TODO: create sqladmin service client using application default credentials
-	//   or credentials from environment (GOOGLE_APPLICATION_CREDENTIALS)
-	// TODO: call instances.List(project)
-	// TODO: handle pagination via NextPageToken
-	// TODO: for each instance in response:
-	//   extract Name, DatabaseVersion, Settings.Tier, Region,
-	//   State, IpAddresses, Settings.DataDiskSizeGb,
-	//   Settings.StorageAutoResize, Settings.BackupConfiguration.Enabled,
-	//   Settings.AvailabilityType (REGIONAL = HA), Settings.MaintenanceWindow,
-	//   SelfLink
-	// TODO: handle API errors (permission denied, quota, not found)
-	// TODO: return instances
-	return nil, nil
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	svc, err := sqladmin.NewService(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("creating sqladmin client: %w", err)
+	}
+
+	var instances []cloudSQLInstance
+	pageToken := ""
+
+	for {
+		call := svc.Instances.List(project)
+		if pageToken != "" {
+			call = call.PageToken(pageToken)
+		}
+
+		resp, err := call.Context(ctx).Do()
+		if err != nil {
+			return instances, fmt.Errorf("listing Cloud SQL instances: %w", err)
+		}
+
+		for _, dbInst := range resp.Items {
+			inst := cloudSQLInstance{
+				Name:            dbInst.Name,
+				DatabaseVersion: dbInst.DatabaseVersion,
+				Region:          dbInst.Region,
+				State:           dbInst.State,
+				SelfLink:        dbInst.SelfLink,
+			}
+
+			// Settings fields.
+			if dbInst.Settings != nil {
+				inst.Tier = dbInst.Settings.Tier
+				inst.StorageSizeGB = int(dbInst.Settings.DataDiskSizeGb)
+				inst.AutoResize = dbInst.Settings.StorageAutoResize
+
+				// Backup configuration.
+				if dbInst.Settings.BackupConfiguration != nil {
+					inst.BackupEnabled = dbInst.Settings.BackupConfiguration.Enabled
+				}
+
+				// HA: AvailabilityType "REGIONAL" means HA is enabled.
+				inst.HAEnabled = dbInst.Settings.AvailabilityType == "REGIONAL"
+
+				// Maintenance window: combine day and hour if set.
+				if dbInst.Settings.MaintenanceWindow != nil {
+					inst.MaintenanceWindow = fmt.Sprintf("day=%d hour=%d",
+						dbInst.Settings.MaintenanceWindow.Day,
+						dbInst.Settings.MaintenanceWindow.Hour)
+				}
+			}
+
+			// IP addresses.
+			for _, ipMapping := range dbInst.IpAddresses {
+				if ipMapping.IpAddress != "" {
+					inst.IPAddresses = append(inst.IPAddresses, ipMapping.IpAddress)
+				}
+			}
+
+			instances = append(instances, inst)
+		}
+
+		if resp.NextPageToken == "" {
+			break
+		}
+		pageToken = resp.NextPageToken
+	}
+
+	return instances, nil
 }
 
 // MapCloudSQLInstance transforms a raw GCP Cloud SQL instance into an OpsDB observation.
@@ -79,8 +142,6 @@ func MapCloudSQLInstance(project string, inst cloudSQLInstance) Observation {
 		"self_link":          inst.SelfLink,
 	}
 
-	// IP addresses flattened as primary only; multiple IPs would use
-	// a list in the JSON payload since they are per-instance metadata.
 	if len(inst.IPAddresses) > 0 {
 		dataJSON["primary_ip_address"] = inst.IPAddresses[0]
 	}

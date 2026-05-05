@@ -1,6 +1,15 @@
 package gcp
 
-import "fmt"
+import (
+	"context"
+	"fmt"
+	"path"
+	"time"
+
+	compute "cloud.google.com/go/compute/apiv1"
+	computepb "cloud.google.com/go/compute/apiv1/computepb"
+	"google.golang.org/api/iterator"
+)
 
 // ImportGCE reads GCE instances from the GCP API across all configured
 // projects. Uses aggregated list to get instances across all zones in
@@ -32,8 +41,8 @@ func ImportGCE(config *GCPImportConfig) ([]Observation, error) {
 type gceInstance struct {
 	Name              string
 	Zone              string
-	MachineType       string // short name extracted from full URL
-	Status            string // RUNNING, STOPPED, TERMINATED, etc.
+	MachineType       string
+	Status            string
 	InternalIP        string
 	ExternalIP        string
 	NetworkInterfaces int
@@ -49,24 +58,92 @@ type gceInstance struct {
 // listGCEInstances reads all GCE instances in a project via aggregated list.
 // Aggregated list returns instances across all zones in one paginated call.
 func listGCEInstances(project string) ([]gceInstance, error) {
-	// TODO: create compute service client using application default credentials
-	//   or credentials from environment (GOOGLE_APPLICATION_CREDENTIALS)
-	// TODO: call instances.AggregatedList(project)
-	// TODO: handle pagination via NextPageToken
-	// TODO: for each zone's instance list in response:
-	//   for each instance:
-	//     extract Name, Zone (short name from full URL),
-	//     MachineType (short name from full URL),
-	//     Status, NetworkInterfaces[0].NetworkIP (internal),
-	//     NetworkInterfaces[0].AccessConfigs[0].NatIP (external, if present),
-	//     len(NetworkInterfaces), len(Disks),
-	//     sum of Disks[*].DiskSizeGb,
-	//     Scheduling.Preemptible, Labels,
-	//     ServiceAccounts[*].Email,
-	//     CreationTimestamp, SelfLink
-	// TODO: handle API errors (permission denied, quota exceeded)
-	// TODO: return instances
-	return nil, nil
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel()
+
+	client, err := compute.NewInstancesRESTClient(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("creating compute client: %w", err)
+	}
+	defer client.Close()
+
+	var instances []gceInstance
+
+	req := &computepb.AggregatedListInstancesRequest{
+		Project: project,
+	}
+
+	it := client.AggregatedList(ctx, req)
+	for {
+		pair, err := it.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return instances, fmt.Errorf("iterating aggregated instances: %w", err)
+		}
+
+		// pair.Value is the InstancesScopedList for one zone.
+		if pair.Value == nil || pair.Value.Instances == nil {
+			continue
+		}
+
+		for _, inst := range pair.Value.Instances {
+			if inst == nil {
+				continue
+			}
+
+			g := gceInstance{
+				Name:   derefStr(inst.Name),
+				Zone:   shortName(derefStr(inst.Zone)),
+				Status: derefStr(inst.Status),
+				Labels: inst.Labels,
+			}
+
+			// Machine type: extract short name from full URL.
+			// e.g. "zones/us-central1-a/machineTypes/e2-medium" -> "e2-medium"
+			g.MachineType = shortName(derefStr(inst.MachineType))
+
+			// Network interfaces.
+			g.NetworkInterfaces = len(inst.NetworkInterfaces)
+			if len(inst.NetworkInterfaces) > 0 {
+				ni := inst.NetworkInterfaces[0]
+				g.InternalIP = derefStr(ni.NetworkIP)
+				if len(ni.AccessConfigs) > 0 {
+					g.ExternalIP = derefStr(ni.AccessConfigs[0].NatIP)
+				}
+			}
+
+			// Disks: count and total size.
+			g.DiskCount = len(inst.Disks)
+			var totalDiskGB int64
+			for _, disk := range inst.Disks {
+				if disk != nil && disk.DiskSizeGb != nil {
+					totalDiskGB += *disk.DiskSizeGb
+				}
+			}
+			g.DiskSizeGB = totalDiskGB
+
+			// Scheduling.
+			if inst.Scheduling != nil && inst.Scheduling.Preemptible != nil {
+				g.Preemptible = *inst.Scheduling.Preemptible
+			}
+
+			// Service accounts.
+			for _, sa := range inst.ServiceAccounts {
+				if sa != nil {
+					g.ServiceAccounts = append(g.ServiceAccounts, derefStr(sa.Email))
+				}
+			}
+
+			g.CreationTimestamp = derefStr(inst.CreationTimestamp)
+			g.SelfLink = derefStr(inst.SelfLink)
+
+			instances = append(instances, g)
+		}
+	}
+
+	return instances, nil
 }
 
 // MapGCEInstance transforms a raw GCP Compute Engine instance into an OpsDB
@@ -76,32 +153,28 @@ func listGCEInstances(project string) ([]gceInstance, error) {
 // if the org needs that granularity.
 func MapGCEInstance(project string, inst gceInstance) Observation {
 	dataJSON := map[string]interface{}{
-		"project":             project,
-		"instance_name":       inst.Name,
-		"zone":                inst.Zone,
-		"machine_type":        inst.MachineType,
-		"status":              inst.Status,
-		"internal_ip":         inst.InternalIP,
-		"network_interface_count": inst.NetworkInterfaces,
-		"disk_count":          inst.DiskCount,
-		"total_disk_size_gb":  inst.DiskSizeGB,
-		"is_preemptible":      inst.Preemptible,
-		"creation_timestamp":  inst.CreationTimestamp,
-		"self_link":           inst.SelfLink,
+		"project":                   project,
+		"instance_name":             inst.Name,
+		"zone":                      inst.Zone,
+		"machine_type":              inst.MachineType,
+		"status":                    inst.Status,
+		"internal_ip":               inst.InternalIP,
+		"network_interface_count":   inst.NetworkInterfaces,
+		"disk_count":                inst.DiskCount,
+		"total_disk_size_gb":        inst.DiskSizeGB,
+		"is_preemptible":            inst.Preemptible,
+		"creation_timestamp":        inst.CreationTimestamp,
+		"self_link":                 inst.SelfLink,
 	}
 
-	// External IP is optional — not all instances have one.
 	if inst.ExternalIP != "" {
 		dataJSON["external_ip"] = inst.ExternalIP
 	}
 
-	// Labels flattened into the JSON payload as a nested map.
-	// Labels are per-instance metadata, not N-of independent entities.
 	if len(inst.Labels) > 0 {
 		dataJSON["labels"] = inst.Labels
 	}
 
-	// Service account count and first account for quick reference.
 	dataJSON["service_account_count"] = len(inst.ServiceAccounts)
 	if len(inst.ServiceAccounts) > 0 {
 		dataJSON["primary_service_account"] = inst.ServiceAccounts[0]
@@ -114,4 +187,19 @@ func MapGCEInstance(project string, inst gceInstance) Observation {
 		Value:      inst.Status,
 		DataJSON:   dataJSON,
 	}
+}
+
+// shortName extracts the last path component from a GCP resource URL.
+// "zones/us-central1-a/machineTypes/e2-medium" -> "e2-medium"
+// "projects/my-proj/zones/us-central1-a" -> "us-central1-a"
+func shortName(resourceURL string) string {
+	return path.Base(resourceURL)
+}
+
+// derefStr safely dereferences a *string, returning empty string if nil.
+func derefStr(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }
