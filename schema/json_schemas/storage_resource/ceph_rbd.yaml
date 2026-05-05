@@ -1,0 +1,59 @@
+
+# === ceph_rbd.yaml ===
+name: ceph_rbd
+description: "JSON schema for storage_resource of type ceph_rbd. Ceph RADOS Block Device."
+discriminator_field: storage_resource_type
+discriminator_value: ceph_rbd
+
+fields:
+  - name: pool_name
+    type: string
+    max_length: 255
+    required: true
+    description: "Ceph pool containing this RBD"
+
+  - name: image_name
+    type: string
+    max_length: 255
+    required: true
+    description: "RBD image name within pool"
+
+  - name: image_format
+    type: int
+    min_value: 1
+    max_value: 2
+    required: true
+    description: "RBD image format. 2 is current standard."
+
+  - name: stripe_unit_bytes
+    type: int
+    min_value: 4096
+    max_value: 67108864
+    required: false
+    description: "Stripe unit size"
+
+  - name: stripe_count
+    type: int
+    min_value: 1
+    max_value: 256
+    required: false
+    description: "Number of stripes"
+
+  - name: features
+    type: string
+    max_length: 1024
+    required: false
+    description: "Comma-separated enabled features. layering, exclusive_lock, object_map, fast_diff, deep_flatten."
+
+  - name: cluster_name
+    type: string
+    max_length: 255
+    required: true
+    description: "Ceph cluster name"
+
+  - name: monitors
+    type: string
+    max_length: 2048
+    required: true
+    description: "Comma-separated monitor addresses"
+

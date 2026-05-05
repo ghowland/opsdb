@@ -1,0 +1,68 @@
+
+# === ebs.yaml ===
+name: ebs
+description: "JSON schema for storage_resource of type ebs. AWS Elastic Block Store volume."
+discriminator_field: storage_resource_type
+discriminator_value: ebs
+
+fields:
+  - name: volume_type
+    type: string
+    allowed_values: [gp2, gp3, io1, io2, st1, sc1, standard]
+    required: true
+    description: "EBS volume type"
+
+  - name: iops
+    type: int
+    min_value: 100
+    max_value: 256000
+    required: false
+    description: "Provisioned IOPS. Required for io1/io2, optional for gp3."
+
+  - name: throughput_mbps
+    type: int
+    min_value: 125
+    max_value: 4000
+    required: false
+    description: "Provisioned throughput in MB/s. gp3 and io2 only."
+
+  - name: is_encrypted
+    type: boolean
+    required: true
+    description: "Whether volume is encrypted"
+
+  - name: kms_key_id
+    type: string
+    max_length: 512
+    required: false
+    description: "KMS key ARN if encrypted with customer-managed key"
+
+  - name: snapshot_id
+    type: string
+    max_length: 255
+    required: false
+    description: "Source snapshot if volume was created from snapshot"
+
+  - name: availability_zone
+    type: string
+    max_length: 64
+    required: true
+    description: "AZ where volume resides"
+
+  - name: attached_instance_id
+    type: string
+    max_length: 255
+    required: false
+    description: "EC2 instance ID this volume is attached to. Null if detached."
+
+  - name: device_name
+    type: string
+    max_length: 64
+    required: false
+    description: "Device name on instance. /dev/xvda, /dev/sdf, etc."
+
+  - name: multi_attach_enabled
+    type: boolean
+    required: false
+    description: "Whether multi-attach is enabled. io1/io2 only."
+

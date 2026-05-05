@@ -1,0 +1,43 @@
+
+# === azure_blob.yaml ===
+name: azure_blob
+description: "JSON schema for storage_resource of type azure_blob. Azure Blob Storage as a storage resource."
+discriminator_field: storage_resource_type
+discriminator_value: azure_blob
+
+fields:
+  - name: storage_account_name
+    type: string
+    max_length: 255
+    required: true
+    description: "Azure storage account"
+
+  - name: container_name
+    type: string
+    max_length: 255
+    required: true
+    description: "Blob container name"
+
+  - name: access_tier
+    type: string
+    allowed_values: [hot, cool, cold, archive]
+    required: true
+    description: "Default access tier"
+
+  - name: replication_type
+    type: string
+    allowed_values: [lrs, zrs, grs, ra_grs, gzrs, ra_gzrs]
+    required: true
+    description: "Replication strategy"
+
+  - name: versioning_enabled
+    type: boolean
+    required: true
+
+  - name: soft_delete_retention_days
+    type: int
+    min_value: 1
+    max_value: 365
+    required: false
+    description: "Days soft-deleted blobs are retained"
+

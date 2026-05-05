@@ -1,0 +1,41 @@
+
+# === gcs.yaml ===
+name: gcs
+description: "JSON schema for storage_resource of type gcs. Google Cloud Storage as a storage resource."
+discriminator_field: storage_resource_type
+discriminator_value: gcs
+
+fields:
+  - name: bucket_name
+    type: string
+    max_length: 255
+    required: true
+    description: "GCS bucket name"
+
+  - name: prefix
+    type: string
+    max_length: 1024
+    required: false
+    description: "Object prefix if this resource is a partition within a bucket"
+
+  - name: storage_class
+    type: string
+    allowed_values: [standard, nearline, coldline, archive]
+    required: true
+
+  - name: location_type
+    type: string
+    allowed_values: [region, dual_region, multi_region]
+    required: true
+
+  - name: versioning_enabled
+    type: boolean
+    required: true
+
+  - name: lifecycle_delete_age_days
+    type: int
+    min_value: 0
+    max_value: 36500
+    required: false
+    description: "Days before objects are deleted by lifecycle rule"
+

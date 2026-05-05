@@ -1,0 +1,55 @@
+
+# === local_disk.yaml ===
+name: local_disk
+description: "JSON schema for storage_resource of type local_disk. Locally attached disk or partition."
+discriminator_field: storage_resource_type
+discriminator_value: local_disk
+
+fields:
+  - name: device_path
+    type: string
+    max_length: 255
+    required: true
+    description: "Block device path. /dev/sda, /dev/nvme0n1, etc."
+
+  - name: partition_path
+    type: string
+    max_length: 255
+    required: false
+    description: "Partition path if partitioned. /dev/sda1, /dev/nvme0n1p1."
+
+  - name: filesystem_type
+    type: string
+    allowed_values: [ext4, xfs, zfs, btrfs, ntfs, fat32, swap, raw]
+    required: true
+    description: "Filesystem type"
+
+  - name: mount_point
+    type: string
+    max_length: 1024
+    required: false
+    description: "Where filesystem is mounted. Null for swap or raw."
+
+  - name: disk_type
+    type: string
+    allowed_values: [hdd, ssd, nvme, sas_hdd, sas_ssd]
+    required: true
+    description: "Physical disk technology"
+
+  - name: is_raid_member
+    type: boolean
+    required: false
+    description: "Whether this disk is part of a RAID array"
+
+  - name: raid_level
+    type: string
+    allowed_values: [raid0, raid1, raid5, raid6, raid10, jbod]
+    required: false
+    description: "RAID level if is_raid_member is true"
+
+  - name: smart_status
+    type: string
+    allowed_values: [healthy, warning, failing, unknown]
+    required: false
+    description: "Last known SMART health status"
+

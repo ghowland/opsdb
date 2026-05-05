@@ -1,0 +1,56 @@
+
+# === iscsi.yaml ===
+name: iscsi
+description: "JSON schema for storage_resource of type iscsi. iSCSI target LUN."
+discriminator_field: storage_resource_type
+discriminator_value: iscsi
+
+fields:
+  - name: target_portal
+    type: string
+    max_length: 512
+    required: true
+    description: "iSCSI target portal address. host:port."
+
+  - name: target_iqn
+    type: string
+    max_length: 1024
+    required: true
+    description: "iSCSI Qualified Name of the target"
+
+  - name: lun_id
+    type: int
+    min_value: 0
+    max_value: 65535
+    required: true
+    description: "Logical Unit Number"
+
+  - name: auth_method
+    type: string
+    allowed_values: [none, chap, mutual_chap]
+    required: true
+    description: "Authentication method"
+
+  - name: multipath_enabled
+    type: boolean
+    required: false
+    description: "Whether multipath I/O is configured"
+
+  - name: multipath_policy
+    type: string
+    allowed_values: [round_robin, failover, weighted]
+    required: false
+    description: "Multipath policy when multipath_enabled is true"
+
+  - name: portal_group_count
+    type: int
+    min_value: 1
+    max_value: 256
+    required: false
+    description: "Number of target portal groups for this LUN"
+
+  - name: persistent_reservation_enabled
+    type: boolean
+    required: false
+    description: "Whether SCSI persistent reservations are enabled"
+

@@ -1,0 +1,49 @@
+
+# === nfs_export.yaml ===
+name: nfs_export
+description: "JSON schema for storage_resource of type nfs_export. NFS exported filesystem."
+discriminator_field: storage_resource_type
+discriminator_value: nfs_export
+
+fields:
+  - name: server_hostname
+    type: string
+    max_length: 512
+    required: true
+    description: "NFS server hostname or IP"
+
+  - name: export_path
+    type: string
+    max_length: 1024
+    required: true
+    description: "Exported path on the server"
+
+  - name: nfs_version
+    type: string
+    allowed_values: [nfs3, nfs4, nfs4_1, nfs4_2]
+    required: true
+    description: "NFS protocol version"
+
+  - name: access_mode
+    type: string
+    allowed_values: [read_write, read_only]
+    required: true
+
+  - name: allowed_clients
+    type: string
+    max_length: 4096
+    required: false
+    description: "Comma-separated client CIDR ranges or hostnames allowed to mount"
+
+  - name: squash_mode
+    type: string
+    allowed_values: [root_squash, no_root_squash, all_squash]
+    required: false
+    description: "UID squashing mode"
+
+  - name: sync_mode
+    type: string
+    allowed_values: [sync, async]
+    required: true
+    description: "Whether writes are synchronous or asynchronous"
+

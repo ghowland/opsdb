@@ -1,0 +1,55 @@
+
+# === calendar_anchored.yaml ===
+name: calendar_anchored
+description: "JSON schema for schedule of type calendar_anchored. Runs at specific calendar points — first Monday, last Friday, quarterly, etc."
+discriminator_field: schedule_type
+discriminator_value: calendar_anchored
+
+fields:
+  - name: anchor_type
+    type: string
+    allowed_values: [day_of_month, day_of_week, first_weekday_of_month, last_weekday_of_month, quarterly, annually]
+    required: true
+    description: "Calendar anchor type"
+
+  - name: anchor_value
+    type: int
+    min_value: 0
+    max_value: 366
+    required: false
+    description: "Anchor value. Day of month (1-31), day of week (0-6 Sunday=0), month (1-12), day of year (1-366). Interpretation depends on anchor_type."
+
+  - name: anchor_time
+    type: string
+    max_length: 5
+    required: true
+    description: "HH:MM time of day for the anchored run"
+
+  - name: timezone
+    type: string
+    max_length: 64
+    required: true
+    description: "Timezone for calendar evaluation"
+
+  - name: quarter_months
+    type: string
+    max_length: 20
+    required: false
+    description: "Comma-separated months for quarterly. 1,4,7,10 for standard quarters."
+
+  - name: jitter_seconds
+    type: int
+    min_value: 0
+    max_value: 3600
+    required: false
+
+  - name: skip_weekends
+    type: boolean
+    required: false
+    description: "Whether to shift to next business day if anchor falls on weekend"
+
+  - name: skip_holidays
+    type: boolean
+    required: false
+    description: "Whether to shift if anchor falls on a configured holiday"
+

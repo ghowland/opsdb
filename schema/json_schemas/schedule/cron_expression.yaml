@@ -1,0 +1,37 @@
+
+# === cron_expression.yaml ===
+name: cron_expression
+description: "JSON schema for schedule of type cron_expression. Standard cron format scheduling."
+discriminator_field: schedule_type
+discriminator_value: cron_expression
+
+fields:
+  - name: expression
+    type: string
+    max_length: 255
+    required: true
+    description: "Cron expression. 5-field (minute hour day_of_month month day_of_week) or 6-field with seconds."
+
+  - name: timezone
+    type: string
+    max_length: 64
+    required: true
+    description: "Timezone for cron evaluation. UTC, America/Los_Angeles, etc."
+
+  - name: jitter_seconds
+    type: int
+    min_value: 0
+    max_value: 3600
+    required: false
+    description: "Random delay added to scheduled time to prevent thundering herd. 0 for exact."
+
+  - name: skip_if_previous_running
+    type: boolean
+    required: true
+    description: "Whether to skip this invocation if the previous cycle is still running"
+
+  - name: catchup_missed
+    type: boolean
+    required: false
+    description: "Whether to run missed invocations on startup. False means skip missed and wait for next."
+

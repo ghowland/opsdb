@@ -1,0 +1,38 @@
+
+# === rate_based.yaml ===
+name: rate_based
+description: "JSON schema for schedule of type rate_based. Fixed interval scheduling."
+discriminator_field: schedule_type
+discriminator_value: rate_based
+
+fields:
+  - name: interval_seconds
+    type: int
+    min_value: 1
+    max_value: 604800
+    required: true
+    description: "Seconds between invocations"
+
+  - name: jitter_seconds
+    type: int
+    min_value: 0
+    max_value: 3600
+    required: false
+    description: "Random jitter added to interval"
+
+  - name: skip_if_previous_running
+    type: boolean
+    required: true
+    description: "Whether to skip if previous cycle still running"
+
+  - name: align_to_interval
+    type: boolean
+    required: false
+    description: "Whether to align invocations to clock boundaries. Every-5-minute schedule fires at :00, :05, :10, not at arbitrary offsets."
+
+  - name: initial_delay_seconds
+    type: int
+    min_value: 0
+    max_value: 3600
+    required: false
+    description: "Delay before first invocation after runner starts. Allows staggering."

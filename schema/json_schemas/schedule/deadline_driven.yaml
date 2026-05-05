@@ -1,0 +1,50 @@
+
+# === deadline_driven.yaml ===
+name: deadline_driven
+description: "JSON schema for schedule of type deadline_driven. Runs relative to a deadline — certificate expiry, contract end date, compliance audit due date."
+discriminator_field: schedule_type
+discriminator_value: deadline_driven
+
+fields:
+  - name: deadline_source
+    type: string
+    allowed_values: [entity_field, schedule_field, manual]
+    required: true
+    description: "Where the deadline comes from"
+
+  - name: deadline_entity_type
+    type: string
+    max_length: 255
+    required: false
+    description: "Entity type containing the deadline field. Required when deadline_source is entity_field."
+
+  - name: deadline_field_name
+    type: string
+    max_length: 255
+    required: false
+    description: "Field name containing the deadline datetime. Required when deadline_source is entity_field."
+
+  - name: warning_offsets_days
+    type: string
+    max_length: 255
+    required: true
+    description: "Comma-separated days before deadline to trigger. 90,60,30,14,7,3,1 for escalating urgency."
+
+  - name: action_at_each_offset
+    type: string
+    allowed_values: [notify, file_finding, page, run_renewal]
+    required: true
+    description: "What happens at each warning offset"
+
+  - name: action_on_deadline_passed
+    type: string
+    allowed_values: [file_critical_finding, page_immediately, continue_warning]
+    required: true
+    description: "What happens when deadline has passed without resolution"
+
+  - name: timezone
+    type: string
+    max_length: 64
+    required: true
+    description: "Timezone for deadline evaluation"
+

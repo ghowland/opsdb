@@ -1,0 +1,49 @@
+
+
+# === event_triggered.yaml ===
+name: event_triggered
+description: "JSON schema for schedule of type event_triggered. Runs in response to an external event."
+discriminator_field: schedule_type
+discriminator_value: event_triggered
+
+fields:
+  - name: event_source
+    type: string
+    allowed_values: [k8s_watch, webhook, opsdb_change_set_approved, opsdb_entity_created, opsdb_entity_updated, cloud_event]
+    required: true
+    description: "Where events come from"
+
+  - name: event_filter
+    type: string
+    max_length: 4096
+    required: false
+    description: "Filter criteria for which events trigger invocation. Entity type, field name, value pattern."
+
+  - name: debounce_seconds
+    type: int
+    min_value: 0
+    max_value: 3600
+    required: false
+    description: "Minimum seconds between invocations from rapid events. Prevents storm."
+
+  - name: batch_window_seconds
+    type: int
+    min_value: 0
+    max_value: 300
+    required: false
+    description: "Collect events for this many seconds before processing as batch. 0 for immediate."
+
+  - name: max_events_per_batch
+    type: int
+    min_value: 1
+    max_value: 10000
+    required: false
+    description: "Maximum events in a batch before forcing processing"
+
+  - name: reconciler_backstop_interval_seconds
+    type: int
+    min_value: 60
+    max_value: 86400
+    required: true
+    description: "How often to run a full reconciliation regardless of events. Level-triggered backstop."
+

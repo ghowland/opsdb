@@ -1,0 +1,44 @@
+
+# === s3.yaml ===
+name: s3
+description: "JSON schema for storage_resource of type s3. AWS S3 as a storage resource."
+discriminator_field: storage_resource_type
+discriminator_value: s3
+
+fields:
+  - name: bucket_name
+    type: string
+    max_length: 255
+    required: true
+    description: "S3 bucket name"
+
+  - name: prefix
+    type: string
+    max_length: 1024
+    required: false
+    description: "Key prefix if this storage resource is a partition within a bucket"
+
+  - name: storage_class
+    type: string
+    allowed_values: [standard, intelligent_tiering, standard_ia, onezone_ia, glacier_instant, glacier_flexible, glacier_deep_archive]
+    required: true
+    description: "Default storage class"
+
+  - name: versioning_enabled
+    type: boolean
+    required: true
+
+  - name: lifecycle_transition_days
+    type: int
+    min_value: 0
+    max_value: 36500
+    required: false
+    description: "Days before objects transition to cheaper storage class"
+
+  - name: lifecycle_expiration_days
+    type: int
+    min_value: 0
+    max_value: 36500
+    required: false
+    description: "Days before objects expire. 0 means no expiration."
+
