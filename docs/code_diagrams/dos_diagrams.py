@@ -716,7 +716,7 @@ ax.text(
 )
 ax.text(
     9.0,
-    8.95,
+    8.95 + 0.2,
     "Many callers, one ordered boundary before state can change.",
     color=SILVER,
     fontsize=10,
