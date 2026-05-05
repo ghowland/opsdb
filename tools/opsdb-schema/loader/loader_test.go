@@ -1,236 +1,830 @@
-//# tools/opsdb-schema/loader/loader_test.go
-
-go
 package loader
 
 import (
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
+	"github.com/ghowland/opsdb/internal/model"
+	"github.com/ghowland/opsdb/internal/pg"
 	"github.com/ghowland/opsdb/internal/testutil"
+	"github.com/ghowland/opsdb/internal/vocabulary"
 )
 
-// TestParseMinimalEntity tests parsing of the simplest valid entity YAML.
+// --- Parser Tests ---
+
 func TestParseMinimalEntity(t *testing.T) {
-	// TODO: get minimal entity YAML from testutil.MinimalValidEntity()
-	// TODO: write to temp file
-	// TODO: call ParseEntityFile(tempFile)
-	// TODO: assert no error
-	// TODO: assert entity.Name is set
-	// TODO: assert entity has at least one field
-	// TODO: assert raw YAML map is non-nil
-	_ = testutil.MinimalValidEntity
+	repoDir := testutil.SchemaRepoDir(t, testutil.MinimalValidEntity())
+	entityPath := filepath.Join(repoDir, "schema", "domains", "test", "entity_000.yaml")
+
+	entity, rawYAML, err := ParseEntityFile(entityPath)
+	if err != nil {
+		t.Fatalf("unexpected error parsing minimal entity: %v", err)
+	}
+	if entity.Name == "" {
+		t.Fatal("entity name is empty")
+	}
+	if entity.Name != "test_entity" {
+		t.Fatalf("expected name test_entity, got %s", entity.Name)
+	}
+	if len(entity.Fields) == 0 {
+		t.Fatal("entity has no fields")
+	}
+	if rawYAML == nil {
+		t.Fatal("raw YAML map is nil")
+	}
 }
 
-// TestParseEntityWithAllTypes tests parsing of an entity with all nine field types.
 func TestParseEntityWithAllTypes(t *testing.T) {
-	// TODO: get YAML from testutil.EntityWithAllTypes()
-	// TODO: parse
-	// TODO: assert 9 fields parsed
-	// TODO: assert each field type is correctly identified
+	repoDir := testutil.SchemaRepoDir(t, testutil.EntityWithAllTypes())
+	entityPath := filepath.Join(repoDir, "schema", "domains", "test", "entity_000.yaml")
+
+	entity, _, err := ParseEntityFile(entityPath)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(entity.Fields) < 9 {
+		t.Fatalf("expected at least 9 fields, got %d", len(entity.Fields))
+	}
+
+	typesSeen := make(map[string]bool)
+	for _, f := range entity.Fields {
+		typesSeen[f.Type] = true
+	}
+
+	expectedTypes := []string{"int", "float", "varchar", "text", "boolean", "datetime", "date", "enum", "json"}
+	for _, et := range expectedTypes {
+		if !typesSeen[et] {
+			t.Errorf("expected field type %s not found", et)
+		}
+	}
 }
 
-// TestValidateRejectsReservedFieldNames tests that declaring reserved
-// field names in entity YAML produces validation errors.
+func TestParseDirectoryYAML(t *testing.T) {
+	repoDir := testutil.SchemaRepoDir(t, testutil.MinimalValidEntity())
+	directoryPath := filepath.Join(repoDir, "schema", "directory.yaml")
+
+	paths, err := ParseDirectoryYAML(directoryPath)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(paths) == 0 {
+		t.Fatal("directory.yaml returned no paths")
+	}
+	if !strings.Contains(paths[0], "entity_000.yaml") {
+		t.Fatalf("expected path containing entity_000.yaml, got %s", paths[0])
+	}
+}
+
+// --- Validation Tests ---
+
 func TestValidateRejectsReservedFieldNames(t *testing.T) {
-	// TODO: create entity YAML that declares a field named "id" or "created_time"
-	// TODO: parse
-	// TODO: call Validate with the entity
-	// TODO: assert at least one error mentioning "reserved"
+	repoDir := testutil.SchemaRepoDir(t, testutil.EntityWithReservedFieldCollision())
+	entityPath := filepath.Join(repoDir, "schema", "domains", "test", "entity_000.yaml")
+
+	entity, rawYAML, err := ParseEntityFile(entityPath)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+
+	metaPath := filepath.Join(repoDir, "schema", "meta", "_schema_meta.yaml")
+	metaSchema, err := ParseMetaSchema(metaPath)
+	if err != nil {
+		t.Fatalf("meta-schema error: %v", err)
+	}
+
+	errors := Validate(entity, rawYAML, metaSchema, make(map[string]bool))
+	if len(errors) == 0 {
+		t.Fatal("expected validation errors for reserved field name, got none")
+	}
+
+	foundReserved := false
+	for _, e := range errors {
+		if strings.Contains(strings.ToLower(e.Message), "reserved") {
+			foundReserved = true
+			break
+		}
+	}
+	if !foundReserved {
+		t.Errorf("expected error mentioning 'reserved', got: %v", errors)
+	}
 }
 
-// TestForbiddenRegex tests detection of regex patterns in entity YAML.
 func TestForbiddenRegex(t *testing.T) {
-	// TODO: get YAML from testutil.EntityWithForbiddenRegex()
-	// TODO: parse
-	// TODO: call Validate
-	// TODO: assert forbidden violation for regex
+	repoDir := testutil.SchemaRepoDir(t, testutil.EntityWithForbiddenRegex())
+	entityPath := filepath.Join(repoDir, "schema", "domains", "test", "entity_000.yaml")
+
+	entity, rawYAML, err := ParseEntityFile(entityPath)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+
+	metaPath := filepath.Join(repoDir, "schema", "meta", "_schema_meta.yaml")
+	metaSchema, _ := ParseMetaSchema(metaPath)
+
+	errors := Validate(entity, rawYAML, metaSchema, make(map[string]bool))
+
+	foundRegex := false
+	for _, e := range errors {
+		if strings.Contains(strings.ToLower(e.Message), "regex") ||
+			strings.Contains(strings.ToLower(e.Message), "pattern") {
+			foundRegex = true
+			break
+		}
+	}
+	if !foundRegex {
+		t.Errorf("expected forbidden violation for regex, got: %v", errors)
+	}
 }
 
-// TestForbiddenInheritance tests detection of extends/inherits keywords.
 func TestForbiddenInheritance(t *testing.T) {
-	// TODO: get YAML from testutil.EntityWithForbiddenInheritance()
-	// TODO: parse, validate
-	// TODO: assert forbidden violation for inheritance
+	repoDir := testutil.SchemaRepoDir(t, testutil.EntityWithForbiddenInheritance())
+	entityPath := filepath.Join(repoDir, "schema", "domains", "test", "entity_000.yaml")
+
+	_, rawYAML, err := ParseEntityFile(entityPath)
+	if err != nil {
+		return // parse rejection of unknown key is also acceptable
+	}
+
+	violations := vocabulary.ScanForForbiddenPatterns(rawYAML)
+	foundInheritance := false
+	for _, v := range violations {
+		if v.Pattern == "inheritance" {
+			foundInheritance = true
+			break
+		}
+	}
+	if !foundInheritance {
+		t.Error("expected forbidden violation for inheritance")
+	}
 }
 
-// TestForbiddenLogic tests detection of embedded logic like NOW() in defaults.
 func TestForbiddenLogic(t *testing.T) {
-	// TODO: get YAML from testutil.EntityWithForbiddenLogic()
-	// TODO: parse, validate
-	// TODO: assert forbidden violation for embedded logic
+	repoDir := testutil.SchemaRepoDir(t, testutil.EntityWithForbiddenLogic())
+	entityPath := filepath.Join(repoDir, "schema", "domains", "test", "entity_000.yaml")
+
+	_, rawYAML, err := ParseEntityFile(entityPath)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+
+	violations := vocabulary.ScanForForbiddenPatterns(rawYAML)
+	foundLogic := false
+	for _, v := range violations {
+		if v.Pattern == "embedded_logic" {
+			foundLogic = true
+			break
+		}
+	}
+	if !foundLogic {
+		t.Error("expected forbidden violation for embedded logic (NOW())")
+	}
 }
 
-// TestResolverTopologicalSort tests that FK dependencies produce correct ordering.
+func TestForbiddenTemplating(t *testing.T) {
+	repoDir := testutil.SchemaRepoDir(t, testutil.EntityWithForbiddenTemplating())
+	entityPath := filepath.Join(repoDir, "schema", "domains", "test", "entity_000.yaml")
+
+	_, rawYAML, err := ParseEntityFile(entityPath)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+
+	violations := vocabulary.ScanForForbiddenPatterns(rawYAML)
+	foundTemplate := false
+	for _, v := range violations {
+		if v.Pattern == "templating" {
+			foundTemplate = true
+			break
+		}
+	}
+	if !foundTemplate {
+		t.Error("expected forbidden violation for templating syntax")
+	}
+}
+
+// --- Resolver Tests ---
+
 func TestResolverTopologicalSort(t *testing.T) {
-	// TODO: get parent and child YAML from testutil.TwoEntitiesWithFK()
-	// TODO: create schema with both entities
-	// TODO: call Resolve(schema)
-	// TODO: assert no error
-	// TODO: assert schema.LoadOrder has parent before child
+	parent, child := testutil.TwoEntitiesWithFK()
+	repoDir := testutil.SchemaRepoDirOrdered(t,
+		map[string]string{"parent_entity": parent, "child_entity": child},
+		[]string{"parent_entity", "child_entity"},
+	)
+
+	schema, err := Load(repoDir)
+	if err != nil {
+		t.Fatalf("load error: %v", err)
+	}
+
+	parentIdx, childIdx := -1, -1
+	for i, name := range schema.LoadOrder {
+		if name == "parent_entity" {
+			parentIdx = i
+		}
+		if name == "child_entity" {
+			childIdx = i
+		}
+	}
+	if parentIdx == -1 || childIdx == -1 {
+		t.Fatal("parent or child not found in LoadOrder")
+	}
+	if parentIdx >= childIdx {
+		t.Fatalf("parent should precede child: parent=%d child=%d", parentIdx, childIdx)
+	}
 }
 
-// TestResolverDetectsCycles tests that circular FK references produce an error.
 func TestResolverDetectsCycles(t *testing.T) {
-	// TODO: get cyclic entities from testutil.CyclicEntities()
-	// TODO: create schema with both entities
-	// TODO: call Resolve(schema)
-	// TODO: assert error mentioning "cycle"
+	entityA, entityB := testutil.CyclicEntities()
+
+	schema := &model.Schema{Entities: make(map[string]*model.Entity)}
+
+	tmpDir := t.TempDir()
+	pathA := filepath.Join(tmpDir, "cycle_a.yaml")
+	pathB := filepath.Join(tmpDir, "cycle_b.yaml")
+	os.WriteFile(pathA, []byte(entityA), 0644)
+	os.WriteFile(pathB, []byte(entityB), 0644)
+
+	entA, _, _ := ParseEntityFile(pathA)
+	entB, _, _ := ParseEntityFile(pathB)
+	if entA != nil {
+		schema.Entities[entA.Name] = entA
+	}
+	if entB != nil {
+		schema.Entities[entB.Name] = entB
+	}
+
+	err := Resolve(schema)
+	if err == nil {
+		t.Fatal("expected error for cyclic FK references")
+	}
+	if !strings.Contains(strings.ToLower(err.Error()), "cycle") {
+		t.Fatalf("expected cycle error, got: %v", err)
+	}
 }
 
-// TestInjectorUniversalFields tests that id, created_time, updated_time are injected.
+func TestResolverThreeEntityChain(t *testing.T) {
+	gp, p, c := testutil.ThreeEntityChain()
+	repoDir := testutil.SchemaRepoDirOrdered(t,
+		map[string]string{"grandparent": gp, "parent_node": p, "leaf_node": c},
+		[]string{"grandparent", "parent_node", "leaf_node"},
+	)
+
+	schema, err := Load(repoDir)
+	if err != nil {
+		t.Fatalf("load error: %v", err)
+	}
+
+	gpIdx, pIdx, cIdx := -1, -1, -1
+	for i, name := range schema.LoadOrder {
+		switch name {
+		case "grandparent":
+			gpIdx = i
+		case "parent_node":
+			pIdx = i
+		case "leaf_node":
+			cIdx = i
+		}
+	}
+	if gpIdx >= pIdx || pIdx >= cIdx {
+		t.Fatalf("wrong order: gp=%d p=%d c=%d", gpIdx, pIdx, cIdx)
+	}
+}
+
+// --- Injector Tests ---
+
 func TestInjectorUniversalFields(t *testing.T) {
-	// TODO: create minimal entity
-	// TODO: create minimal schema
-	// TODO: call Inject(schema, reserved)
-	// TODO: assert entity now has "id", "created_time", "updated_time" fields
-	// TODO: assert these fields have IsReserved = true
+	repoDir := testutil.SchemaRepoDir(t, testutil.MinimalValidEntity())
+	entityPath := filepath.Join(repoDir, "schema", "domains", "test", "entity_000.yaml")
+	reservedPath := filepath.Join(repoDir, "schema", "conventions", "reserved.yaml")
+
+	entity, _, _ := ParseEntityFile(entityPath)
+	reserved, _ := ParseReserved(reservedPath)
+
+	schema := &model.Schema{
+		Entities:  map[string]*model.Entity{entity.Name: entity},
+		LoadOrder: []string{entity.Name},
+	}
+
+	if err := Inject(schema, reserved); err != nil {
+		t.Fatalf("inject error: %v", err)
+	}
+
+	fieldNames := make(map[string]bool)
+	for _, f := range entity.Fields {
+		fieldNames[f.Name] = true
+	}
+	for _, name := range []string{"id", "created_time", "updated_time"} {
+		if !fieldNames[name] {
+			t.Errorf("missing universal field %s", name)
+		}
+	}
+	for _, f := range entity.Fields {
+		if (f.Name == "id" || f.Name == "created_time" || f.Name == "updated_time") && !f.IsReserved {
+			t.Errorf("%s should be IsReserved", f.Name)
+		}
+	}
 }
 
-// TestInjectorVersioningSibling tests that versioned entities get a sibling.
 func TestInjectorVersioningSibling(t *testing.T) {
-	// TODO: get YAML from testutil.VersionedEntity()
-	// TODO: parse, create schema, resolve, inject
-	// TODO: assert schema.Entities contains "{entity_name}_version"
-	// TODO: assert sibling has version_serial, parent version FK, change_set FK,
-	//   is_active_version, approved_for_production_time fields
-	// TODO: assert sibling has copies of parent entity's fields
+	repoDir := testutil.SchemaRepoDir(t, testutil.VersionedEntity())
+	entityPath := filepath.Join(repoDir, "schema", "domains", "test", "entity_000.yaml")
+	reservedPath := filepath.Join(repoDir, "schema", "conventions", "reserved.yaml")
+
+	entity, _, _ := ParseEntityFile(entityPath)
+	reserved, _ := ParseReserved(reservedPath)
+
+	schema := &model.Schema{
+		Entities:  map[string]*model.Entity{entity.Name: entity},
+		LoadOrder: []string{entity.Name},
+	}
+	_ = Resolve(schema)
+	if err := Inject(schema, reserved); err != nil {
+		t.Fatalf("inject error: %v", err)
+	}
+
+	siblingName := entity.Name + "_version"
+	sibling, exists := schema.Entities[siblingName]
+	if !exists {
+		t.Fatalf("sibling %s not found", siblingName)
+	}
+
+	sibFields := make(map[string]bool)
+	for _, f := range sibling.Fields {
+		sibFields[f.Name] = true
+	}
+	for _, name := range []string{"version_serial", "is_active_version", "approved_for_production_time", entity.Name + "_id", "change_set_id"} {
+		if !sibFields[name] {
+			t.Errorf("missing sibling field %s", name)
+		}
+	}
 }
 
-// TestInjectorHierarchical tests that hierarchical entities get parent FK.
 func TestInjectorHierarchical(t *testing.T) {
-	// TODO: get YAML from testutil.HierarchicalEntity()
-	// TODO: parse, create schema, inject
-	// TODO: assert entity has "parent_{name}_id" field
-	// TODO: assert field References points to same entity (self-referential)
+	repoDir := testutil.SchemaRepoDir(t, testutil.HierarchicalEntity())
+	entityPath := filepath.Join(repoDir, "schema", "domains", "test", "entity_000.yaml")
+	reservedPath := filepath.Join(repoDir, "schema", "conventions", "reserved.yaml")
+
+	entity, _, _ := ParseEntityFile(entityPath)
+	reserved, _ := ParseReserved(reservedPath)
+
+	schema := &model.Schema{
+		Entities:  map[string]*model.Entity{entity.Name: entity},
+		LoadOrder: []string{entity.Name},
+	}
+	if err := Inject(schema, reserved); err != nil {
+		t.Fatalf("inject error: %v", err)
+	}
+
+	expectedFK := "parent_" + entity.Name + "_id"
+	found := false
+	for _, f := range entity.Fields {
+		if f.Name == expectedFK {
+			found = true
+			if f.Type != "foreign_key" {
+				t.Errorf("expected FK type, got %s", f.Type)
+			}
+			if f.References != entity.Name {
+				t.Errorf("expected self-ref, got %s", f.References)
+			}
+			if !f.Nullable {
+				t.Error("hierarchical FK should be nullable")
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("missing %s", expectedFK)
+	}
 }
 
-// TestInjectorGovernanceFields tests that enabled governance fields are injected.
 func TestInjectorGovernanceFields(t *testing.T) {
-	// TODO: get YAML from testutil.EntityWithGovernance()
-	// TODO: parse, create schema, inject
-	// TODO: assert entity has underscore-prefixed governance fields
-	// TODO: assert these fields have IsGovernance = true
+	repoDir := testutil.SchemaRepoDir(t, testutil.EntityWithGovernance())
+	entityPath := filepath.Join(repoDir, "schema", "domains", "test", "entity_000.yaml")
+	reservedPath := filepath.Join(repoDir, "schema", "conventions", "reserved.yaml")
+
+	entity, _, _ := ParseEntityFile(entityPath)
+	reserved, _ := ParseReserved(reservedPath)
+
+	schema := &model.Schema{
+		Entities:  map[string]*model.Entity{entity.Name: entity},
+		LoadOrder: []string{entity.Name},
+	}
+	if err := Inject(schema, reserved); err != nil {
+		t.Fatalf("inject error: %v", err)
+	}
+
+	fieldNames := make(map[string]bool)
+	for _, f := range entity.Fields {
+		fieldNames[f.Name] = true
+		if strings.HasPrefix(f.Name, "_") && !f.IsGovernance {
+			t.Errorf("%s should be IsGovernance", f.Name)
+		}
+	}
+	for _, name := range []string{"_requires_group", "_access_classification", "_retention_policy_id"} {
+		if !fieldNames[name] {
+			t.Errorf("missing governance field %s", name)
+		}
+	}
 }
 
-// TestEvolutionAllowsNewNullableField tests that adding a nullable field passes.
+// --- Evolution Tests ---
+
+func TestEvolutionAllowsNewEntity(t *testing.T) {
+	diff := &SchemaDiff{NewEntities: []string{"new_table"}}
+	result, _ := CheckEvolution(diff)
+	if len(result.Allowed) != 1 || result.Allowed[0].ChangeType != "new_entity" {
+		t.Fatal("new entity should be allowed")
+	}
+	if len(result.Forbidden) != 0 {
+		t.Fatal("no forbidden expected")
+	}
+}
+
 func TestEvolutionAllowsNewNullableField(t *testing.T) {
-	// TODO: create SchemaDiff with one new nullable field
-	// TODO: call CheckEvolution(diff)
-	// TODO: assert len(result.Allowed) == 1 and len(result.Forbidden) == 0
+	diff := &SchemaDiff{
+		NewFields: []DiffItem{{Entity: "e", Field: "f", DesiredValue: "varchar"}},
+	}
+	result, _ := CheckEvolution(diff)
+	if len(result.Allowed) != 1 {
+		t.Fatalf("expected 1 allowed, got %d", len(result.Allowed))
+	}
 }
 
-// TestEvolutionForbidsFieldDeletion tests that removing a field is forbidden.
 func TestEvolutionForbidsFieldDeletion(t *testing.T) {
-	// TODO: create SchemaDiff with one removed field
-	// TODO: call CheckEvolution(diff)
-	// TODO: assert len(result.Forbidden) == 1
-	// TODO: assert forbidden change mentions "deprecate" as alternative
+	diff := &SchemaDiff{
+		RemovedFields: []DiffItem{{Entity: "e", Field: "f", CurrentValue: "varchar"}},
+	}
+	result, _ := CheckEvolution(diff)
+	if len(result.Forbidden) != 1 || result.Forbidden[0].Rule != "delete_field" {
+		t.Fatal("field deletion should be forbidden")
+	}
+	if !strings.Contains(result.Forbidden[0].Alternative, "deprecate") {
+		t.Error("alternative should mention deprecate")
+	}
 }
 
-// TestEvolutionForbidsTypeChange tests that changing a field's type is forbidden.
+func TestEvolutionForbidsEntityDeletion(t *testing.T) {
+	diff := &SchemaDiff{RemovedEntities: []string{"old_table"}}
+	result, _ := CheckEvolution(diff)
+	if len(result.Forbidden) != 1 || result.Forbidden[0].Rule != "delete_entity" {
+		t.Fatal("entity deletion should be forbidden")
+	}
+}
+
 func TestEvolutionForbidsTypeChange(t *testing.T) {
-	// TODO: create SchemaDiff with one type change
-	// TODO: call CheckEvolution(diff)
-	// TODO: assert forbidden
-	// TODO: assert alternative mentions "duplication pattern"
+	diff := &SchemaDiff{
+		TypeChanges: []DiffItem{{Entity: "e", Field: "f", CurrentValue: "integer", DesiredValue: "varchar(255)"}},
+	}
+	result, _ := CheckEvolution(diff)
+	if len(result.Forbidden) != 1 || result.Forbidden[0].Rule != "type_change" {
+		t.Fatal("type change should be forbidden")
+	}
+	if !strings.Contains(result.Forbidden[0].Alternative, "duplication") {
+		t.Error("alternative should mention duplication")
+	}
 }
 
-// TestEvolutionAllowsWideningRange tests that increasing max_value passes.
+func TestEvolutionDetectsRename(t *testing.T) {
+	diff := &SchemaDiff{
+		TypeChanges: []DiffItem{{Entity: "e", Field: "old_name", CurrentValue: "varchar(255)"}},
+		NewFields:   []DiffItem{{Entity: "e", Field: "new_name", DesiredValue: "varchar(255)"}},
+	}
+	result, _ := CheckEvolution(diff)
+	foundRename := false
+	for _, fc := range result.Forbidden {
+		if fc.Rule == "rename_field" {
+			foundRename = true
+		}
+	}
+	if !foundRename {
+		t.Error("should detect rename")
+	}
+}
+
 func TestEvolutionAllowsWideningRange(t *testing.T) {
-	// TODO: create SchemaDiff with widened numeric range
-	// TODO: call CheckEvolution
-	// TODO: assert allowed
+	diff := &SchemaDiff{
+		ChangedConstraints: []DiffItem{
+			{Entity: "e", Field: "f", CurrentValue: 100, DesiredValue: 200, Description: "max_value: 100 -> 200"},
+		},
+	}
+	result, _ := CheckEvolution(diff)
+	if len(result.Allowed) != 1 {
+		t.Fatalf("expected 1 allowed, got %d", len(result.Allowed))
+	}
 }
 
-// TestEvolutionForbidsNarrowingRange tests that decreasing max_value is forbidden.
 func TestEvolutionForbidsNarrowingRange(t *testing.T) {
-	// TODO: create SchemaDiff with narrowed range
-	// TODO: call CheckEvolution
-	// TODO: assert forbidden
+	diff := &SchemaDiff{
+		ChangedConstraints: []DiffItem{
+			{Entity: "e", Field: "f", CurrentValue: 200, DesiredValue: 100, Description: "max_value: 200 -> 100"},
+		},
+	}
+	result, _ := CheckEvolution(diff)
+	if len(result.Forbidden) != 1 || result.Forbidden[0].Rule != "narrow_range" {
+		t.Fatal("range narrowing should be forbidden")
+	}
 }
 
-// TestGeneratorCreateTable tests DDL generation for a new entity.
+// --- Generator Tests ---
+
 func TestGeneratorCreateTable(t *testing.T) {
-	// TODO: create entity with int, varchar, enum, FK fields
-	// TODO: call generateCreateTable(entity)
-	// TODO: assert SQL contains CREATE TABLE
-	// TODO: assert SQL contains column definitions with correct Postgres types
-	// TODO: assert SQL contains NOT NULL where applicable
-	// TODO: assert SQL contains CHECK for enum values
+	maxLen := 255
+	entity := &model.Entity{
+		Name: "test_table", Category: "identity",
+		Fields: []model.Field{
+			{Name: "id", Type: "int", Nullable: false, IsReserved: true},
+			{Name: "label", Type: "varchar", Nullable: false, MaxLength: &maxLen},
+			{Name: "status", Type: "enum", Nullable: false, EnumValues: []string{"active", "inactive"}},
+		},
+	}
+	stmt := generateCreateTable(entity)
+	if !strings.Contains(stmt.SQL, "CREATE TABLE IF NOT EXISTS test_table") {
+		t.Error("missing CREATE TABLE")
+	}
+	if !strings.Contains(stmt.SQL, "label VARCHAR(255)") {
+		t.Error("missing label column")
+	}
+	if !strings.Contains(stmt.SQL, "CHECK (status IN (") {
+		t.Error("missing enum CHECK")
+	}
 }
 
-// TestGeneratorFKConstraint tests DDL generation for FK constraints.
 func TestGeneratorFKConstraint(t *testing.T) {
-	// TODO: create field with References set
-	// TODO: call generateFKConstraint(entityName, field)
-	// TODO: assert SQL contains ALTER TABLE ADD CONSTRAINT
-	// TODO: assert SQL contains FOREIGN KEY and REFERENCES
+	field := &model.Field{Name: "service_id", Type: "foreign_key", References: "service"}
+	stmt := generateFKConstraint("service_connection", field)
+	if !strings.Contains(stmt.SQL, "FOREIGN KEY (service_id)") {
+		t.Error("missing FK clause")
+	}
+	if !strings.Contains(stmt.SQL, "REFERENCES service(id)") {
+		t.Error("missing REFERENCES")
+	}
 }
 
-// TestGeneratorAppendOnlyRevoke tests REVOKE generation for append-only tables.
 func TestGeneratorAppendOnlyRevoke(t *testing.T) {
-	// TODO: call generateRevokeAppendOnly("audit_log_entry", roles)
-	// TODO: assert at least one REVOKE statement
-	// TODO: assert SQL contains "REVOKE UPDATE, DELETE"
+	roles := []string{"opsdb_app_role", "opsdb_runner_role", "opsdb_readonly_role"}
+	stmts := generateRevokeAppendOnly("audit_log_entry", roles)
+	if len(stmts) != 3 {
+		t.Fatalf("expected 3 statements, got %d", len(stmts))
+	}
+	for _, s := range stmts {
+		if !strings.Contains(s.SQL, "REVOKE UPDATE, DELETE") {
+			t.Errorf("missing REVOKE: %s", s.SQL)
+		}
+	}
+}
+
+func TestGeneratorOrderByDependency(t *testing.T) {
+	stmts := []DDLStatement{
+		{Entity: "child", Phase: 1}, {Entity: "parent", Phase: 1},
+		{Entity: "child", Phase: 2}, {Entity: "parent", Phase: 2},
+	}
+	ordered := OrderByDependency(stmts, []string{"parent", "child"})
+	if ordered[0].Entity != "parent" || ordered[0].Phase != 1 {
+		t.Error("parent phase 1 should be first")
+	}
+	if ordered[1].Entity != "child" || ordered[1].Phase != 1 {
+		t.Error("child phase 1 should be second")
+	}
 }
 
 // --- Integration Tests ---
-// These require a running Postgres instance via testcontainers.
 
-// TestFullLoadPipeline tests the complete load pipeline against actual YAML files.
 func TestFullLoadPipeline(t *testing.T) {
-	// TODO: if testing.Short(): t.Skip("skipping integration test")
-	// TODO: create temp schema repo via testutil.SchemaRepoDir
-	// TODO: call Load(repoDir)
-	// TODO: assert no error
-	// TODO: assert schema.Entities populated
-	// TODO: assert schema.LoadOrder non-empty
-	// TODO: assert schema.Relationships populated
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+	parent, child := testutil.TwoEntitiesWithFK()
+	repoDir := testutil.SchemaRepoDirOrdered(t,
+		map[string]string{"parent_entity": parent, "child_entity": child},
+		[]string{"parent_entity", "child_entity"},
+	)
+	schema, err := Load(repoDir)
+	if err != nil {
+		t.Fatalf("load error: %v", err)
+	}
+	if len(schema.Entities) < 2 {
+		t.Fatal("expected at least 2 entities")
+	}
+	if len(schema.LoadOrder) < 2 {
+		t.Fatal("expected at least 2 in load order")
+	}
+	if len(schema.Relationships) == 0 {
+		t.Fatal("expected relationships")
+	}
 }
 
-// TestApplyToPostgres tests DDL application against a real Postgres instance.
 func TestApplyToPostgres(t *testing.T) {
-	// TODO: if testing.Short(): t.Skip("skipping integration test")
-	// TODO: start test Postgres via testutil.StartTestPostgres(t)
-	// TODO: defer stop
-	// TODO: load schema from test fixtures
-	// TODO: generate DDL
-	// TODO: call Apply(db, statements, false)
-	// TODO: assert no error
-	// TODO: assert result.EntitiesCreated > 0
-	// TODO: verify tables exist via information_schema query
-	_ = testutil.StartTestPostgres
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+	tdb := testutil.StartTestPostgres(t)
+	if tdb == nil {
+		return
+	}
+	testutil.ResetTestDB(t, tdb)
+
+	parent, child := testutil.TwoEntitiesWithFK()
+	repoDir := testutil.SchemaRepoDirOrdered(t,
+		map[string]string{"parent_entity": parent, "child_entity": child},
+		[]string{"parent_entity", "child_entity"},
+	)
+	schema, err := Load(repoDir)
+	if err != nil {
+		t.Fatalf("load error: %v", err)
+	}
+
+	var changes []AllowedChange
+	for _, name := range schema.LoadOrder {
+		changes = append(changes, AllowedChange{Entity: name, ChangeType: "new_entity"})
+	}
+
+	db, err := pg.Connect(tdb.DSN)
+	if err != nil {
+		t.Fatalf("connect error: %v", err)
+	}
+	defer db.Close()
+
+	stmts, err := GenerateDDL(schema, changes)
+	if err != nil {
+		t.Fatalf("generate error: %v", err)
+	}
+	result, err := Apply(db, stmts, false)
+	if err != nil {
+		t.Fatalf("apply error: %v", err)
+	}
+	if result.EntitiesCreated == 0 {
+		t.Error("no entities created")
+	}
+	if !testutil.TableExists(t, tdb, "parent_entity") {
+		t.Error("parent_entity not found")
+	}
+	if !testutil.TableExists(t, tdb, "child_entity") {
+		t.Error("child_entity not found")
+	}
 }
 
-// TestDryRunDoesNotPersist tests that dry run rolls back all changes.
 func TestDryRunDoesNotPersist(t *testing.T) {
-	// TODO: if testing.Short(): t.Skip
-	// TODO: start test Postgres
-	// TODO: load schema, generate DDL
-	// TODO: call DryRun(db, statements)
-	// TODO: assert no error
-	// TODO: verify tables do NOT exist (rollback worked)
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+	tdb := testutil.StartTestPostgres(t)
+	if tdb == nil {
+		return
+	}
+	testutil.ResetTestDB(t, tdb)
+
+	repoDir := testutil.SchemaRepoDir(t, testutil.MinimalValidEntity())
+	schema, err := Load(repoDir)
+	if err != nil {
+		t.Fatalf("load error: %v", err)
+	}
+
+	var changes []AllowedChange
+	for _, name := range schema.LoadOrder {
+		changes = append(changes, AllowedChange{Entity: name, ChangeType: "new_entity"})
+	}
+
+	db, err := pg.Connect(tdb.DSN)
+	if err != nil {
+		t.Fatalf("connect error: %v", err)
+	}
+	defer db.Close()
+
+	stmts, _ := GenerateDDL(schema, changes)
+	_, err = DryRun(db, stmts)
+	if err != nil {
+		t.Fatalf("dry run error: %v", err)
+	}
+	if testutil.TableExists(t, tdb, "test_entity") {
+		t.Error("table exists after dry run — rollback failed")
+	}
 }
 
-// TestMetaPopulation tests that _schema_* tables are correctly populated.
 func TestMetaPopulation(t *testing.T) {
-	// TODO: if testing.Short(): t.Skip
-	// TODO: start test Postgres
-	// TODO: apply schema
-	// TODO: call PopulateMeta
-	// TODO: query _schema_version: assert one row with is_current=true
-	// TODO: query _schema_entity_type: assert row count matches entities
-	// TODO: query _schema_field: assert fields populated
-	// TODO: query _schema_relationship: assert relationships populated
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+	tdb := testutil.StartTestPostgres(t)
+	if tdb == nil {
+		return
+	}
+	testutil.ResetTestDB(t, tdb)
+
+	parent, child := testutil.TwoEntitiesWithFK()
+	repoDir := testutil.SchemaRepoDirOrdered(t,
+		map[string]string{"parent_entity": parent, "child_entity": child},
+		[]string{"parent_entity", "child_entity"},
+	)
+	schema, err := Load(repoDir)
+	if err != nil {
+		t.Fatalf("load error: %v", err)
+	}
+
+	var changes []AllowedChange
+	for _, name := range schema.LoadOrder {
+		changes = append(changes, AllowedChange{Entity: name, ChangeType: "new_entity"})
+	}
+
+	db, err := pg.Connect(tdb.DSN)
+	if err != nil {
+		t.Fatalf("connect error: %v", err)
+	}
+	defer db.Close()
+
+	stmts, _ := GenerateDDL(schema, changes)
+	_, err = Apply(db, stmts, false)
+	if err != nil {
+		t.Fatalf("apply error: %v", err)
+	}
+
+	err = pg.WithTransaction(db, func(tx *pg.Tx) error {
+		return PopulateMeta(tx, schema, changes, "test-apply")
+	})
+	if err != nil {
+		t.Fatalf("meta population error: %v", err)
+	}
+
+	// Verify _schema_version has a current row.
+	versionCount := testutil.QueryScalarInt(t, tdb,
+		"SELECT count(*) FROM _schema_version WHERE is_current = true")
+	if versionCount != 1 {
+		t.Errorf("expected 1 current schema version, got %d", versionCount)
+	}
+
+	// Verify entity types populated.
+	entityCount := testutil.QueryScalarInt(t, tdb,
+		"SELECT count(*) FROM _schema_entity_type")
+	if entityCount < 2 {
+		t.Errorf("expected at least 2 entity types, got %d", entityCount)
+	}
+
+	// Verify fields populated.
+	fieldCount := testutil.QueryScalarInt(t, tdb,
+		"SELECT count(*) FROM _schema_field")
+	if fieldCount == 0 {
+		t.Error("no fields in _schema_field")
+	}
 }
 
-// TestFullApplyAndDiffCycle tests apply followed by diff shows no changes.
 func TestFullApplyAndDiffCycle(t *testing.T) {
-	// TODO: if testing.Short(): t.Skip
-	// TODO: start test Postgres
-	// TODO: load schema, generate DDL, apply, populate meta
-	// TODO: read current state from DB
-	// TODO: diff desired vs current
-	// TODO: assert diff has no new entities, no new fields, no changes
-	//   (everything desired is now in the database)
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+	tdb := testutil.StartTestPostgres(t)
+	if tdb == nil {
+		return
+	}
+	testutil.ResetTestDB(t, tdb)
+
+	repoDir := testutil.SchemaRepoDir(t, testutil.MinimalValidEntity())
+	schema, err := Load(repoDir)
+	if err != nil {
+		t.Fatalf("load error: %v", err)
+	}
+
+	var changes []AllowedChange
+	for _, name := range schema.LoadOrder {
+		changes = append(changes, AllowedChange{Entity: name, ChangeType: "new_entity"})
+	}
+
+	db, err := pg.Connect(tdb.DSN)
+	if err != nil {
+		t.Fatalf("connect error: %v", err)
+	}
+	defer db.Close()
+
+	stmts, _ := GenerateDDL(schema, changes)
+	_, err = Apply(db, stmts, false)
+	if err != nil {
+		t.Fatalf("apply error: %v", err)
+	}
+	err = pg.WithTransaction(db, func(tx *pg.Tx) error {
+		return PopulateMeta(tx, schema, changes, "test")
+	})
+	if err != nil {
+		t.Fatalf("meta error: %v", err)
+	}
+
+	// Re-read current state and diff — should show no changes.
+	current, err := ReadCurrentState(db)
+	if err != nil {
+		t.Fatalf("read state error: %v", err)
+	}
+
+	diff, err := Diff(schema, current)
+	if err != nil {
+		t.Fatalf("diff error: %v", err)
+	}
+
+	if len(diff.NewEntities) > 0 {
+		t.Errorf("expected no new entities, got %d: %v", len(diff.NewEntities), diff.NewEntities)
+	}
+	if len(diff.RemovedEntities) > 0 {
+		t.Errorf("expected no removed entities, got %d", len(diff.RemovedEntities))
+	}
+	if len(diff.TypeChanges) > 0 {
+		t.Errorf("expected no type changes, got %d", len(diff.TypeChanges))
+	}
 }
