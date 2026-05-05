@@ -1,3 +1,4 @@
+// === importers/opsdb-import-oncall/pagerduty.go ===
 package oncall
 
 import (
@@ -10,196 +11,231 @@ import (
 	runner "github.com/ghowland/opsdb/tools/opsdb-runner-lib"
 )
 
-// ImportOpsgenieSchedules reads on-call schedules from the Opsgenie API
+// ImportConfig holds on-call importer configuration shared across backends.
+type ImportConfig struct {
+	Backend              string
+	APIToken             string
+	BaseURL              string
+	BatchSize            int
+	MaxRetries           int
+	AssignmentWindowDays int
+}
+
+// Observation is the observation structure for on-call importers.
+type Observation struct {
+	EntityType string
+	EntityID   string
+	StateKey   string
+	Value      string
+	DataJSON   map[string]interface{}
+}
+
+// ImportPagerDutySchedules reads on-call schedules from the PagerDuty API
 // and maps them to on_call_schedule observations.
-func ImportOpsgenieSchedules(config *ImportConfig) ([]Observation, error) {
+func ImportPagerDutySchedules(config *ImportConfig) ([]Observation, error) {
 	var results []Observation
 
-	client := newOpsgenieClient(config)
+	client := newPagerDutyClient(config)
 	offset := 0
+	more := true
 
-	for {
-		schedules, total, err := client.ListSchedules(offset, config.BatchSize)
+	for more {
+		schedules, hasMore, err := client.ListSchedules(offset, config.BatchSize)
 		if err != nil {
-			return results, fmt.Errorf("opsgenie list schedules offset=%d: %w", offset, err)
+			return results, fmt.Errorf("pagerduty list schedules offset=%d: %w", offset, err)
 		}
 
 		for _, sched := range schedules {
-			rotationNames := make([]string, 0, len(sched.Rotations))
-			for _, rot := range sched.Rotations {
-				rotationNames = append(rotationNames, rot.Name)
+			layerNames := make([]string, 0, len(sched.ScheduleLayers))
+			for _, layer := range sched.ScheduleLayers {
+				layerNames = append(layerNames, layer.Name)
 			}
 
 			obs := Observation{
 				EntityType: "on_call_schedule",
 				EntityID:   sched.ID,
-				StateKey:   "opsgenie_schedule",
+				StateKey:   "pagerduty_schedule",
 				Value:      sched.Name,
 				DataJSON: map[string]interface{}{
-					"name":            sched.Name,
-					"timezone":        sched.Timezone,
-					"enabled":         sched.Enabled,
-					"rotation_count":  len(sched.Rotations),
-					"rotation_names":  rotationNames,
-					"description":     sched.Description,
-					"opsgenie_id":     sched.ID,
-					"owner_team_id":   sched.OwnerTeamID,
-					"owner_team_name": sched.OwnerTeamName,
+					"name":              sched.Name,
+					"description":       sched.Description,
+					"timezone":          sched.TimeZone,
+					"layer_count":       len(sched.ScheduleLayers),
+					"layer_names":       layerNames,
+					"pagerduty_id":      sched.ID,
+					"pagerduty_html_url": sched.HTMLURL,
 				},
 			}
 			results = append(results, obs)
 		}
 
 		offset += len(schedules)
-		if offset >= total {
-			break
-		}
+		more = hasMore
 	}
 
 	return results, nil
 }
 
-// ImportOpsgenieAssignments reads current on-call assignments for all schedules
-// from the Opsgenie API and maps them to on_call_assignment observations.
-func ImportOpsgenieAssignments(config *ImportConfig) ([]Observation, error) {
+// ImportPagerDutyAssignments reads current and upcoming on-call assignments
+// from the PagerDuty API and maps them to on_call_assignment observations.
+func ImportPagerDutyAssignments(config *ImportConfig) ([]Observation, error) {
 	var results []Observation
 
-	client := newOpsgenieClient(config)
+	client := newPagerDutyClient(config)
 	offset := 0
+	more := true
 
-	for {
-		schedules, total, err := client.ListSchedules(offset, config.BatchSize)
+	windowDays := config.AssignmentWindowDays
+	if windowDays <= 0 {
+		windowDays = 14
+	}
+	since := time.Now().UTC()
+	until := since.AddDate(0, 0, windowDays)
+
+	// first collect all schedule IDs
+	var scheduleIDs []string
+	for more {
+		schedules, hasMore, err := client.ListSchedules(offset, config.BatchSize)
 		if err != nil {
-			return results, fmt.Errorf("opsgenie list schedules for assignments offset=%d: %w", offset, err)
+			return results, fmt.Errorf("pagerduty list schedules for assignments offset=%d: %w", offset, err)
 		}
-
 		for _, sched := range schedules {
-			participants, err := client.GetOnCallParticipants(sched.ID)
-			if err != nil {
-				results = append(results, Observation{
-					EntityType: "on_call_assignment",
-					EntityID:   fmt.Sprintf("%s_error", sched.ID),
-					StateKey:   "opsgenie_assignment_error",
-					Value:      fmt.Sprintf("failed to read participants: %v", err),
-					DataJSON: map[string]interface{}{
-						"schedule_id": sched.ID,
-						"error":       err.Error(),
-					},
-				})
-				continue
-			}
+			scheduleIDs = append(scheduleIDs, sched.ID)
+		}
+		offset += len(schedules)
+		more = hasMore
+	}
 
-			for i, participant := range participants {
-				assignmentID := fmt.Sprintf("%s_%d", sched.ID, i)
-				obs := Observation{
-					EntityType: "on_call_assignment",
-					EntityID:   assignmentID,
-					StateKey:   "opsgenie_assignment",
-					Value:      participant.Name,
-					DataJSON: map[string]interface{}{
-						"schedule_id":      sched.ID,
-						"schedule_name":    sched.Name,
-						"participant_name": participant.Name,
-						"participant_id":   participant.ID,
-						"participant_type": participant.Type,
-						"rotation_id":      participant.RotationID,
-						"rotation_name":    participant.RotationName,
-						"start_time":       participant.StartTime.Format(time.RFC3339),
-						"end_time":         participant.EndTime.Format(time.RFC3339),
-						"opsgenie_id":      sched.ID,
-					},
-				}
-				results = append(results, obs)
-			}
+	for _, schedID := range scheduleIDs {
+		entries, scheduleName, err := client.ListOnCalls(schedID, since, until)
+		if err != nil {
+			results = append(results, Observation{
+				EntityType: "on_call_assignment",
+				EntityID:   fmt.Sprintf("%s_error", schedID),
+				StateKey:   "pagerduty_assignment_error",
+				Value:      fmt.Sprintf("failed to read on-calls: %v", err),
+				DataJSON: map[string]interface{}{
+					"schedule_id": schedID,
+					"error":       err.Error(),
+				},
+			})
+			continue
 		}
 
-		offset += len(schedules)
-		if offset >= total {
-			break
+		for i, entry := range entries {
+			assignmentID := fmt.Sprintf("%s_%d", schedID, i)
+			obs := Observation{
+				EntityType: "on_call_assignment",
+				EntityID:   assignmentID,
+				StateKey:   "pagerduty_assignment",
+				Value:      entry.UserName,
+				DataJSON: map[string]interface{}{
+					"schedule_id":        schedID,
+					"schedule_name":      scheduleName,
+					"user_name":          entry.UserName,
+					"user_id":            entry.UserID,
+					"user_email":         entry.UserEmail,
+					"start_time":         entry.Start.Format(time.RFC3339),
+					"end_time":           entry.End.Format(time.RFC3339),
+					"escalation_level":   entry.EscalationLevel,
+					"escalation_policy_id": entry.EscalationPolicyID,
+					"pagerduty_schedule_id": schedID,
+				},
+			}
+			results = append(results, obs)
 		}
 	}
 
 	return results, nil
 }
 
-// ImportOpsgenieEscalations reads escalation policies from the Opsgenie API
+// ImportPagerDutyEscalations reads escalation policies from the PagerDuty API
 // and maps them to escalation_path observations.
-func ImportOpsgenieEscalations(config *ImportConfig) ([]Observation, error) {
+func ImportPagerDutyEscalations(config *ImportConfig) ([]Observation, error) {
 	var results []Observation
 
-	client := newOpsgenieClient(config)
+	client := newPagerDutyClient(config)
 	offset := 0
+	more := true
 
-	for {
-		policies, total, err := client.ListEscalations(offset, config.BatchSize)
+	for more {
+		policies, hasMore, err := client.ListEscalationPolicies(offset, config.BatchSize)
 		if err != nil {
-			return results, fmt.Errorf("opsgenie list escalations offset=%d: %w", offset, err)
+			return results, fmt.Errorf("pagerduty list escalation policies offset=%d: %w", offset, err)
 		}
 
 		for _, policy := range policies {
+			serviceIDs := make([]string, 0, len(policy.Services))
+			for _, svc := range policy.Services {
+				serviceIDs = append(serviceIDs, svc.ID)
+			}
+
 			obs := Observation{
 				EntityType: "escalation_path",
 				EntityID:   policy.ID,
-				StateKey:   "opsgenie_escalation",
+				StateKey:   "pagerduty_escalation",
 				Value:      policy.Name,
 				DataJSON: map[string]interface{}{
-					"name":            policy.Name,
-					"description":     policy.Description,
-					"rule_count":      len(policy.Rules),
-					"owner_team_id":   policy.OwnerTeamID,
-					"owner_team_name": policy.OwnerTeamName,
-					"repeat_count":    policy.RepeatCount,
-					"opsgenie_id":     policy.ID,
+					"name":               policy.Name,
+					"description":        policy.Description,
+					"num_loops":          policy.NumLoops,
+					"rule_count":         len(policy.Rules),
+					"service_count":      len(policy.Services),
+					"service_ids":        serviceIDs,
+					"on_call_handoff":    policy.OnCallHandoff,
+					"pagerduty_id":       policy.ID,
+					"pagerduty_html_url": policy.HTMLURL,
 				},
 			}
 			results = append(results, obs)
 		}
 
 		offset += len(policies)
-		if offset >= total {
-			break
-		}
+		more = hasMore
 	}
 
 	return results, nil
 }
 
-// ImportOpsgenieEscalationSteps reads escalation rules (steps) from each
-// escalation policy and maps them to escalation_step observations.
-func ImportOpsgenieEscalationSteps(config *ImportConfig) ([]Observation, error) {
+// ImportPagerDutyEscalationSteps reads escalation rules from each policy
+// and maps them to escalation_step observations.
+func ImportPagerDutyEscalationSteps(config *ImportConfig) ([]Observation, error) {
 	var results []Observation
 
-	client := newOpsgenieClient(config)
+	client := newPagerDutyClient(config)
 	offset := 0
+	more := true
 
-	for {
-		policies, total, err := client.ListEscalations(offset, config.BatchSize)
+	for more {
+		policies, hasMore, err := client.ListEscalationPolicies(offset, config.BatchSize)
 		if err != nil {
-			return results, fmt.Errorf("opsgenie list escalations for steps offset=%d: %w", offset, err)
+			return results, fmt.Errorf("pagerduty list escalation policies for steps offset=%d: %w", offset, err)
 		}
 
 		for _, policy := range policies {
 			for stepOrder, rule := range policy.Rules {
-				recipientNames := make([]string, 0, len(rule.Recipients))
-				for _, r := range rule.Recipients {
-					recipientNames = append(recipientNames, r.Name)
+				targetNames := make([]string, 0, len(rule.Targets))
+				targetTypes := make([]string, 0, len(rule.Targets))
+				for _, target := range rule.Targets {
+					targetNames = append(targetNames, target.Name)
+					targetTypes = append(targetTypes, target.Type)
 				}
 
 				stepID := fmt.Sprintf("%s_step_%d", policy.ID, stepOrder)
 				obs := Observation{
 					EntityType: "escalation_step",
 					EntityID:   stepID,
-					StateKey:   "opsgenie_escalation_step",
+					StateKey:   "pagerduty_escalation_step",
 					Value:      fmt.Sprintf("step %d of %s", stepOrder+1, policy.Name),
 					DataJSON: map[string]interface{}{
 						"escalation_path_id":   policy.ID,
 						"escalation_path_name": policy.Name,
 						"step_order":           stepOrder + 1,
-						"delay_minutes":        rule.DelayMinutes,
-						"notify_type":          rule.NotifyType,
-						"recipient_count":      len(rule.Recipients),
-						"recipient_names":      recipientNames,
-						"opsgenie_rule_id":     rule.ID,
+						"escalation_delay_minutes": rule.EscalationDelayMinutes,
+						"target_count":         len(rule.Targets),
+						"target_names":         targetNames,
+						"target_types":         targetTypes,
+						"pagerduty_rule_id":    rule.ID,
 					},
 				}
 				results = append(results, obs)
@@ -207,31 +243,27 @@ func ImportOpsgenieEscalationSteps(config *ImportConfig) ([]Observation, error) 
 		}
 
 		offset += len(policies)
-		if offset >= total {
-			break
-		}
+		more = hasMore
 	}
 
 	return results, nil
 }
 
-// opsgenieClient wraps Opsgenie API access with authentication and retry.
-type opsgenieClient struct {
-	apiToken   string
-	baseURL    string
-	maxRetries int
+// pagerDutyClient wraps PagerDuty API access with authentication and retry.
+type pagerDutyClient struct {
+	apiToken    string
+	baseURL     string
 	retryConfig runner.RetryConfig
 }
 
-func newOpsgenieClient(config *ImportConfig) *opsgenieClient {
+func newPagerDutyClient(config *ImportConfig) *pagerDutyClient {
 	baseURL := config.BaseURL
 	if baseURL == "" {
-		baseURL = "https://api.opsgenie.com/v2"
+		baseURL = "https://api.pagerduty.com"
 	}
-	return &opsgenieClient{
-		apiToken:   config.APIToken,
-		baseURL:    baseURL,
-		maxRetries: config.MaxRetries,
+	return &pagerDutyClient{
+		apiToken: config.APIToken,
+		baseURL:  baseURL,
 		retryConfig: runner.RetryConfig{
 			MaxAttempts:  config.MaxRetries,
 			BaseDelay:    time.Second,
@@ -242,93 +274,100 @@ func newOpsgenieClient(config *ImportConfig) *opsgenieClient {
 	}
 }
 
-// OpsgenieSchedule represents a schedule from the Opsgenie API.
-type OpsgenieSchedule struct {
-	ID            string
-	Name          string
-	Description   string
-	Timezone      string
-	Enabled       bool
-	OwnerTeamID   string
-	OwnerTeamName string
-	Rotations     []OpsgenieRotation
+// PDSchedule represents a schedule from the PagerDuty API.
+type PDSchedule struct {
+	ID             string
+	Name           string
+	Description    string
+	TimeZone       string
+	HTMLURL        string
+	ScheduleLayers []PDScheduleLayer
 }
 
-// OpsgenieRotation represents a rotation within a schedule.
-type OpsgenieRotation struct {
+// PDScheduleLayer represents a layer within a schedule.
+type PDScheduleLayer struct {
+	ID   string
+	Name string
+}
+
+// PDOnCallEntry represents one on-call assignment period.
+type PDOnCallEntry struct {
+	UserName           string
+	UserID             string
+	UserEmail          string
+	Start              time.Time
+	End                time.Time
+	EscalationLevel    int
+	EscalationPolicyID string
+}
+
+// PDEscalationPolicy represents an escalation policy from the PagerDuty API.
+type PDEscalationPolicy struct {
+	ID             string
+	Name           string
+	Description    string
+	NumLoops       int
+	OnCallHandoff  string
+	HTMLURL        string
+	Rules          []PDEscalationRule
+	Services       []PDServiceRef
+}
+
+// PDEscalationRule represents one rule in an escalation policy.
+type PDEscalationRule struct {
+	ID                      string
+	EscalationDelayMinutes  int
+	Targets                 []PDTarget
+}
+
+// PDTarget represents a target within an escalation rule.
+type PDTarget struct {
 	ID   string
 	Name string
 	Type string
 }
 
-// OpsgenieParticipant represents a current on-call participant.
-type OpsgenieParticipant struct {
-	ID           string
-	Name         string
-	Type         string
-	RotationID   string
-	RotationName string
-	StartTime    time.Time
-	EndTime      time.Time
-}
-
-// OpsgenieEscalation represents an escalation policy from the Opsgenie API.
-type OpsgenieEscalation struct {
-	ID            string
-	Name          string
-	Description   string
-	OwnerTeamID   string
-	OwnerTeamName string
-	RepeatCount   int
-	Rules         []OpsgenieEscalationRule
-}
-
-// OpsgenieEscalationRule represents one step in an escalation policy.
-type OpsgenieEscalationRule struct {
-	ID           string
-	DelayMinutes int
-	NotifyType   string
-	Recipients   []OpsgenieRecipient
-}
-
-// OpsgenieRecipient represents a notification target within an escalation rule.
-type OpsgenieRecipient struct {
+// PDServiceRef represents a service reference within an escalation policy.
+type PDServiceRef struct {
 	ID   string
 	Name string
-	Type string
 }
 
-// ListSchedules retrieves a paginated list of schedules from Opsgenie.
-func (c *opsgenieClient) ListSchedules(offset int, limit int) ([]OpsgenieSchedule, int, error) {
-	var schedules []OpsgenieSchedule
-	var total int
+// ListSchedules retrieves a paginated list of schedules from PagerDuty.
+func (c *pagerDutyClient) ListSchedules(offset int, limit int) ([]PDSchedule, bool, error) {
+	var schedules []PDSchedule
+	var hasMore bool
 
 	err := runner.WithRetry(c.retryConfig, func() error {
 		url := fmt.Sprintf("%s/schedules?offset=%d&limit=%d", c.baseURL, offset, limit)
-		resp, err := opsgenieGet(url, c.apiToken)
+		body, err := pagerdutyGet(url, c.apiToken)
 		if err != nil {
-			return fmt.Errorf("opsgenie GET schedules: %w", err)
+			return fmt.Errorf("pagerduty GET schedules: %w", err)
 		}
 
-		total = resp.TotalCount
-		for _, item := range resp.Data {
-			sched := OpsgenieSchedule{
-				ID:            getString(item, "id"),
-				Name:          getString(item, "name"),
-				Description:   getString(item, "description"),
-				Timezone:      getString(item, "timezone"),
-				Enabled:       getBool(item, "enabled"),
-				OwnerTeamID:   getNestedString(item, "ownerTeam", "id"),
-				OwnerTeamName: getNestedString(item, "ownerTeam", "name"),
+		hasMore = paginationHasMore(body)
+
+		items, _ := body["schedules"].([]interface{})
+		for _, item := range items {
+			m, ok := item.(map[string]interface{})
+			if !ok {
+				continue
 			}
 
-			if rotations, ok := item["rotations"].([]interface{}); ok {
-				for _, r := range rotations {
-					if rm, ok := r.(map[string]interface{}); ok {
-						sched.Rotations = append(sched.Rotations, OpsgenieRotation{
-							ID:   getString(rm, "id"),
-							Name: getString(rm, "name"),
-							Type: getString(rm, "type"),
+			sched := PDSchedule{
+				ID:          getString(m, "id"),
+				Name:        getString(m, "name"),
+				Description: getString(m, "description"),
+				TimeZone:    getString(m, "time_zone"),
+				HTMLURL:     getString(m, "html_url"),
+			}
+
+			if layers, ok := m["schedule_layers"].([]interface{}); ok {
+				for _, l := range layers {
+					if lm, ok := l.(map[string]interface{}); ok {
+						sched.ScheduleLayers = append(sched.ScheduleLayers, PDScheduleLayer{
+							ID:   getString(lm, "id"),
+							Name: getString(lm, "name"),
 						})
 					}
 				}
@@ -339,120 +378,146 @@ func (c *opsgenieClient) ListSchedules(offset int, limit int) ([]OpsgenieSchedul
 		return nil
 	})
 
-	return schedules, total, err
+	return schedules, hasMore, err
 }
 
-// GetOnCallParticipants retrieves current on-call participants for a schedule.
-func (c *opsgenieClient) GetOnCallParticipants(scheduleID string) ([]OpsgenieParticipant, error) {
-	var participants []OpsgenieParticipant
+// ListOnCalls retrieves on-call entries for a schedule within a time window.
+func (c *pagerDutyClient) ListOnCalls(scheduleID string, since time.Time, until time.Time) ([]PDOnCallEntry, string, error) {
+	var entries []PDOnCallEntry
+	var scheduleName string
 
 	err := runner.WithRetry(c.retryConfig, func() error {
-		url := fmt.Sprintf("%s/schedules/%s/on-calls", c.baseURL, scheduleID)
-		resp, err := opsgenieGet(url, c.apiToken)
+		url := fmt.Sprintf("%s/oncalls?schedule_ids[]=%s&since=%s&until=%s",
+			c.baseURL, scheduleID,
+			since.Format(time.RFC3339), until.Format(time.RFC3339))
+		body, err := pagerdutyGet(url, c.apiToken)
 		if err != nil {
-			return fmt.Errorf("opsgenie GET on-calls for schedule %s: %w", scheduleID, err)
+			return fmt.Errorf("pagerduty GET oncalls for schedule %s: %w", scheduleID, err)
 		}
 
-		if data, ok := resp.Data[0]["onCallParticipants"].([]interface{}); ok {
-			for _, p := range data {
-				if pm, ok := p.(map[string]interface{}); ok {
-					participant := OpsgenieParticipant{
-						ID:           getString(pm, "id"),
-						Name:         getString(pm, "name"),
-						Type:         getString(pm, "type"),
-						RotationID:   getNestedString(pm, "rotation", "id"),
-						RotationName: getNestedString(pm, "rotation", "name"),
-						StartTime:    getTime(pm, "onCallStart"),
-						EndTime:      getTime(pm, "onCallEnd"),
-					}
-					participants = append(participants, participant)
+		items, _ := body["oncalls"].([]interface{})
+		for _, item := range items {
+			m, ok := item.(map[string]interface{})
+			if !ok {
+				continue
+			}
+
+			entry := PDOnCallEntry{
+				Start:           getTimeField(m, "start"),
+				End:             getTimeField(m, "end"),
+				EscalationLevel: getIntField(m, "escalation_level"),
+			}
+
+			if user, ok := m["user"].(map[string]interface{}); ok {
+				entry.UserName = getString(user, "name")
+				entry.UserID = getString(user, "id")
+				entry.UserEmail = getString(user, "email")
+			}
+
+			if ep, ok := m["escalation_policy"].(map[string]interface{}); ok {
+				entry.EscalationPolicyID = getString(ep, "id")
+			}
+
+			if sched, ok := m["schedule"].(map[string]interface{}); ok {
+				if scheduleName == "" {
+					scheduleName = getString(sched, "summary")
 				}
 			}
+
+			entries = append(entries, entry)
 		}
 		return nil
 	})
 
-	return participants, err
+	return entries, scheduleName, err
 }
 
-// ListEscalations retrieves a paginated list of escalation policies from Opsgenie.
-func (c *opsgenieClient) ListEscalations(offset int, limit int) ([]OpsgenieEscalation, int, error) {
-	var escalations []OpsgenieEscalation
-	var total int
+// ListEscalationPolicies retrieves a paginated list of escalation policies from PagerDuty.
+func (c *pagerDutyClient) ListEscalationPolicies(offset int, limit int) ([]PDEscalationPolicy, bool, error) {
+	var policies []PDEscalationPolicy
+	var hasMore bool
 
 	err := runner.WithRetry(c.retryConfig, func() error {
-		url := fmt.Sprintf("%s/escalations?offset=%d&limit=%d", c.baseURL, offset, limit)
-		resp, err := opsgenieGet(url, c.apiToken)
+		url := fmt.Sprintf("%s/escalation_policies?offset=%d&limit=%d", c.baseURL, offset, limit)
+		body, err := pagerdutyGet(url, c.apiToken)
 		if err != nil {
-			return fmt.Errorf("opsgenie GET escalations: %w", err)
+			return fmt.Errorf("pagerduty GET escalation_policies: %w", err)
 		}
 
-		total = resp.TotalCount
-		for _, item := range resp.Data {
-			esc := OpsgenieEscalation{
-				ID:            getString(item, "id"),
-				Name:          getString(item, "name"),
-				Description:   getString(item, "description"),
-				OwnerTeamID:   getNestedString(item, "ownerTeam", "id"),
-				OwnerTeamName: getNestedString(item, "ownerTeam", "name"),
-				RepeatCount:   getInt(item, "repeat", "count"),
+		hasMore = paginationHasMore(body)
+
+		items, _ := body["escalation_policies"].([]interface{})
+		for _, item := range items {
+			m, ok := item.(map[string]interface{})
+			if !ok {
+				continue
 			}
 
-			if rules, ok := item["rules"].([]interface{}); ok {
-				for _, r := range rules {
-					if rm, ok := r.(map[string]interface{}); ok {
-						rule := OpsgenieEscalationRule{
-							ID:           getString(rm, "id"),
-							DelayMinutes: getIntDirect(rm, "delay", "timeAmount"),
-							NotifyType:   getString(rm, "notifyType"),
-						}
+			policy := PDEscalationPolicy{
+				ID:            getString(m, "id"),
+				Name:          getString(m, "name"),
+				Description:   getString(m, "description"),
+				NumLoops:      getIntField(m, "num_loops"),
+				OnCallHandoff: getString(m, "on_call_handoff_notifications"),
+				HTMLURL:       getString(m, "html_url"),
+			}
 
-						if recipients, ok := rm["recipient"].(map[string]interface{}); ok {
-							rule.Recipients = append(rule.Recipients, OpsgenieRecipient{
-								ID:   getString(recipients, "id"),
-								Name: getString(recipients, "name"),
-								Type: getString(recipients, "type"),
-							})
-						}
-						if recipients, ok := rm["recipients"].([]interface{}); ok {
-							for _, rec := range recipients {
-								if recm, ok := rec.(map[string]interface{}); ok {
-									rule.Recipients = append(rule.Recipients, OpsgenieRecipient{
-										ID:   getString(recm, "id"),
-										Name: getString(recm, "name"),
-										Type: getString(recm, "type"),
-									})
-								}
+			if rules, ok := m["escalation_rules"].([]interface{}); ok {
+				for _, r := range rules {
+					rm, ok := r.(map[string]interface{})
+					if !ok {
+						continue
+					}
+
+					rule := PDEscalationRule{
+						ID:                     getString(rm, "id"),
+						EscalationDelayMinutes: getIntField(rm, "escalation_delay_in_minutes"),
+					}
+
+					if targets, ok := rm["targets"].([]interface{}); ok {
+						for _, t := range targets {
+							if tm, ok := t.(map[string]interface{}); ok {
+								rule.Targets = append(rule.Targets, PDTarget{
+									ID:   getString(tm, "id"),
+									Name: getString(tm, "name"),
+									Type: getString(tm, "type"),
+								})
 							}
 						}
+					}
 
-						esc.Rules = append(esc.Rules, rule)
+					policy.Rules = append(policy.Rules, rule)
+				}
+			}
+
+			if services, ok := m["services"].([]interface{}); ok {
+				for _, s := range services {
+					if sm, ok := s.(map[string]interface{}); ok {
+						policy.Services = append(policy.Services, PDServiceRef{
+							ID:   getString(sm, "id"),
+							Name: getString(sm, "name"),
+						})
 					}
 				}
 			}
 
-			escalations = append(escalations, esc)
+			policies = append(policies, policy)
 		}
 		return nil
 	})
 
-	return escalations, total, err
+	return policies, hasMore, err
 }
 
-// opsgenieResponse holds a parsed Opsgenie API response.
-type opsgenieResponse struct {
-	Data       []map[string]interface{}
-	TotalCount int
-}
-
-// opsgenieGet performs an authenticated GET request against the Opsgenie API.
-func opsgenieGet(url string, apiToken string) (*opsgenieResponse, error) {
+// pagerdutyGet performs an authenticated GET request against the PagerDuty API.
+func pagerdutyGet(url string, apiToken string) (map[string]interface{}, error) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating request: %w", err)
 	}
-	req.Header.Set("Authorization", "GenieKey "+apiToken)
+	req.Header.Set("Authorization", "Token token="+apiToken)
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/vnd.pagerduty+json;version=2")
 
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
@@ -461,9 +526,13 @@ func opsgenieGet(url string, apiToken string) (*opsgenieResponse, error) {
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode == 429 {
+		return nil, fmt.Errorf("pagerduty rate limited (429) for %s", url)
+	}
+
 	if resp.StatusCode >= 400 {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("opsgenie API returned status %d for %s: %s", resp.StatusCode, url, string(body))
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("pagerduty API returned status %d for %s: %s", resp.StatusCode, url, string(bodyBytes))
 	}
 
 	var body map[string]interface{}
@@ -471,85 +540,19 @@ func opsgenieGet(url string, apiToken string) (*opsgenieResponse, error) {
 		return nil, fmt.Errorf("decoding response: %w", err)
 	}
 
-	result := &opsgenieResponse{}
-
-	if data, ok := body["data"].([]interface{}); ok {
-		for _, item := range data {
-			if m, ok := item.(map[string]interface{}); ok {
-				result.Data = append(result.Data, m)
-			}
-		}
-	} else if data, ok := body["data"].(map[string]interface{}); ok {
-		result.Data = append(result.Data, data)
-	}
-
-	if paging, ok := body["paging"].(map[string]interface{}); ok {
-		if total, ok := paging["total"].(float64); ok {
-			result.TotalCount = int(total)
-		}
-	}
-	if result.TotalCount == 0 {
-		result.TotalCount = len(result.Data)
-	}
-
-	return result, nil
+	return body, nil
 }
 
-// getString safely extracts a string from a map.
-func getString(m map[string]interface{}, key string) string {
-	if v, ok := m[key].(string); ok {
-		return v
-	}
-	return ""
-}
-
-// getBool safely extracts a bool from a map.
-func getBool(m map[string]interface{}, key string) bool {
-	if v, ok := m[key].(bool); ok {
+// paginationHasMore checks PagerDuty's pagination response for more pages.
+func paginationHasMore(body map[string]interface{}) bool {
+	if v, ok := body["more"].(bool); ok {
 		return v
 	}
 	return false
 }
 
-// getNestedString safely extracts a string from a nested map.
-func getNestedString(m map[string]interface{}, outerKey string, innerKey string) string {
-	if outer, ok := m[outerKey].(map[string]interface{}); ok {
-		return getString(outer, innerKey)
-	}
-	return ""
-}
-
-// getInt safely extracts an int from a nested map path.
-func getInt(m map[string]interface{}, keys ...string) int {
-	current := m
-	for i, key := range keys {
-		if i == len(keys)-1 {
-			if v, ok := current[key].(float64); ok {
-				return int(v)
-			}
-			return 0
-		}
-		if next, ok := current[key].(map[string]interface{}); ok {
-			current = next
-		} else {
-			return 0
-		}
-	}
-	return 0
-}
-
-// getIntDirect safely extracts an int from a nested map with two keys.
-func getIntDirect(m map[string]interface{}, outerKey string, innerKey string) int {
-	if outer, ok := m[outerKey].(map[string]interface{}); ok {
-		if v, ok := outer[innerKey].(float64); ok {
-			return int(v)
-		}
-	}
-	return 0
-}
-
-// getTime safely extracts a time.Time from a map, parsing RFC3339 format.
-func getTime(m map[string]interface{}, key string) time.Time {
+// getTimeField safely extracts a time.Time from a map field, parsing RFC3339.
+func getTimeField(m map[string]interface{}, key string) time.Time {
 	if v, ok := m[key].(string); ok {
 		if t, err := time.Parse(time.RFC3339, v); err == nil {
 			return t
@@ -558,33 +561,10 @@ func getTime(m map[string]interface{}, key string) time.Time {
 	return time.Time{}
 }
 
-// httpNewRequest wraps http.NewRequest for testability.
-var httpNewRequest = httpNewRequestDefault
-
-func httpNewRequestDefault(method string, url string, body interface{}) (*httpRequest, error) {
-	// implemented via net/http in production
-	return nil, fmt.Errorf("http client not initialized")
-}
-
-// httpDo wraps http.Client.Do for testability.
-var httpDo = httpDoDefault
-
-func httpDoDefault(req *httpRequest) (*httpResponse, error) {
-	return nil, fmt.Errorf("http client not initialized")
-}
-
-// jsonDecode wraps json.NewDecoder for testability.
-var jsonDecode = jsonDecodeDefault
-
-func jsonDecodeDefault(r interface{}, v interface{}) error {
-	return fmt.Errorf("json decoder not initialized")
-}
-
-// httpRequest is a type alias for http.Request used in the function variable signatures.
-type httpRequest = interface{}
-
-// httpResponse wraps the fields we need from http.Response.
-type httpResponse struct {
-	StatusCode int
-	Body       interface{ Close() error }
+// getIntField safely extracts an int from a map field.
+func getIntField(m map[string]interface{}, key string) int {
+	if v, ok := m[key].(float64); ok {
+		return int(v)
+	}
+	return 0
 }
