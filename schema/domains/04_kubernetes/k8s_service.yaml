@@ -1,0 +1,54 @@
+
+# === k8s_service.yaml ===
+name: k8s_service
+description: "Kubernetes Service object. ClusterIP, NodePort, LoadBalancer, ExternalName, Headless. Optional link to OpsDB service entity."
+category: k8s
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: k8s_cluster_id
+    type: foreign_key
+    references: k8s_cluster
+    nullable: false
+    description: "Cluster this K8s service exists in"
+
+  - name: k8s_namespace_id
+    type: foreign_key
+    references: k8s_namespace
+    nullable: false
+    description: "Namespace this K8s service exists in"
+
+  - name: name
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "Kubernetes service name"
+    must_be_unique_within:
+      - k8s_namespace_id
+
+  - name: k8s_service_type
+    type: enum
+    enum_values:
+      - cluster_ip
+      - node_port
+      - load_balancer
+      - external_name
+      - headless
+    nullable: false
+    description: "Kubernetes service type"
+
+  - name: service_id
+    type: foreign_key
+    references: service
+    nullable: true
+    description: "Optional link to OpsDB service entity when this K8s service corresponds to a tracked operational service"
+
+indexes:
+  - fields: [k8s_cluster_id]
+  - fields: [k8s_namespace_id]
+  - fields: [service_id]
+  - fields: [k8s_service_type]
+
+governance: {}

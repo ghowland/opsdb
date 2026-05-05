@@ -1,0 +1,31 @@
+
+# === k8s_namespace.yaml ===
+name: k8s_namespace
+description: "Namespace within a Kubernetes cluster. Unit of access control, resource quota, and policy application."
+category: k8s
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: k8s_cluster_id
+    type: foreign_key
+    references: k8s_cluster
+    nullable: false
+    description: "Cluster this namespace belongs to"
+
+  - name: name
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "Namespace name"
+    must_be_unique_within:
+      - k8s_cluster_id
+
+indexes:
+  - fields: [k8s_cluster_id]
+
+governance:
+  _requires_group: true
+  _access_classification: true
+

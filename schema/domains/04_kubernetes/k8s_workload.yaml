@@ -1,0 +1,50 @@
+
+# === k8s_workload.yaml ===
+name: k8s_workload
+description: "Kubernetes workload. Deployment, StatefulSet, DaemonSet, Job, CronJob, ReplicaSet. Versioned through workload_version sibling with typed payload."
+category: k8s
+versioned: true
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: k8s_cluster_id
+    type: foreign_key
+    references: k8s_cluster
+    nullable: false
+    description: "Cluster this workload runs in"
+
+  - name: k8s_namespace_id
+    type: foreign_key
+    references: k8s_namespace
+    nullable: false
+    description: "Namespace this workload belongs to"
+
+  - name: name
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "Workload name"
+    must_be_unique_within:
+      - k8s_namespace_id
+
+  - name: workload_type
+    type: enum
+    enum_values:
+      - deployment
+      - statefulset
+      - daemonset
+      - job
+      - cronjob
+      - replicaset
+    nullable: false
+    description: "Discriminator for workload_data_json in version sibling"
+
+indexes:
+  - fields: [k8s_cluster_id]
+  - fields: [k8s_namespace_id]
+  - fields: [workload_type]
+
+governance:
+  _access_classification: true
+

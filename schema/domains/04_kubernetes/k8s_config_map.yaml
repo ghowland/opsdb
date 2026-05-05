@@ -1,0 +1,36 @@
+
+# === k8s_config_map.yaml ===
+name: k8s_config_map
+description: "Kubernetes ConfigMap entity. Versioned for tracking changes. Contents stored as configuration_variable rows scoped to this entity."
+category: k8s
+versioned: true
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: k8s_cluster_id
+    type: foreign_key
+    references: k8s_cluster
+    nullable: false
+    description: "Cluster this ConfigMap belongs to"
+
+  - name: k8s_namespace_id
+    type: foreign_key
+    references: k8s_namespace
+    nullable: false
+    description: "Namespace this ConfigMap belongs to"
+
+  - name: name
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "ConfigMap name"
+    must_be_unique_within:
+      - k8s_namespace_id
+
+indexes:
+  - fields: [k8s_cluster_id]
+  - fields: [k8s_namespace_id]
+
+governance: {}
+

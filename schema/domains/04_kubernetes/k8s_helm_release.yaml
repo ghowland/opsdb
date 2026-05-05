@@ -1,0 +1,54 @@
+
+# === k8s_helm_release.yaml ===
+name: k8s_helm_release
+description: "Helm release within a cluster namespace. Versioned for tracking upgrades. Values stored in configuration_variable."
+category: k8s
+versioned: true
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: k8s_cluster_id
+    type: foreign_key
+    references: k8s_cluster
+    nullable: false
+    description: "Cluster this release is installed in"
+
+  - name: k8s_namespace_id
+    type: foreign_key
+    references: k8s_namespace
+    nullable: false
+    description: "Namespace this release is installed in"
+
+  - name: name
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "Helm release name"
+    must_be_unique_within:
+      - k8s_namespace_id
+
+  - name: chart_name
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "Helm chart name"
+
+  - name: chart_version
+    type: varchar
+    max_length: 100
+    nullable: false
+    description: "Helm chart version"
+
+  - name: installed_time
+    type: datetime
+    nullable: true
+    description: "When this release was installed or last upgraded"
+
+indexes:
+  - fields: [k8s_cluster_id]
+  - fields: [k8s_namespace_id]
+
+governance:
+  _access_classification: true
+

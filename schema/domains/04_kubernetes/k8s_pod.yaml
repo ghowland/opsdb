@@ -1,0 +1,69 @@
+
+# === k8s_pod.yaml ===
+name: k8s_pod
+description: "Kubernetes pod. Bridges into unified substrate hierarchy via megavisor_instance. Observation-only — pods are ephemeral world state, not governed configuration."
+category: k8s
+versioned: false
+soft_delete: false
+hierarchical: false
+
+fields:
+  - name: megavisor_instance_id
+    type: foreign_key
+    references: megavisor_instance
+    nullable: false
+    description: "Bridge into unified substrate hierarchy"
+
+  - name: k8s_workload_id
+    type: foreign_key
+    references: k8s_workload
+    nullable: false
+    description: "Workload that owns this pod"
+
+  - name: k8s_namespace_id
+    type: foreign_key
+    references: k8s_namespace
+    nullable: false
+    description: "Namespace this pod belongs to"
+
+  - name: k8s_cluster_node_id
+    type: foreign_key
+    references: k8s_cluster_node
+    nullable: false
+    description: "Node this pod is scheduled on"
+
+  - name: name
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "Pod name"
+
+  - name: pod_uid
+    type: varchar
+    max_length: 255
+    nullable: false
+    unique: true
+    description: "Kubernetes pod UID"
+
+  - name: is_running
+    type: boolean
+    nullable: false
+    default: true
+    description: "Whether pod is currently running"
+
+  - name: scheduled_time
+    type: datetime
+    nullable: true
+    description: "When pod was scheduled onto node"
+
+indexes:
+  - fields: [k8s_workload_id]
+  - fields: [k8s_namespace_id]
+  - fields: [k8s_cluster_node_id]
+  - fields: [megavisor_instance_id]
+
+governance:
+  _observed_time: true
+  _authority_id: true
+  _puller_runner_job_id: true
+

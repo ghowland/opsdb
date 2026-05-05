@@ -1,0 +1,64 @@
+# === k8s_cluster.yaml ===
+name: k8s_cluster
+description: "Kubernetes cluster. IS a service via service_id. Versioned for tracking cluster upgrades and configuration changes."
+category: k8s
+versioned: true
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: service_id
+    type: foreign_key
+    references: service
+    nullable: false
+    description: "A K8s cluster is a service in OpsDB's model"
+
+  - name: site_id
+    type: foreign_key
+    references: site
+    nullable: false
+    description: "Owning site"
+
+  - name: name
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "Cluster name"
+    must_be_unique_within:
+      - site_id
+
+  - name: k8s_distribution
+    type: enum
+    enum_values:
+      - vanilla
+      - eks
+      - gke
+      - aks
+      - openshift
+      - rancher
+      - k3s
+      - talos
+    nullable: false
+    description: "Kubernetes distribution"
+
+  - name: k8s_version
+    type: varchar
+    max_length: 50
+    nullable: false
+    description: "Kubernetes version string"
+
+  - name: api_endpoint_fqdn
+    type: varchar
+    max_length: 512
+    nullable: false
+    description: "API server endpoint FQDN"
+
+indexes:
+  - fields: [site_id]
+  - fields: [service_id]
+  - fields: [k8s_distribution]
+
+governance:
+  _requires_group: true
+  _access_classification: true
+
