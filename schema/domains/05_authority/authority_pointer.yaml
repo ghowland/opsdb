@@ -1,0 +1,57 @@
+
+# === authority_pointer.yaml ===
+name: authority_pointer
+description: "Typed reference to a specific item within an authority. A metric in Prometheus, a secret path in Vault, a dashboard in Grafana, a runbook in a wiki, a ticket in Jira."
+category: authority
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: authority_id
+    type: foreign_key
+    references: authority
+    nullable: false
+    description: "Authority this pointer references into"
+
+  - name: pointer_type
+    type: enum
+    enum_values:
+      - metric
+      - log_query
+      - secret
+      - dashboard
+      - runbook
+      - wiki_page
+      - ticket
+      - code_path
+      - chat_thread
+      - artifact
+      - container_image
+    nullable: false
+    description: "Discriminator for pointer_data_json"
+
+  - name: locator
+    type: varchar
+    max_length: 2048
+    nullable: false
+    description: "Path or identifier within the authority. Metric name, secret path, dashboard UID, runbook slug, ticket key."
+
+  - name: pointer_data_json
+    type: json
+    json_type_discriminator: pointer_type
+    nullable: false
+    description: "Type-specific pointer metadata"
+
+  - name: last_verified_time
+    type: datetime
+    nullable: true
+    description: "When this pointer was last confirmed to resolve. Null if never verified. Rot tracking."
+
+indexes:
+  - fields: [authority_id]
+  - fields: [authority_id, pointer_type]
+  - fields: [pointer_type]
+
+governance: {}
+

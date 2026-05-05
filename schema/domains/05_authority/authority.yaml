@@ -1,0 +1,60 @@
+# === authority.yaml ===
+name: authority
+description: "External system owning a slice of operational reality. Prometheus server, log aggregator, secret vault, wiki, dashboard platform, code repository, identity provider, etc."
+category: authority
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: site_id
+    type: foreign_key
+    references: site
+    nullable: false
+    description: "Owning site"
+
+  - name: name
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "Authority name"
+    must_be_unique_within:
+      - site_id
+
+  - name: authority_type
+    type: enum
+    enum_values:
+      - prometheus_server
+      - log_aggregator
+      - secret_vault
+      - wiki
+      - dashboard_platform
+      - code_repository
+      - identity_provider
+      - runbook_store
+      - ticketing_system
+      - chat_platform
+      - status_page
+      - artifact_registry
+      - container_registry
+    nullable: false
+    description: "Discriminator for authority_data_json"
+
+  - name: base_url
+    type: varchar
+    max_length: 1024
+    nullable: false
+    description: "Base URL or connection endpoint for this authority"
+
+  - name: authority_data_json
+    type: json
+    json_type_discriminator: authority_type
+    nullable: false
+    description: "Type-specific authority configuration"
+
+indexes:
+  - fields: [site_id]
+  - fields: [authority_type]
+
+governance:
+  _access_classification: true

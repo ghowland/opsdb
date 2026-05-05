@@ -1,0 +1,41 @@
+
+# === service_authority_pointer.yaml ===
+name: service_authority_pointer
+description: "Bridge: service to authority pointer with relationship role. Links a service to its dashboards, runbooks, log queries, metrics, status pages, on-call handoff docs."
+category: authority
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: service_id
+    type: foreign_key
+    references: service
+    nullable: false
+    description: "Service"
+
+  - name: authority_pointer_id
+    type: foreign_key
+    references: authority_pointer
+    nullable: false
+    description: "Authority pointer"
+
+  - name: relationship_role
+    type: enum
+    enum_values:
+      - primary_dashboard
+      - runbook
+      - log_query
+      - metric_namespace
+      - status_page
+      - on_call_handoff
+    nullable: false
+    description: "How this pointer relates to the service"
+
+indexes:
+  - fields: [service_id]
+  - fields: [authority_pointer_id]
+  - fields: [service_id, relationship_role]
+
+governance: {}
+

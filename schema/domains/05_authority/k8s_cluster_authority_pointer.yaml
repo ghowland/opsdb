@@ -1,0 +1,36 @@
+
+# === k8s_cluster_authority_pointer.yaml ===
+name: k8s_cluster_authority_pointer
+description: "Bridge: Kubernetes cluster to authority pointer with relationship role."
+category: authority
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: k8s_cluster_id
+    type: foreign_key
+    references: k8s_cluster
+    nullable: false
+    description: "Kubernetes cluster"
+
+  - name: authority_pointer_id
+    type: foreign_key
+    references: authority_pointer
+    nullable: false
+    description: "Authority pointer"
+
+  - name: relationship_role
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "How this pointer relates to the cluster"
+
+indexes:
+  - fields: [k8s_cluster_id]
+  - fields: [authority_pointer_id]
+  - fields: [k8s_cluster_id, authority_pointer_id]
+    unique: true
+
+governance: {}
+
