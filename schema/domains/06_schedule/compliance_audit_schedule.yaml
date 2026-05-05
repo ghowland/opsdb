@@ -1,0 +1,37 @@
+
+# === compliance_audit_schedule.yaml ===
+name: compliance_audit_schedule
+description: "Bridge: compliance regime to schedule with audit scope. Defines when compliance audits occur and what they cover."
+category: schedule
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: compliance_regime_id
+    type: foreign_key
+    references: compliance_regime
+    nullable: false
+    description: "Compliance regime this audit schedule serves"
+
+  - name: schedule_id
+    type: foreign_key
+    references: schedule
+    nullable: false
+    description: "Audit cycle schedule"
+
+  - name: audit_scope_data_json
+    type: json
+    json_type_discriminator: schedule_type
+    nullable: true
+    description: "Scope configuration for this audit cycle. Which controls, which services, which evidence types."
+
+indexes:
+  - fields: [compliance_regime_id]
+  - fields: [schedule_id]
+  - fields: [compliance_regime_id, schedule_id]
+    unique: true
+
+governance: {}
+
+

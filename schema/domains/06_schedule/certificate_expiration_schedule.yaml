@@ -1,0 +1,38 @@
+
+# === certificate_expiration_schedule.yaml ===
+name: certificate_expiration_schedule
+description: "Bridge: certificate to schedule with warning offsets. Defines when certificate expiration warnings trigger. Certificate entity referenced externally."
+category: schedule
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: certificate_id
+    type: int
+    nullable: false
+    min_value: 1
+    max_value: 2147483647
+    description: "FK to certificate entity (externally referenced, not detailed in this schema)"
+
+  - name: schedule_id
+    type: foreign_key
+    references: schedule
+    nullable: false
+    description: "Expiration check schedule"
+
+  - name: warning_offsets_data_json
+    type: json
+    json_type_discriminator: schedule_type
+    nullable: true
+    description: "Warning offset configuration. Days before expiration to alert at each severity level."
+
+indexes:
+  - fields: [certificate_id]
+    unique: true
+  - fields: [schedule_id]
+
+governance: {}
+
+
+

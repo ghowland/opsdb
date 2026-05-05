@@ -1,0 +1,37 @@
+
+# === runner_schedule.yaml ===
+name: runner_schedule
+description: "Bridge: runner spec to schedule. Defines when a runner runs. Optional service scoping for service-targeted scheduling."
+category: schedule
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: runner_spec_id
+    type: foreign_key
+    references: runner_spec
+    nullable: false
+    description: "Runner spec this schedule applies to"
+
+  - name: schedule_id
+    type: foreign_key
+    references: schedule
+    nullable: false
+    description: "Schedule definition"
+
+  - name: service_id
+    type: foreign_key
+    references: service
+    nullable: true
+    description: "Optional service scoping. When set, this schedule applies only when the runner targets this service."
+
+indexes:
+  - fields: [runner_spec_id]
+  - fields: [schedule_id]
+  - fields: [runner_spec_id, schedule_id]
+    unique: true
+
+governance: {}
+
+

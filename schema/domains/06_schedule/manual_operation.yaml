@@ -1,0 +1,60 @@
+# === manual_operation.yaml ===
+name: manual_operation
+description: "Operational task humans perform. Tape rotations, vendor reviews, keycard audits, license renewals, contract renewals, evidence collection, physical inspections."
+category: schedule
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: site_id
+    type: foreign_key
+    references: site
+    nullable: false
+    description: "Owning site"
+
+  - name: name
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "Operation name"
+    must_be_unique_within:
+      - site_id
+
+  - name: description
+    type: text
+    nullable: true
+    description: "What this operation involves and why it matters"
+
+  - name: manual_operation_type
+    type: enum
+    enum_values:
+      - tape_rotation
+      - vendor_review
+      - keycard_audit
+      - license_renewal
+      - contract_renewal
+      - evidence_collection
+      - physical_inspection
+    nullable: false
+    description: "Discriminator for manual_operation_data_json"
+
+  - name: manual_operation_data_json
+    type: json
+    json_type_discriminator: manual_operation_type
+    nullable: false
+    description: "Type-specific operation details"
+
+  - name: responsible_ops_user_role_id
+    type: foreign_key
+    references: ops_user_role
+    nullable: false
+    description: "Role responsible for performing this operation"
+
+indexes:
+  - fields: [site_id]
+  - fields: [manual_operation_type]
+  - fields: [responsible_ops_user_role_id]
+
+governance: {}
+

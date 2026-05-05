@@ -1,0 +1,52 @@
+
+# === schedule.yaml ===
+name: schedule
+description: "Time-based or event-based trigger specification. Cron expressions, rate-based, event-triggered, calendar-anchored, deadline-driven, manual."
+category: schedule
+versioned: true
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: site_id
+    type: foreign_key
+    references: site
+    nullable: false
+    description: "Owning site"
+
+  - name: name
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "Schedule name"
+    must_be_unique_within:
+      - site_id
+
+  - name: schedule_type
+    type: enum
+    enum_values:
+      - cron_expression
+      - rate_based
+      - event_triggered
+      - calendar_anchored
+      - deadline_driven
+      - manual
+    nullable: false
+    description: "Discriminator for schedule_data_json"
+
+  - name: schedule_data_json
+    type: json
+    json_type_discriminator: schedule_type
+    nullable: false
+    description: "Type-specific schedule configuration"
+
+  - name: description
+    type: text
+    nullable: true
+    description: "What this schedule governs"
+
+indexes:
+  - fields: [site_id]
+  - fields: [schedule_type]
+
+governance: {}

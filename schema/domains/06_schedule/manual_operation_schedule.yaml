@@ -1,0 +1,30 @@
+
+# === manual_operation_schedule.yaml ===
+name: manual_operation_schedule
+description: "Bridge: manual operation to schedule. Defines when a manual operation should be performed."
+category: schedule
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: manual_operation_id
+    type: foreign_key
+    references: manual_operation
+    nullable: false
+    description: "Manual operation"
+
+  - name: schedule_id
+    type: foreign_key
+    references: schedule
+    nullable: false
+    description: "Schedule for performing this operation"
+
+indexes:
+  - fields: [manual_operation_id]
+  - fields: [schedule_id]
+  - fields: [manual_operation_id, schedule_id]
+    unique: true
+
+governance: {}
+
