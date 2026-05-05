@@ -1,5 +1,7 @@
 # DOS — Distributed Operating System Instances
 
+![Fig. 1: OpsDB as a Closed Operational Loop — operate, govern, and evidence through the same motion.](../docs/figures/opsdb_01_operational_loop.png)
+
 ## What This Directory Is
 
 Each subdirectory under `dos/` represents one OpsDB substrate instance — one
@@ -154,4 +156,35 @@ scripts/seed.sh --dos dos/prod-0 --api http://localhost:8080
 6. Apply schema, start API, seed, start runners — same process.
 
 The schema and all code are shared. Only the per-substrate configuration diverges.
+
+
+# Diagrams
+
+## Definitions Become Runtime Control
+
+![Fig. 2: Definitions Become Runtime Control — schema definitions become live runtime behavior through the loader, database, and metadata path.](../docs/figures/opsdb_02_schema_to_runtime.png)
+
+## Change Management
+
+![Fig. 3: Governed Change as Staged Motion — intent, approval, execution, and version history are separate visible stages.](../docs/figures/opsdb_03_governed_change_flow.png)
+
+## Provenance Through Time
+
+![Fig. 4: Provenance Through Time — one action becomes a queryable timeline instead of a reconstructed story.](../docs/figures/opsdb_04_provenance_timeline.png)
+
+## Automation Shift
+
+![Fig. 5: Automation Topology Shift — runners coordinate through OpsDB state instead of calling each other directly.](../docs/figures/opsdb_05_automation_topology.png)
+
+## One Operational Grammar Across Domains
+
+![Fig. 6: One Operational Grammar Across Domains — cloud, Kubernetes, internal systems, manual procedures, and audit all fit one operational model.](../docs/figures/opsdb_06_operational_landscape.png)
+
+## The API Gate as a Control Membrane
+
+![Fig. 7: The API Gate as a Control Membrane — many callers cross one ordered boundary before durable state can change.](../docs/figures/opsdb_07_api_membrane.png)
+
+## Operations and Audit as One System
+
+![Fig. 8: Operations and Audit as One System — operational events produce evidence as a native property of execution.](../docs/figures/opsdb_08_operations_audit_unified.png)
 
