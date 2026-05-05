@@ -1,0 +1,105 @@
+# === change_set.yaml ===
+name: change_set
+description: "Bundled proposed changes. The unit of change management. Flows through lifecycle: draft, submitted, validating, pending_approval, approved, applied, rejected, expired, cancelled, failed."
+category: change-mgmt
+versioned: false
+soft_delete: false
+hierarchical: false
+
+fields:
+  - name: site_id
+    type: foreign_key
+    references: site
+    nullable: false
+    description: "Owning site"
+
+  - name: name
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "Short descriptive name for this change set"
+
+  - name: description
+    type: text
+    nullable: true
+    description: "Detailed description of what this change set does and why"
+
+  - name: proposed_by_ops_user_id
+    type: foreign_key
+    references: ops_user
+    nullable: true
+    description: "Set when proposed by a human"
+
+  - name: proposed_by_runner_job_id
+    type: foreign_key
+    references: runner_job
+    nullable: true
+    description: "Set when proposed by a runner (drift detector, reconciler)"
+
+  - name: change_set_status
+    type: enum
+    enum_values:
+      - draft
+      - submitted
+      - validating
+      - pending_approval
+      - approved
+      - rejected
+      - expired
+      - applied
+      - rolled_back
+      - cancelled
+      - failed
+      - applying
+    nullable: false
+    description: "Current lifecycle state"
+
+  - name: reason_text
+    type: text
+    nullable: false
+    description: "Why this change is being made"
+
+  - name: ticket_pointer_authority_pointer_id
+    type: foreign_key
+    references: authority_pointer
+    nullable: true
+    description: "Optional link to a ticket in an external ticketing system"
+
+  - name: is_emergency
+    type: boolean
+    nullable: false
+    default: false
+    description: "Break-glass emergency change. Reduced approvals, mandatory post-hoc review."
+
+  - name: is_bulk
+    type: boolean
+    nullable: false
+    default: false
+    description: "Bulk change set with chunked validation and apply"
+
+  - name: expected_apply_time
+    type: datetime
+    nullable: true
+    description: "When this change set is expected to be applied"
+
+  - name: applied_time
+    type: datetime
+    nullable: true
+    description: "When all field changes were successfully applied"
+
+  - name: rolled_back_time
+    type: datetime
+    nullable: true
+    description: "When this change set was rolled back via a new change set"
+
+indexes:
+  - fields: [site_id]
+  - fields: [change_set_status]
+  - fields: [proposed_by_ops_user_id]
+  - fields: [proposed_by_runner_job_id]
+  - fields: [is_emergency]
+  - fields: [change_set_status, is_emergency]
+
+governance:
+  _access_classification: true
+

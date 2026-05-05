@@ -1,0 +1,44 @@
+
+# === change_set_rejection.yaml ===
+name: change_set_rejection
+description: "Rejection record from a stakeholder. Rejection halts the change set per the approval rule's rejection semantics."
+category: change-mgmt
+versioned: false
+soft_delete: false
+hierarchical: false
+
+fields:
+  - name: change_set_id
+    type: foreign_key
+    references: change_set
+    nullable: false
+    description: "Change set being rejected"
+
+  - name: rejecting_ops_user_id
+    type: foreign_key
+    references: ops_user
+    nullable: false
+    description: "User rejecting"
+
+  - name: rejection_reason_text
+    type: text
+    nullable: false
+    description: "Why the change set was rejected"
+
+  - name: rejection_data_json
+    type: json
+    json_type_discriminator: change_set_id
+    nullable: true
+    description: "Structured rejection detail"
+
+  - name: rejected_time
+    type: datetime
+    nullable: false
+    description: "When rejection was recorded"
+
+indexes:
+  - fields: [change_set_id]
+  - fields: [rejecting_ops_user_id]
+
+governance: {}
+

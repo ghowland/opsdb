@@ -1,0 +1,41 @@
+
+# === change_set_approval.yaml ===
+name: change_set_approval
+description: "Recorded approval from a stakeholder. Each approval increments the fulfilled count on the matching approval requirement."
+category: change-mgmt
+versioned: false
+soft_delete: false
+hierarchical: false
+
+fields:
+  - name: change_set_id
+    type: foreign_key
+    references: change_set
+    nullable: false
+    description: "Change set being approved"
+
+  - name: approving_ops_user_id
+    type: foreign_key
+    references: ops_user
+    nullable: false
+    description: "User approving"
+
+  - name: approval_data_json
+    type: json
+    json_type_discriminator: change_set_id
+    nullable: true
+    description: "Optional comments, conditions, or notes from approver"
+
+  - name: approved_time
+    type: datetime
+    nullable: false
+    description: "When approval was recorded"
+
+indexes:
+  - fields: [change_set_id]
+  - fields: [approving_ops_user_id]
+  - fields: [change_set_id, approving_ops_user_id]
+    unique: true
+
+governance: {}
+

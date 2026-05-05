@@ -1,0 +1,54 @@
+
+# === change_set_validation.yaml ===
+name: change_set_validation
+description: "Validation outcome record. One row per validation type (schema, semantic, policy, lint) per change set. Records pass, fail, or warning."
+category: change-mgmt
+versioned: false
+soft_delete: false
+hierarchical: false
+
+fields:
+  - name: change_set_id
+    type: foreign_key
+    references: change_set
+    nullable: false
+    description: "Change set being validated"
+
+  - name: validation_type
+    type: enum
+    enum_values:
+      - schema
+      - semantic
+      - policy
+      - lint
+    nullable: false
+    description: "Which validation step"
+
+  - name: validation_status
+    type: enum
+    enum_values:
+      - passed
+      - failed
+      - warning
+    nullable: false
+    description: "Outcome of this validation"
+
+  - name: validation_data_json
+    type: json
+    json_type_discriminator: validation_type
+    nullable: true
+    description: "Validation detail. Errors, warnings, affected fields."
+
+  - name: validated_time
+    type: datetime
+    nullable: false
+    description: "When validation was performed"
+
+indexes:
+  - fields: [change_set_id]
+  - fields: [change_set_id, validation_type]
+    unique: true
+  - fields: [validation_status]
+
+governance: {}
+

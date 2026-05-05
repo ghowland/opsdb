@@ -1,0 +1,95 @@
+
+# === change_set_field_change.yaml ===
+name: change_set_field_change
+description: "Per-field change record within a change set. Records before and after values, apply order, and application status."
+category: change-mgmt
+versioned: false
+soft_delete: false
+hierarchical: false
+
+fields:
+  - name: change_set_id
+    type: foreign_key
+    references: change_set
+    nullable: false
+    description: "Change set this field change belongs to"
+
+  - name: target_entity_type
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "Entity type being changed"
+
+  - name: target_entity_id
+    type: int
+    nullable: false
+    min_value: 1
+    max_value: 2147483647
+    description: "ID of the entity being changed"
+
+  - name: target_field_name
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "Field being changed"
+
+  - name: before_value_text
+    type: text
+    nullable: true
+    description: "Value before change. Null on create."
+
+  - name: after_value_text
+    type: text
+    nullable: true
+    description: "Value after change. Null on delete."
+
+  - name: before_value_data_json
+    type: json
+    json_type_discriminator: target_field_name
+    nullable: true
+    description: "Structured before value for JSON fields"
+
+  - name: after_value_data_json
+    type: json
+    json_type_discriminator: target_field_name
+    nullable: true
+    description: "Structured after value for JSON fields"
+
+  - name: field_change_type
+    type: enum
+    enum_values:
+      - create
+      - update
+      - delete
+    nullable: false
+    description: "Nature of this field change"
+
+  - name: apply_order
+    type: int
+    nullable: false
+    min_value: 0
+    max_value: 999999
+    description: "Order in which this field change is applied within the change set"
+
+  - name: applied_status
+    type: enum
+    enum_values:
+      - pending
+      - applied
+      - failed
+    nullable: false
+    description: "Whether this field change has been applied by the executor"
+
+  - name: applied_error_text
+    type: text
+    nullable: true
+    description: "Error detail if application failed"
+
+indexes:
+  - fields: [change_set_id]
+  - fields: [change_set_id, apply_order]
+  - fields: [target_entity_type, target_entity_id]
+  - fields: [applied_status]
+
+governance: {}
+

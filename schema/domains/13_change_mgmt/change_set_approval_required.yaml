@@ -1,0 +1,55 @@
+
+# === change_set_approval_required.yaml ===
+name: change_set_approval_required
+description: "Computed approval requirement for a change set. Written by the API during change management routing. Specifies which group must approve and how many approvers are needed."
+category: change-mgmt
+versioned: false
+soft_delete: false
+hierarchical: false
+
+fields:
+  - name: change_set_id
+    type: foreign_key
+    references: change_set
+    nullable: false
+    description: "Change set requiring approval"
+
+  - name: approval_rule_id
+    type: foreign_key
+    references: approval_rule
+    nullable: false
+    description: "Approval rule that generated this requirement"
+
+  - name: ops_group_required_id
+    type: foreign_key
+    references: ops_group
+    nullable: false
+    description: "Group from which approvers must come"
+
+  - name: approver_count_required
+    type: int
+    nullable: false
+    min_value: 1
+    max_value: 100
+    description: "How many approvers from this group are needed"
+
+  - name: fulfilled_count
+    type: int
+    nullable: false
+    min_value: 0
+    max_value: 100
+    description: "How many approvals have been received so far"
+
+  - name: is_fulfilled
+    type: boolean
+    nullable: false
+    default: false
+    description: "True when fulfilled_count >= approver_count_required"
+
+indexes:
+  - fields: [change_set_id]
+  - fields: [change_set_id, is_fulfilled]
+  - fields: [ops_group_required_id]
+
+governance: {}
+

@@ -1,0 +1,49 @@
+
+# === change_set_emergency_review.yaml ===
+name: change_set_emergency_review
+description: "Post-hoc review of an emergency change. Created automatically when is_emergency=true. Must be reviewed within configured window (default 72 hours)."
+category: change-mgmt
+versioned: false
+soft_delete: false
+hierarchical: false
+
+fields:
+  - name: change_set_id
+    type: foreign_key
+    references: change_set
+    nullable: false
+    description: "Emergency change set requiring review"
+    unique: true
+
+  - name: reviewing_ops_user_id
+    type: foreign_key
+    references: ops_user
+    nullable: true
+    description: "Who reviewed. Null while pending."
+
+  - name: review_status
+    type: enum
+    enum_values:
+      - pending
+      - approved_post_hoc
+      - findings_filed
+      - requires_corrective_change
+    nullable: false
+    description: "Review outcome"
+
+  - name: review_text
+    type: text
+    nullable: true
+    description: "Review notes and findings"
+
+  - name: reviewed_time
+    type: datetime
+    nullable: true
+    description: "When review was completed. Null while pending."
+
+indexes:
+  - fields: [review_status]
+  - fields: [change_set_id]
+
+governance: {}
+

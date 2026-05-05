@@ -1,0 +1,40 @@
+
+# === change_set_bulk_membership.yaml ===
+name: change_set_bulk_membership
+description: "Structure within bulk change sets. Links member change sets to a parent bulk change set with ordering and role."
+category: change-mgmt
+versioned: false
+soft_delete: false
+hierarchical: false
+
+fields:
+  - name: change_set_id
+    type: foreign_key
+    references: change_set
+    nullable: false
+    description: "Parent bulk change set"
+
+  - name: member_change_set_id
+    type: foreign_key
+    references: change_set
+    nullable: true
+    description: "Child change set within the bulk. Null for top-level structuring rows."
+
+  - name: bulk_role
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "Role of this member within the bulk. rotation_step_1, rotation_step_2, pre_migration, migration, post_migration, etc."
+
+  - name: bulk_data_json
+    type: json
+    json_type_discriminator: bulk_role
+    nullable: true
+    description: "Role-specific structuring data"
+
+indexes:
+  - fields: [change_set_id]
+  - fields: [member_change_set_id]
+  - fields: [change_set_id, bulk_role]
+
+governance: {}
