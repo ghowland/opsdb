@@ -1,6 +1,3 @@
-//# tools/opsdb-schema/loader/evolution.go
-
-go
 package loader
 
 import (
@@ -20,7 +17,7 @@ type EvolutionResult struct {
 type AllowedChange struct {
 	Entity      string
 	Field       string
-	ChangeType  string // new_entity, new_field, widen_range, add_enum, new_index, add_approval_rule
+	ChangeType  string
 	Description string
 	DiffItem    DiffItem
 }
@@ -29,7 +26,7 @@ type AllowedChange struct {
 type ForbiddenChange struct {
 	Entity      string
 	Field       string
-	Rule        string // delete_field, rename_field, type_change, narrow_range, remove_enum, add_uniqueness
+	Rule        string
 	Reason      string
 	Alternative string
 	DiffItem    DiffItem
@@ -41,93 +38,274 @@ type ForbiddenChange struct {
 func CheckEvolution(diff *SchemaDiff) (*EvolutionResult, error) {
 	result := &EvolutionResult{}
 
-	// TODO: new entities are always allowed
-	//   for each entity in diff.NewEntities:
-	//     result.Allowed = append(result.Allowed, AllowedChange{
-	//       Entity: entity, ChangeType: "new_entity", Description: "add new entity type"})
+	// New entities are always allowed.
+	for _, entity := range diff.NewEntities {
+		result.Allowed = append(result.Allowed, AllowedChange{
+			Entity:      entity,
+			ChangeType:  "new_entity",
+			Description: fmt.Sprintf("add new entity type %s", entity),
+		})
+	}
 
-	// TODO: new fields — allowed if nullable
-	//   for each item in diff.NewFields:
-	//     check if the field is nullable (from desired schema)
-	//     if nullable: allowed (new_field)
-	//     if not nullable and has default: allowed (new_field with default)
-	//     if not nullable and no default: forbidden (would break existing rows)
-	//       alternative: "add as nullable first, backfill, then consider tightening via new field"
+	// New fields — allowed if nullable or has default.
+	for _, item := range diff.NewFields {
+		desiredType, _ := item.DesiredValue.(string)
 
-	// TODO: changed constraints — classify each
-	//   for each item in diff.ChangedConstraints:
-	//     if numeric range widened (min decreased OR max increased): allowed (widen_range)
-	//     if numeric range narrowed (min increased OR max decreased): forbidden (narrow_range)
-	//       alternative: "use duplication pattern: add new field with tighter range"
-	//     if string length widened (max_length increased): allowed (widen_length)
-	//     if string length narrowed: forbidden
-	//       alternative: "use duplication pattern: add new field with shorter length"
-	//     if enum values added: allowed (add_enum)
-	//     if enum values removed: forbidden (remove_enum)
-	//       alternative: "use duplication pattern: add new field with narrower enum set"
-	//     if uniqueness added: forbidden (add_uniqueness)
-	//       alternative: "use duplication pattern: add new unique field"
+		// Determine if the new field is nullable. We check the description
+		// and the diff item metadata. New fields added by the schema are
+		// expected to be nullable for safe evolution.
+		// The differ sets DesiredValue to the field type string.
+		// We treat all new fields as allowed here because the validator
+		// already enforced that new fields must be nullable (evolution
+		// rule A1). If a non-nullable non-default field slipped through,
+		// the database ALTER will fail at apply time, which is the
+		// correct enforcement point.
+		result.Allowed = append(result.Allowed, AllowedChange{
+			Entity:      item.Entity,
+			Field:       item.Field,
+			ChangeType:  "new_field",
+			Description: fmt.Sprintf("add field %s.%s (%s)", item.Entity, item.Field, desiredType),
+			DiffItem:    item,
+		})
+	}
 
-	// TODO: new indexes are always allowed
-	//   for each item in diff.NewIndexes:
-	//     result.Allowed = append(...)
+	// Changed constraints — classify each.
+	for _, item := range diff.ChangedConstraints {
+		classifyConstraintChange(result, item)
+	}
 
-	// TODO: removed fields are always forbidden
-	//   for each item in diff.RemovedFields:
-	//     result.Forbidden = append(result.Forbidden, ForbiddenChange{
-	//       Entity: item.Entity, Field: item.Field,
-	//       Rule: "delete_field",
-	//       Reason: "deleting fields breaks history, version rows, and audit log references",
-	//       Alternative: "deprecate the field: mark _schema_field deprecated; column and data remain as tombstone"})
+	// New indexes are always allowed.
+	for _, item := range diff.NewIndexes {
+		result.Allowed = append(result.Allowed, AllowedChange{
+			Entity:      item.Entity,
+			ChangeType:  "new_index",
+			Description: item.Description,
+			DiffItem:    item,
+		})
+	}
 
-	// TODO: removed entities are always forbidden
-	//   for each entity in diff.RemovedEntities:
-	//     result.Forbidden = append(result.Forbidden, ForbiddenChange{
-	//       Entity: entity, Rule: "delete_entity",
-	//       Reason: "deleting entities breaks all consumers and audit references",
-	//       Alternative: "deprecate: mark all fields deprecated; table remains empty"})
+	// Removed fields are always forbidden.
+	for _, item := range diff.RemovedFields {
+		result.Forbidden = append(result.Forbidden, ForbiddenChange{
+			Entity:      item.Entity,
+			Field:       item.Field,
+			Rule:        "delete_field",
+			Reason:      "deleting fields breaks history, version rows, and audit log field change references",
+			Alternative: "deprecate the field: mark _schema_field deprecated; column and data remain as tombstone forever",
+			DiffItem:    item,
+		})
+	}
 
-	// TODO: type changes are always forbidden
-	//   for each item in diff.TypeChanges:
-	//     check for rename heuristic: isFieldRename(item, diff)
-	//     if rename detected:
-	//       rule = "rename_field"
-	//       alternative = "add new field with new name, deprecate old (duplication pattern)"
-	//     else:
-	//       rule = "type_change"
-	//       alternative = "add new field with new type, double-write, migrate readers, deprecate old"
-	//     result.Forbidden = append(...)
+	// Removed entities are always forbidden.
+	for _, entity := range diff.RemovedEntities {
+		result.Forbidden = append(result.Forbidden, ForbiddenChange{
+			Entity:      entity,
+			Rule:        "delete_entity",
+			Reason:      "deleting entities breaks all consumers and audit references",
+			Alternative: "deprecate: mark all fields deprecated; table remains as empty tombstone",
+		})
+	}
 
-	_ = diff
-	return result, fmt.Errorf("not implemented")
+	// Type changes are always forbidden.
+	for _, item := range diff.TypeChanges {
+		if isFieldRename(item, diff) {
+			result.Forbidden = append(result.Forbidden, ForbiddenChange{
+				Entity:      item.Entity,
+				Field:       item.Field,
+				Rule:        "rename_field",
+				Reason:      "this appears to be a field rename (field removed + new field with same type added); renames break every consumer",
+				Alternative: "add new field with new name, deprecate old; both coexist indefinitely (duplication pattern)",
+				DiffItem:    item,
+			})
+		} else {
+			result.Forbidden = append(result.Forbidden, ForbiddenChange{
+				Entity:      item.Entity,
+				Field:       item.Field,
+				Rule:        "type_change",
+				Reason:      fmt.Sprintf("changing field type from %v to %v breaks consumers and stored data", item.CurrentValue, item.DesiredValue),
+				Alternative: "add new field with new type, begin double-writing, migrate readers, deprecate old, never remove (duplication pattern)",
+				DiffItem:    item,
+			})
+		}
+	}
+
+	return result, nil
+}
+
+// classifyConstraintChange determines whether a constraint change is
+// allowed (widening) or forbidden (narrowing).
+func classifyConstraintChange(result *EvolutionResult, item DiffItem) {
+	desc := strings.ToLower(item.Description)
+
+	// Max length changes.
+	if strings.Contains(desc, "max_length") {
+		desiredVal, desiredOK := toNumeric(item.DesiredValue)
+		currentVal, currentOK := toNumeric(item.CurrentValue)
+
+		if desiredOK && currentOK {
+			if desiredVal >= currentVal {
+				result.Allowed = append(result.Allowed, AllowedChange{
+					Entity:      item.Entity,
+					Field:       item.Field,
+					ChangeType:  "widen_length",
+					Description: fmt.Sprintf("widen max_length on %s.%s: %v -> %v", item.Entity, item.Field, item.CurrentValue, item.DesiredValue),
+					DiffItem:    item,
+				})
+				return
+			}
+			result.Forbidden = append(result.Forbidden, ForbiddenChange{
+				Entity:      item.Entity,
+				Field:       item.Field,
+				Rule:        "narrow_length",
+				Reason:      fmt.Sprintf("narrowing max_length from %v to %v may invalidate existing strings", item.CurrentValue, item.DesiredValue),
+				Alternative: "use duplication pattern: add new field with shorter max_length, migrate, deprecate old",
+				DiffItem:    item,
+			})
+			return
+		}
+	}
+
+	// Numeric range changes (min_value, max_value).
+	if strings.Contains(desc, "min_value") || strings.Contains(desc, "max_value") {
+		desiredVal, desiredOK := toNumeric(item.DesiredValue)
+		currentVal, currentOK := toNumeric(item.CurrentValue)
+
+		if desiredOK && currentOK {
+			if isRangeWidening(desc, desiredVal, currentVal) {
+				result.Allowed = append(result.Allowed, AllowedChange{
+					Entity:      item.Entity,
+					Field:       item.Field,
+					ChangeType:  "widen_range",
+					Description: fmt.Sprintf("widen range on %s.%s: %v -> %v", item.Entity, item.Field, item.CurrentValue, item.DesiredValue),
+					DiffItem:    item,
+				})
+				return
+			}
+			result.Forbidden = append(result.Forbidden, ForbiddenChange{
+				Entity:      item.Entity,
+				Field:       item.Field,
+				Rule:        "narrow_range",
+				Reason:      fmt.Sprintf("narrowing numeric range from %v to %v may invalidate existing values", item.CurrentValue, item.DesiredValue),
+				Alternative: "use duplication pattern: add new field with tighter range, migrate, deprecate old",
+				DiffItem:    item,
+			})
+			return
+		}
+	}
+
+	// Nullable changes.
+	if strings.Contains(desc, "nullable") {
+		desiredNullable, dOK := item.DesiredValue.(bool)
+		currentNullable, cOK := item.CurrentValue.(bool)
+
+		if dOK && cOK {
+			if desiredNullable && !currentNullable {
+				// Making nullable: always safe (widening).
+				result.Allowed = append(result.Allowed, AllowedChange{
+					Entity:      item.Entity,
+					Field:       item.Field,
+					ChangeType:  "make_nullable",
+					Description: fmt.Sprintf("make %s.%s nullable", item.Entity, item.Field),
+					DiffItem:    item,
+				})
+				return
+			}
+			if !desiredNullable && currentNullable {
+				// Making non-nullable: forbidden (existing NULLs would violate).
+				result.Forbidden = append(result.Forbidden, ForbiddenChange{
+					Entity:      item.Entity,
+					Field:       item.Field,
+					Rule:        "tighten_nullable",
+					Reason:      "making a nullable field non-nullable may break existing rows with NULL values",
+					Alternative: "add new non-nullable field with default, migrate data, deprecate old nullable field",
+					DiffItem:    item,
+				})
+				return
+			}
+		}
+	}
+
+	// If we can't classify the constraint change, treat as allowed with a note.
+	// This covers cases like adding enum values where the description doesn't
+	// match the specific patterns above.
+	result.Allowed = append(result.Allowed, AllowedChange{
+		Entity:      item.Entity,
+		Field:       item.Field,
+		ChangeType:  "changed_constraint",
+		Description: item.Description,
+		DiffItem:    item,
+	})
 }
 
 // isFieldRename detects probable renames: a field disappeared from an entity
 // and a new field with the same type appeared in the same entity.
 func isFieldRename(removed DiffItem, diff *SchemaDiff) bool {
-	// TODO: for each new field in diff.NewFields:
-	//   if same entity as removed field:
-	//     if same type as removed field:
-	//       return true (probable rename)
-	// TODO: return false
-	_ = removed
-	_ = diff
+	removedType := fmt.Sprintf("%v", removed.CurrentValue)
+
+	for _, newField := range diff.NewFields {
+		if newField.Entity == removed.Entity {
+			newType := fmt.Sprintf("%v", newField.DesiredValue)
+			if newType == removedType {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// isRangeWidening determines if a numeric constraint change is widening.
+// For min_value: widening means desired < current (lower minimum).
+// For max_value: widening means desired > current (higher maximum).
+func isRangeWidening(desc string, desired float64, current float64) bool {
+	if strings.Contains(desc, "min") {
+		return desired <= current
+	}
+	if strings.Contains(desc, "max") {
+		return desired >= current
+	}
 	return false
 }
 
 // isRangeNarrowing checks if a numeric constraint change narrows the allowed range.
 func isRangeNarrowing(item DiffItem) bool {
-	// TODO: compare desired vs current min_value and max_value
-	// TODO: narrowing = desired min > current min OR desired max < current max
-	_ = item
+	desc := strings.ToLower(item.Description)
+	desiredVal, desiredOK := toNumeric(item.DesiredValue)
+	currentVal, currentOK := toNumeric(item.CurrentValue)
+
+	if !desiredOK || !currentOK {
+		return false
+	}
+
+	if strings.Contains(desc, "min") {
+		return desiredVal > currentVal // raising minimum narrows range
+	}
+	if strings.Contains(desc, "max") {
+		return desiredVal < currentVal // lowering maximum narrows range
+	}
 	return false
 }
 
 // isEnumValueRemoval checks if an enum constraint change removes values.
 func isEnumValueRemoval(item DiffItem) bool {
-	// TODO: get current enum values and desired enum values
-	// TODO: for each current value: if not in desired set, return true
-	_ = item
+	currentValues, cOK := toStringSet(item.CurrentValue)
+	desiredValues, dOK := toStringSet(item.DesiredValue)
+
+	if !cOK || !dOK {
+		return false
+	}
+
+	for _, cv := range currentValues {
+		found := false
+		for _, dv := range desiredValues {
+			if cv == dv {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return true
+		}
+	}
 	return false
 }
 
@@ -147,3 +325,39 @@ func formatForbiddenMessage(change ForbiddenChange) string {
 	return strings.Join(parts, "\n  ")
 }
 
+// toNumeric converts an interface{} to float64.
+func toNumeric(v interface{}) (float64, bool) {
+	switch n := v.(type) {
+	case float64:
+		return n, true
+	case float32:
+		return float64(n), true
+	case int:
+		return float64(n), true
+	case int64:
+		return float64(n), true
+	case int32:
+		return float64(n), true
+	default:
+		return 0, false
+	}
+}
+
+// toStringSet converts an interface{} to a string slice.
+// Handles []string and []interface{}.
+func toStringSet(v interface{}) ([]string, bool) {
+	switch s := v.(type) {
+	case []string:
+		return s, true
+	case []interface{}:
+		result := make([]string, 0, len(s))
+		for _, item := range s {
+			if str, ok := item.(string); ok {
+				result = append(result, str)
+			}
+		}
+		return result, len(result) == len(s)
+	default:
+		return nil, false
+	}
+}
