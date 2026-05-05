@@ -1,0 +1,49 @@
+
+# === compliance_regime.yaml ===
+name: compliance_regime
+description: "Regulatory regime declaration. SOC2 Type 2, ISO 27001, PCI DSS, HIPAA, FedRAMP, GDPR, SOX ITGC. Defines scoping, control mapping, and audit cycle."
+category: policy
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: site_id
+    type: foreign_key
+    references: site
+    nullable: false
+    description: "Owning site"
+
+  - name: name
+    type: enum
+    enum_values:
+      - soc2_type2
+      - iso27001
+      - pci_dss
+      - hipaa
+      - fedramp_moderate
+      - gdpr
+      - sox_itgc
+    nullable: false
+    description: "Compliance regime identifier"
+    must_be_unique_within:
+      - site_id
+
+  - name: description
+    type: text
+    nullable: true
+    description: "Regime description and organizational scope"
+
+  - name: regime_data_json
+    type: json
+    json_type_discriminator: name
+    nullable: false
+    description: "Scoping rules, control mapping, audit cycle configuration"
+
+indexes:
+  - fields: [site_id]
+
+governance:
+  _requires_group: true
+  _access_classification: true
+

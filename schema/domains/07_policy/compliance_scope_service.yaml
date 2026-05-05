@@ -1,0 +1,29 @@
+
+# === compliance_scope_service.yaml ===
+name: compliance_scope_service
+description: "Bridge: compliance regime to service. Places a service within the scope of a compliance regime."
+category: policy
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: compliance_regime_id
+    type: foreign_key
+    references: compliance_regime
+    nullable: false
+    description: "Compliance regime"
+
+  - name: service_id
+    type: foreign_key
+    references: service
+    nullable: false
+    description: "Service in scope"
+
+indexes:
+  - fields: [compliance_regime_id]
+  - fields: [service_id]
+  - fields: [compliance_regime_id, service_id]
+    unique: true
+
+governance: {}

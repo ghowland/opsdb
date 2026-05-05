@@ -1,0 +1,36 @@
+
+# === change_management_rule.yaml ===
+name: change_management_rule
+description: "Policy data governing change management behavior. When rules apply, emergency path configuration, bulk handling configuration."
+category: policy
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: site_id
+    type: foreign_key
+    references: site
+    nullable: false
+    description: "Owning site"
+
+  - name: name
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "Change management rule name"
+    must_be_unique_within:
+      - site_id
+
+  - name: rule_data_json
+    type: json
+    json_type_discriminator: name
+    nullable: false
+    description: "When this rule applies, what shape it enforces, emergency path parameters, bulk handling parameters."
+
+indexes:
+  - fields: [site_id]
+
+governance:
+  _requires_group: true
+

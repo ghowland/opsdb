@@ -1,0 +1,31 @@
+
+# === security_zone_membership_k8s_namespace.yaml ===
+name: security_zone_membership_k8s_namespace
+description: "Bridge: security zone to Kubernetes namespace. Places a namespace within a security zone."
+category: policy
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: security_zone_id
+    type: foreign_key
+    references: security_zone
+    nullable: false
+    description: "Security zone"
+
+  - name: k8s_namespace_id
+    type: foreign_key
+    references: k8s_namespace
+    nullable: false
+    description: "Namespace in this zone"
+
+indexes:
+  - fields: [security_zone_id]
+  - fields: [k8s_namespace_id]
+  - fields: [security_zone_id, k8s_namespace_id]
+    unique: true
+
+governance: {}
+
+

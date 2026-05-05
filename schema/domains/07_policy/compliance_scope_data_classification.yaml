@@ -1,0 +1,31 @@
+
+
+# === compliance_scope_data_classification.yaml ===
+name: compliance_scope_data_classification
+description: "Bridge: compliance regime to data classification. Links a compliance regime to the data sensitivity levels it governs."
+category: policy
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: compliance_regime_id
+    type: foreign_key
+    references: compliance_regime
+    nullable: false
+    description: "Compliance regime"
+
+  - name: data_classification_id
+    type: foreign_key
+    references: data_classification
+    nullable: false
+    description: "Data classification in scope"
+
+indexes:
+  - fields: [compliance_regime_id]
+  - fields: [data_classification_id]
+  - fields: [compliance_regime_id, data_classification_id]
+    unique: true
+
+governance: {}
+

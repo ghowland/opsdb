@@ -1,0 +1,58 @@
+
+# === policy.yaml ===
+name: policy
+description: "Organizational rule with typed payload. Security zone, data classification, retention, approval rule, escalation, change management, schedule governance, access control, compliance scope."
+category: policy
+versioned: true
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: site_id
+    type: foreign_key
+    references: site
+    nullable: false
+    description: "Owning site"
+
+  - name: name
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "Policy name"
+    must_be_unique_within:
+      - site_id
+
+  - name: policy_type
+    type: enum
+    enum_values:
+      - security_zone
+      - data_classification
+      - retention
+      - approval_rule
+      - escalation
+      - change_management
+      - schedule_governance
+      - access_control
+      - compliance_scope
+    nullable: false
+    description: "Discriminator for policy_data_json"
+
+  - name: policy_data_json
+    type: json
+    json_type_discriminator: policy_type
+    nullable: false
+    description: "Type-specific policy configuration"
+
+  - name: description
+    type: text
+    nullable: true
+    description: "What this policy governs and why"
+
+indexes:
+  - fields: [site_id]
+  - fields: [policy_type]
+
+governance:
+  _requires_group: true
+  _access_classification: true
+

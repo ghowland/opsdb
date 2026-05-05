@@ -1,0 +1,30 @@
+
+# === service_policy.yaml ===
+name: service_policy
+description: "Bridge: service to policy. Applies a policy to a service."
+category: policy
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: service_id
+    type: foreign_key
+    references: service
+    nullable: false
+    description: "Service"
+
+  - name: policy_id
+    type: foreign_key
+    references: policy
+    nullable: false
+    description: "Policy applied to this service"
+
+indexes:
+  - fields: [service_id]
+  - fields: [policy_id]
+  - fields: [service_id, policy_id]
+    unique: true
+
+governance: {}
+

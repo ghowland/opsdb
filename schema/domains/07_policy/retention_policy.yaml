@@ -1,0 +1,45 @@
+
+# === retention_policy.yaml ===
+name: retention_policy
+description: "Per-entity-type retention horizon. Defines how long data is kept before reaper runners trim it."
+category: policy
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: site_id
+    type: foreign_key
+    references: site
+    nullable: false
+    description: "Owning site"
+
+  - name: name
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "Retention policy name"
+    must_be_unique_within:
+      - site_id
+
+  - name: retention_type
+    type: enum
+    enum_values:
+      - time_bounded
+      - count_bounded
+      - hybrid
+      - infinite
+    nullable: false
+    description: "How retention horizon is measured"
+
+  - name: retention_data_json
+    type: json
+    json_type_discriminator: retention_type
+    nullable: false
+    description: "Horizon configuration. Days, row counts, or hybrid rules."
+
+indexes:
+  - fields: [site_id]
+
+governance: {}
+

@@ -1,0 +1,39 @@
+
+# === service_escalation_path.yaml ===
+name: service_escalation_path
+description: "Bridge: service to escalation path with severity threshold. Defines which escalation path fires for a service at which alert severity."
+category: policy
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: service_id
+    type: foreign_key
+    references: service
+    nullable: false
+    description: "Service"
+
+  - name: escalation_path_id
+    type: foreign_key
+    references: escalation_path
+    nullable: false
+    description: "Escalation path"
+
+  - name: trigger_alert_severity_minimum
+    type: enum
+    enum_values:
+      - info
+      - warning
+      - critical
+      - page
+    nullable: false
+    description: "Minimum alert severity that triggers this escalation path"
+
+indexes:
+  - fields: [service_id]
+  - fields: [escalation_path_id]
+  - fields: [service_id, trigger_alert_severity_minimum]
+
+governance: {}
+

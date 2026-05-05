@@ -1,0 +1,29 @@
+# === k8s_namespace_policy.yaml ===
+name: k8s_namespace_policy
+description: "Bridge: Kubernetes namespace to policy. Applies a policy to a namespace."
+category: policy
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: k8s_namespace_id
+    type: foreign_key
+    references: k8s_namespace
+    nullable: false
+    description: "Kubernetes namespace"
+
+  - name: policy_id
+    type: foreign_key
+    references: policy
+    nullable: false
+    description: "Policy applied to this namespace"
+
+indexes:
+  - fields: [k8s_namespace_id]
+  - fields: [policy_id]
+  - fields: [k8s_namespace_id, policy_id]
+    unique: true
+
+governance: {}
+

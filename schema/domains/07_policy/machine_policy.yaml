@@ -1,0 +1,31 @@
+
+# === machine_policy.yaml ===
+name: machine_policy
+description: "Bridge: machine to policy. Applies a policy to a machine."
+category: policy
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: machine_id
+    type: foreign_key
+    references: machine
+    nullable: false
+    description: "Machine"
+
+  - name: policy_id
+    type: foreign_key
+    references: policy
+    nullable: false
+    description: "Policy applied to this machine"
+
+indexes:
+  - fields: [machine_id]
+  - fields: [policy_id]
+  - fields: [machine_id, policy_id]
+    unique: true
+
+governance: {}
+
+

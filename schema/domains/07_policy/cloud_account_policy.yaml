@@ -1,0 +1,31 @@
+
+# === cloud_account_policy.yaml ===
+name: cloud_account_policy
+description: "Bridge: cloud account to policy. Applies a policy to a cloud account."
+category: policy
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: cloud_account_id
+    type: foreign_key
+    references: cloud_account
+    nullable: false
+    description: "Cloud account"
+
+  - name: policy_id
+    type: foreign_key
+    references: policy
+    nullable: false
+    description: "Policy applied to this cloud account"
+
+indexes:
+  - fields: [cloud_account_id]
+  - fields: [policy_id]
+  - fields: [cloud_account_id, policy_id]
+    unique: true
+
+governance: {}
+
+

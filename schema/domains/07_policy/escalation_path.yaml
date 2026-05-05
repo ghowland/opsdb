@@ -1,0 +1,34 @@
+
+# === escalation_path.yaml ===
+name: escalation_path
+description: "Named alert escalation policy. Composed of ordered escalation steps."
+category: policy
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: site_id
+    type: foreign_key
+    references: site
+    nullable: false
+    description: "Owning site"
+
+  - name: name
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "Escalation path name"
+    must_be_unique_within:
+      - site_id
+
+  - name: description
+    type: text
+    nullable: true
+    description: "When and how this escalation path is used"
+
+indexes:
+  - fields: [site_id]
+
+governance: {}
+

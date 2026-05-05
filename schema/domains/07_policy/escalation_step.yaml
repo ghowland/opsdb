@@ -1,0 +1,48 @@
+
+# === escalation_step.yaml ===
+name: escalation_step
+description: "Step within an escalation path. Ordered by step_order. Notify role, notify user, page role, page user, wait, branch on acknowledge."
+category: policy
+versioned: false
+soft_delete: true
+hierarchical: true
+
+fields:
+  - name: escalation_path_id
+    type: foreign_key
+    references: escalation_path
+    nullable: false
+    description: "Escalation path this step belongs to"
+
+  - name: step_order
+    type: int
+    nullable: false
+    min_value: 0
+    max_value: 999
+    description: "Position in escalation sequence"
+
+  - name: step_type
+    type: enum
+    enum_values:
+      - notify_role
+      - notify_user
+      - page_role
+      - page_user
+      - wait_seconds
+      - branch_on_acknowledge
+    nullable: false
+    description: "What happens at this step"
+
+  - name: step_data_json
+    type: json
+    json_type_discriminator: step_type
+    nullable: false
+    description: "Step-type-specific configuration. Target role/user, wait duration, branch conditions."
+
+indexes:
+  - fields: [escalation_path_id, step_order]
+    unique: true
+  - fields: [escalation_path_id]
+
+governance: {}
+

@@ -1,0 +1,30 @@
+
+# === security_zone_membership_service.yaml ===
+name: security_zone_membership_service
+description: "Bridge: security zone to service. Places a service within a security zone."
+category: policy
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: security_zone_id
+    type: foreign_key
+    references: security_zone
+    nullable: false
+    description: "Security zone"
+
+  - name: service_id
+    type: foreign_key
+    references: service
+    nullable: false
+    description: "Service in this zone"
+
+indexes:
+  - fields: [security_zone_id]
+  - fields: [service_id]
+  - fields: [security_zone_id, service_id]
+    unique: true
+
+governance: {}
+

@@ -1,0 +1,47 @@
+
+# === data_classification.yaml ===
+name: data_classification
+description: "Data sensitivity level. Public, internal, confidential, restricted, regulated variants. Used by authorization layer 3 for per-field access decisions."
+category: policy
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: site_id
+    type: foreign_key
+    references: site
+    nullable: false
+    description: "Owning site"
+
+  - name: name
+    type: enum
+    enum_values:
+      - public
+      - internal
+      - confidential
+      - restricted
+      - regulated_pci
+      - regulated_phi
+      - regulated_pii
+    nullable: false
+    description: "Classification level"
+    must_be_unique_within:
+      - site_id
+
+  - name: description
+    type: text
+    nullable: true
+    description: "What this classification means and what handling it requires"
+
+  - name: classification_data_json
+    type: json
+    json_type_discriminator: name
+    nullable: true
+    description: "Classification-specific handling requirements"
+
+indexes:
+  - fields: [site_id]
+
+governance: {}
+

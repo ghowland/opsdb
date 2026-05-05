@@ -1,0 +1,47 @@
+
+# === security_zone.yaml ===
+name: security_zone
+description: "Operational security scope. Production, corp, PCI cardholder, PHI processing, DMZ. Defines required controls and threat model."
+category: policy
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: site_id
+    type: foreign_key
+    references: site
+    nullable: false
+    description: "Owning site"
+
+  - name: name
+    type: enum
+    enum_values:
+      - production
+      - corp
+      - pci_cardholder
+      - phi_processing
+      - dmz
+    nullable: false
+    description: "Security zone name"
+    must_be_unique_within:
+      - site_id
+
+  - name: description
+    type: text
+    nullable: true
+    description: "Purpose and security posture of this zone"
+
+  - name: zone_data_json
+    type: json
+    json_type_discriminator: name
+    nullable: false
+    description: "Required controls and threat model for this zone"
+
+indexes:
+  - fields: [site_id]
+
+governance:
+  _requires_group: true
+  _access_classification: true
+

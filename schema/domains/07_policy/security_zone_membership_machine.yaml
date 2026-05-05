@@ -1,0 +1,31 @@
+
+# === security_zone_membership_machine.yaml ===
+name: security_zone_membership_machine
+description: "Bridge: security zone to machine. Places a machine within a security zone."
+category: policy
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: security_zone_id
+    type: foreign_key
+    references: security_zone
+    nullable: false
+    description: "Security zone"
+
+  - name: machine_id
+    type: foreign_key
+    references: machine
+    nullable: false
+    description: "Machine in this zone"
+
+indexes:
+  - fields: [security_zone_id]
+  - fields: [machine_id]
+  - fields: [security_zone_id, machine_id]
+    unique: true
+
+governance: {}
+
+
