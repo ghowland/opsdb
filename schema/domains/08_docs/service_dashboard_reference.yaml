@@ -1,0 +1,39 @@
+
+# === service_dashboard_reference.yaml ===
+name: service_dashboard_reference
+description: "Bridge: service to dashboard reference with purpose. Primary, capacity, error budget, security, dependency."
+category: docs
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: service_id
+    type: foreign_key
+    references: service
+    nullable: false
+    description: "Service"
+
+  - name: dashboard_reference_id
+    type: foreign_key
+    references: dashboard_reference
+    nullable: false
+    description: "Dashboard"
+
+  - name: dashboard_purpose
+    type: enum
+    enum_values:
+      - primary
+      - capacity
+      - error_budget
+      - security
+      - dependency
+    nullable: false
+    description: "What this dashboard shows for this service"
+
+indexes:
+  - fields: [service_id]
+  - fields: [dashboard_reference_id]
+  - fields: [service_id, dashboard_purpose]
+
+governance: {}

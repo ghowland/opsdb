@@ -1,0 +1,50 @@
+
+# === runbook_reference.yaml ===
+name: runbook_reference
+description: "Structured runbook pointer with review and test metadata. Points to a runbook in a wiki or runbook store via authority pointer."
+category: docs
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: authority_pointer_id
+    type: foreign_key
+    references: authority_pointer
+    nullable: false
+    description: "Points to actual runbook content in wiki or runbook store"
+
+  - name: last_reviewed_time
+    type: datetime
+    nullable: true
+    description: "When this runbook was last reviewed for accuracy"
+
+  - name: last_tested_time
+    type: datetime
+    nullable: true
+    description: "When this runbook was last executed in a drill or test"
+
+  - name: next_review_due_time
+    type: datetime
+    nullable: true
+    description: "When the next review is due. Verifier runners check this."
+
+  - name: reviewer_ops_user_id
+    type: foreign_key
+    references: ops_user
+    nullable: true
+    description: "Who last reviewed this runbook"
+
+  - name: tester_ops_user_id
+    type: foreign_key
+    references: ops_user
+    nullable: true
+    description: "Who last tested this runbook"
+
+indexes:
+  - fields: [authority_pointer_id]
+    unique: true
+  - fields: [next_review_due_time]
+
+governance: {}
+

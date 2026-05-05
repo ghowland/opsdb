@@ -1,0 +1,36 @@
+
+# === k8s_cluster_ownership.yaml ===
+name: k8s_cluster_ownership
+description: "Bridge: Kubernetes cluster to ops_user_role with ownership role."
+category: docs
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: k8s_cluster_id
+    type: foreign_key
+    references: k8s_cluster
+    nullable: false
+    description: "Kubernetes cluster"
+
+  - name: ops_user_role_id
+    type: foreign_key
+    references: ops_user_role
+    nullable: false
+    description: "Role that owns this cluster"
+
+  - name: ownership_role
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "Type of ownership"
+
+indexes:
+  - fields: [k8s_cluster_id]
+  - fields: [ops_user_role_id]
+  - fields: [k8s_cluster_id, ops_user_role_id]
+    unique: true
+
+governance: {}
+

@@ -1,0 +1,27 @@
+
+# === dashboard_reference.yaml ===
+name: dashboard_reference
+description: "Structured dashboard pointer with review metadata. Points to a dashboard in a dashboard platform via authority pointer."
+category: docs
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: authority_pointer_id
+    type: foreign_key
+    references: authority_pointer
+    nullable: false
+    description: "Points to actual dashboard in Grafana, Datadog, etc."
+
+  - name: last_reviewed_time
+    type: datetime
+    nullable: true
+    description: "When this dashboard was last reviewed for accuracy"
+
+indexes:
+  - fields: [authority_pointer_id]
+    unique: true
+
+governance: {}
+

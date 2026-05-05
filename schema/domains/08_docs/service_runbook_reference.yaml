@@ -1,0 +1,40 @@
+
+# === service_runbook_reference.yaml ===
+name: service_runbook_reference
+description: "Bridge: service to runbook reference with purpose. On-call response, deployment, disaster recovery, security incident, capacity response."
+category: docs
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: service_id
+    type: foreign_key
+    references: service
+    nullable: false
+    description: "Service"
+
+  - name: runbook_reference_id
+    type: foreign_key
+    references: runbook_reference
+    nullable: false
+    description: "Runbook"
+
+  - name: runbook_purpose
+    type: enum
+    enum_values:
+      - oncall_response
+      - deployment
+      - disaster_recovery
+      - security_incident
+      - capacity_response
+    nullable: false
+    description: "What scenario this runbook addresses for this service"
+
+indexes:
+  - fields: [service_id]
+  - fields: [runbook_reference_id]
+  - fields: [service_id, runbook_purpose]
+
+governance: {}
+
