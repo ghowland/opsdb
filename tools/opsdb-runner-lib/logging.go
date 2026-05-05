@@ -1,12 +1,23 @@
-//# tools/opsdb-runner-lib/logging.go
-
-go
 package runnerlib
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
+	"os"
+	"strings"
 	"time"
+
+	"github.com/google/uuid"
 )
+
+// severityLevel maps severity names to numeric levels for filtering.
+var severityLevel = map[string]int{
+	"debug": 0,
+	"info":  1,
+	"warn":  2,
+	"error": 3,
+}
 
 // Logger provides structured logging with runner context. Every log line
 // includes timestamp, severity, runner_job_id, correlation_id, runner spec
@@ -17,8 +28,8 @@ type Logger struct {
 	RunnerMachineID int
 	JobID           int
 	CorrelationID   string
-	// TODO: output destination (os.Stdout, syslog, etc.)
-	// TODO: minimum severity level
+	minLevel        int
+	output          io.Writer
 }
 
 // LogField is a key-value pair for structured log data.
@@ -35,61 +46,120 @@ func Field(key string, value interface{}) LogField {
 // NewLogger creates a logger with runner context fields populated
 // from the RunnerConfig.
 func NewLogger(config *RunnerConfig) *Logger {
-	// TODO: create logger with:
-	//   SpecName = config.SpecName
-	//   SpecVersion = config.SpecVersion
-	//   RunnerMachineID = config.RunnerMachineID
-	//   JobID = 0 (set per cycle via WithJobID)
-	//   CorrelationID = generated UUID
-	// TODO: read log level from OPSDB_LOG_LEVEL env var, default "info"
-	// TODO: return logger
-	return nil
+	level := "info"
+	if envLevel := os.Getenv("OPSDB_LOG_LEVEL"); envLevel != "" {
+		lower := strings.ToLower(envLevel)
+		if _, ok := severityLevel[lower]; ok {
+			level = lower
+		}
+	}
+
+	return &Logger{
+		SpecName:        config.SpecName,
+		SpecVersion:     config.SpecVersion,
+		RunnerMachineID: config.RunnerMachineID,
+		JobID:           0,
+		CorrelationID:   uuid.New().String(),
+		minLevel:        severityLevel[level],
+		output:          os.Stdout,
+	}
+}
+
+// NewTestLogger creates a logger that writes to the provided writer.
+// Used in tests to capture log output.
+func NewTestLogger(w io.Writer) *Logger {
+	return &Logger{
+		SpecName:      "test",
+		CorrelationID: "test-correlation",
+		minLevel:      severityLevel["debug"],
+		output:        w,
+	}
 }
 
 // WithJobID returns a new logger with the runner_job_id set for the
 // current cycle. Called at cycle start after runner_job row is created.
 func (l *Logger) WithJobID(jobID int) *Logger {
-	// TODO: shallow copy logger
-	// TODO: set JobID = jobID
-	// TODO: return copy
-	return nil
+	return &Logger{
+		SpecName:        l.SpecName,
+		SpecVersion:     l.SpecVersion,
+		RunnerMachineID: l.RunnerMachineID,
+		JobID:           jobID,
+		CorrelationID:   l.CorrelationID,
+		minLevel:        l.minLevel,
+		output:          l.output,
+	}
 }
 
 // Info logs at info severity.
 func (l *Logger) Info(msg string, fields ...LogField) {
-	// TODO: call emit("info", msg, fields)
+	l.emit("info", msg, fields)
 }
 
 // Warn logs at warn severity.
 func (l *Logger) Warn(msg string, fields ...LogField) {
-	// TODO: call emit("warn", msg, fields)
+	l.emit("warn", msg, fields)
 }
 
 // Error logs at error severity.
 func (l *Logger) Error(msg string, fields ...LogField) {
-	// TODO: call emit("error", msg, fields)
+	l.emit("error", msg, fields)
 }
 
 // Debug logs at debug severity.
 func (l *Logger) Debug(msg string, fields ...LogField) {
-	// TODO: call emit("debug", msg, fields)
+	l.emit("debug", msg, fields)
 }
 
-// emit formats and writes one structured log line.
+// emit formats and writes one structured log line as JSON.
+// Each line is a complete JSON object terminated by newline.
 func (l *Logger) emit(severity string, msg string, fields []LogField) {
-	// TODO: build structured log entry as JSON:
-	//   "timestamp": time.Now().UTC().Format(time.RFC3339Nano)
-	//   "severity": severity
-	//   "message": msg
-	//   "runner_spec": l.SpecName
-	//   "runner_spec_version": l.SpecVersion
-	//   "runner_machine_id": l.RunnerMachineID
-	//   "runner_job_id": l.JobID (if > 0)
-	//   "correlation_id": l.CorrelationID
-	//   plus all extra fields from fields parameter
-	// TODO: serialize to JSON
-	// TODO: write to output destination (one line, newline terminated)
-	_ = fmt.Sprintf("%s %s %s", time.Now().Format(time.RFC3339), severity, msg)
+	level, ok := severityLevel[severity]
+	if !ok {
+		level = severityLevel["info"]
+	}
+	if level < l.minLevel {
+		return
+	}
+
+	// Build the log entry as an ordered map.
+	// Using a map and json.Marshal — field order is not guaranteed
+	// but all fields are present and machine-parseable.
+	entry := make(map[string]interface{}, 8+len(fields))
+
+	entry["timestamp"] = time.Now().UTC().Format(time.RFC3339Nano)
+	entry["severity"] = severity
+	entry["message"] = msg
+	entry["runner_spec"] = l.SpecName
+
+	if l.SpecVersion > 0 {
+		entry["runner_spec_version"] = l.SpecVersion
+	}
+	if l.RunnerMachineID > 0 {
+		entry["runner_machine_id"] = l.RunnerMachineID
+	}
+	if l.JobID > 0 {
+		entry["runner_job_id"] = l.JobID
+	}
+	if l.CorrelationID != "" {
+		entry["correlation_id"] = l.CorrelationID
+	}
+
+	// Append caller-provided fields.
+	for _, f := range fields {
+		entry[f.Key] = f.Value
+	}
+
+	b, err := json.Marshal(entry)
+	if err != nil {
+		// Fallback to unstructured if JSON marshal fails.
+		fallback := fmt.Sprintf("%s %s %s runner_spec=%s",
+			time.Now().UTC().Format(time.RFC3339), severity, msg, l.SpecName)
+		for _, f := range fields {
+			fallback += fmt.Sprintf(" %s=%v", f.Key, f.Value)
+		}
+		fmt.Fprintln(l.output, fallback)
+		return
+	}
+
+	fmt.Fprintln(l.output, string(b))
 }
-
-
