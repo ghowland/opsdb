@@ -1,0 +1,53 @@
+
+# === observation_cache_state.yaml ===
+name: observation_cache_state
+description: "Cached state data keyed by entity type, entity ID, and state key. Written by puller runners. Used by reconcilers and drift detectors as the observed-state comparison surface."
+category: observation
+versioned: false
+soft_delete: false
+hierarchical: false
+
+fields:
+  - name: entity_type
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "OpsDB entity type this observation describes. machine, k8s_pod, cloud_resource, service, etc."
+
+  - name: entity_id
+    type: int
+    nullable: false
+    min_value: 1
+    max_value: 2147483647
+    description: "ID of the entity this observation describes. Interpreted with entity_type."
+
+  - name: state_key
+    type: varchar
+    max_length: 1024
+    nullable: false
+    description: "What aspect of state is observed. process_count, disk_pct_used, pod_phase, instance_state, etc."
+
+  - name: state_value
+    type: varchar
+    max_length: 4096
+    nullable: false
+    description: "Current observed value as string"
+
+  - name: state_data_json
+    type: json
+    json_type_discriminator: state_key
+    nullable: true
+    description: "Structured observation detail beyond the scalar value"
+
+indexes:
+  - fields: [entity_type, entity_id, state_key]
+    unique: true
+  - fields: [entity_type, entity_id]
+  - fields: [entity_type]
+  - fields: [state_key]
+
+governance:
+  _observed_time: true
+  _authority_id: true
+  _puller_runner_job_id: true
+  _retention_policy_id: true

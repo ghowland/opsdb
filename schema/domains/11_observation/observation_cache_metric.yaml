@@ -1,0 +1,51 @@
+# === observation_cache_metric.yaml ===
+name: observation_cache_metric
+description: "Cached metric data keyed by authority, hostname, and metric key. Written by puller runners. Latest observation wins — previous value overwritten. History in audit log."
+category: observation
+versioned: false
+soft_delete: false
+hierarchical: false
+
+fields:
+  - name: authority_id
+    type: foreign_key
+    references: authority
+    nullable: false
+    description: "Source authority (Prometheus server, Datadog, etc.)"
+
+  - name: hostname
+    type: varchar
+    max_length: 512
+    nullable: false
+    description: "Host this metric was collected from"
+
+  - name: metric_key
+    type: varchar
+    max_length: 1024
+    nullable: false
+    description: "Metric name plus normalized labels"
+
+  - name: metric_value
+    type: float
+    nullable: false
+    description: "Current metric value"
+
+  - name: metric_data_json
+    type: json
+    json_type_discriminator: metric_key
+    nullable: true
+    description: "Additional labels, metadata, unit information"
+
+indexes:
+  - fields: [authority_id, hostname, metric_key]
+    unique: true
+  - fields: [authority_id]
+  - fields: [hostname]
+  - fields: [metric_key]
+
+governance:
+  _observed_time: true
+  _authority_id: true
+  _puller_runner_job_id: true
+  _retention_policy_id: true
+

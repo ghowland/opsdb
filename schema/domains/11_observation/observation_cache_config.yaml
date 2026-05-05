@@ -1,0 +1,52 @@
+
+
+# === observation_cache_config.yaml ===
+name: observation_cache_config
+description: "Cached configuration data keyed by authority, optional hostname, and config key. Written by puller runners. Captures configuration as observed in the world, distinct from OpsDB's governed desired state."
+category: observation
+versioned: false
+soft_delete: false
+hierarchical: false
+
+fields:
+  - name: authority_id
+    type: foreign_key
+    references: authority
+    nullable: false
+    description: "Source authority"
+
+  - name: hostname
+    type: varchar
+    max_length: 512
+    nullable: true
+    description: "Host this config was collected from. Null for non-host-scoped config."
+
+  - name: config_key
+    type: varchar
+    max_length: 1024
+    nullable: false
+    description: "Configuration key. sysctl_vm_swappiness, nginx_worker_connections, pg_max_connections, etc."
+
+  - name: config_value
+    type: text
+    nullable: false
+    description: "Current observed configuration value"
+
+  - name: config_data_json
+    type: json
+    json_type_discriminator: config_key
+    nullable: true
+    description: "Structured configuration detail"
+
+indexes:
+  - fields: [authority_id, hostname, config_key]
+    unique: true
+  - fields: [authority_id]
+  - fields: [hostname]
+  - fields: [config_key]
+
+governance:
+  _observed_time: true
+  _authority_id: true
+  _puller_runner_job_id: true
+  _retention_policy_id: true
