@@ -1,55 +1,177 @@
-//# tools/runners/emergency-review-monitor/cmd/main.go
-
-go
 package main
 
 import (
+	"flag"
+	"fmt"
 	"os"
-	// runner "github.com/ghowland/opsdb/tools/opsdb-runner-lib"
+
+	runner "github.com/ghowland/opsdb/tools/opsdb-runner-lib"
+	"github.com/ghowland/opsdb/tools/runners/emergency-review-monitor"
 )
 
-// main is the CLI entrypoint for the emergency review monitor runner.
-// Finds emergency change sets where the post-hoc review window has elapsed
-// without review, files compliance findings, and escalates.
-//
-// The spec requires that every emergency change is reviewed eventually.
-// This runner is the enforcement backstop for that requirement.
 func main() {
-	// TODO: parse --dos flag for DOS config directory path
-	// TODO: runner.Init("emergency-review-monitor") to load runner spec
-	//   spec runner_data_json contains:
-	//     review_window_hours: default review window (default 72)
-	//     escalation_interval_hours: re-escalate every N hours after overdue (default 24)
-	//     max_findings_per_cycle: bound on findings created per cycle (default 100)
-	//     notify_on_overdue: bool, whether to trigger notification (default true)
-	// TODO: loop while runner.ShouldRun():
-	//   jobID := runner.StartCycle(config)
-	//
-	//   GET:
-	//     search change_set_emergency_review where status=pending
-	//     for each: load parent change_set for submitted_time and is_emergency flag
-	//     load change_management_rule for configured review_window_hours override
-	//     compute which reviews are overdue: now - submitted_time > review_window
-	//     compute which overdue reviews need re-escalation:
-	//       last escalation was > escalation_interval_hours ago
-	//
-	//   ACT (skip if dry run):
-	//     for each overdue review without existing finding:
-	//       create compliance_finding via WriteObservation:
-	//         finding_type=emergency_review_overdue
-	//         severity=high
-	//         description with change set ID, submitter, elapsed hours
-	//     for each overdue review needing re-escalation:
-	//       create additional compliance_finding with incremented severity
-	//       (or update runner_job_output_var to signal notification runner)
-	//
-	//   SET:
-	//     write runner_job with cycle summary:
-	//       reviews_checked, overdue_found, findings_created, escalations_sent
-	//     runner.FinishCycle(config, status, summary)
-	//
-	//   runner.WaitForNextCycle(config)
+	dosPath := flag.String("dos", "", "path to DOS directory")
+	flag.Parse()
+
+	if *dosPath == "" {
+		fmt.Fprintf(os.Stderr, "usage: emergency-review-monitor --dos <dos-directory>\n")
+		os.Exit(2)
+	}
+	_ = dosPath
+
+	config, err := runner.Init("emergency-review-monitor")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "init failed: %v\n", err)
+		os.Exit(1)
+	}
+
+	for runner.ShouldRun(config) {
+		jobID, err := runner.StartCycle(config)
+		if err != nil {
+			config.Logger.Error("failed to start cycle", runner.Field("error", err.Error()))
+			runner.WaitForNextCycle(config)
+			continue
+		}
+		client := config.Client.WithCorrelation(jobID, "")
+
+		// --- GET ---
+		reviewWindowHours, _ := runner.GetSpecDataInt(config, "review_window_hours")
+		if reviewWindowHours == 0 {
+			reviewWindowHours = 72
+		}
+		escalationIntervalHours, _ := runner.GetSpecDataInt(config, "escalation_interval_hours")
+		if escalationIntervalHours == 0 {
+			escalationIntervalHours = 24
+		}
+		maxFindings, _ := runner.GetSpecDataInt(config, "max_findings_per_cycle")
+		if maxFindings == 0 {
+			maxFindings = 100
+		}
+		notifyOnOverdue, ok := runner.GetSpecDataBool(config, "notify_on_overdue")
+		if !ok {
+			notifyOnOverdue = true
+		}
+
+		overdue, totalChecked, err := monitor.GetPendingEmergencyReviews(client, reviewWindowHours)
+		if err != nil {
+			config.Logger.Error("failed to get pending reviews",
+				runner.Field("error", err.Error()))
+			runner.FinishCycle(config, "failed", map[string]interface{}{
+				"error": err.Error(),
+			})
+			runner.WaitForNextCycle(config)
+			continue
+		}
+
+		config.Logger.Info("checked emergency reviews",
+			runner.Field("total_checked", totalChecked),
+			runner.Field("overdue_found", len(overdue)),
+		)
+
+		// --- ACT ---
+		if runner.IsDryRun(config) {
+			planData := make([]map[string]interface{}, 0, len(overdue))
+			for _, r := range overdue {
+				planData = append(planData, map[string]interface{}{
+					"change_set_id":  r.ChangeSetID,
+					"change_set_name": r.ChangeSetName,
+					"elapsed_hours":  r.ElapsedHours,
+					"has_finding":    r.ExistingFindingID != nil,
+				})
+			}
+			runner.LogPlan(config.Logger, "overdue emergency reviews", planData)
+			runner.SkipActPhase(config.Logger)
+			runner.SkipSetPhase(config.Logger)
+			runner.FinishCycle(config, "completed", map[string]interface{}{
+				"dry_run":        true,
+				"reviews_checked": totalChecked,
+				"overdue_found":  len(overdue),
+			})
+			runner.WaitForNextCycle(config)
+			continue
+		}
+
+		findingsCreated := 0
+		escalationsSent := 0
+		var errors []string
+
+		for _, rev := range overdue {
+			if findingsCreated >= maxFindings {
+				config.Logger.Warn("max findings per cycle reached")
+				runner.RecordBoundHit(config, "max_findings_per_cycle", maxFindings)
+				break
+			}
+
+			if rev.ExistingFindingID == nil {
+				// No existing finding — file one.
+				findingID, err := monitor.FileOverdueFinding(client, &rev, jobID)
+				if err != nil {
+					errors = append(errors, fmt.Sprintf("finding for cs %d: %v", rev.ChangeSetID, err))
+					config.Logger.Error("failed to file finding",
+						runner.Field("change_set_id", rev.ChangeSetID),
+						runner.Field("error", err.Error()),
+					)
+					continue
+				}
+				findingsCreated++
+
+				config.Logger.Info("filed overdue finding",
+					runner.Field("change_set_id", rev.ChangeSetID),
+					runner.Field("finding_id", findingID),
+					runner.Field("elapsed_hours", rev.ElapsedHours),
+				)
+
+				if notifyOnOverdue {
+					err = monitor.SignalNotification(client, &rev, findingID, jobID)
+					if err != nil {
+						errors = append(errors, fmt.Sprintf("notification for cs %d: %v", rev.ChangeSetID, err))
+					} else {
+						escalationsSent++
+					}
+				}
+			} else if monitor.ShouldReescalate(&rev, escalationIntervalHours) {
+				// Existing finding but re-escalation interval has passed.
+				findingID, err := monitor.FileOverdueFinding(client, &rev, jobID)
+				if err != nil {
+					errors = append(errors, fmt.Sprintf("re-escalation for cs %d: %v", rev.ChangeSetID, err))
+					continue
+				}
+				findingsCreated++
+
+				config.Logger.Info("filed re-escalation finding",
+					runner.Field("change_set_id", rev.ChangeSetID),
+					runner.Field("finding_id", findingID),
+					runner.Field("elapsed_hours", rev.ElapsedHours),
+				)
+
+				if notifyOnOverdue {
+					err = monitor.SignalNotification(client, &rev, findingID, jobID)
+					if err != nil {
+						errors = append(errors, fmt.Sprintf("re-escalation notification for cs %d: %v", rev.ChangeSetID, err))
+					} else {
+						escalationsSent++
+					}
+				}
+			}
+		}
+
+		// --- SET ---
+		status := "completed"
+		if len(errors) > 0 {
+			status = "completed_with_errors"
+		}
+
+		runner.FinishCycle(config, status, map[string]interface{}{
+			"reviews_checked":  totalChecked,
+			"overdue_found":    len(overdue),
+			"findings_created": findingsCreated,
+			"escalations_sent": escalationsSent,
+			"errors":           errors,
+		})
+
+		runner.WaitForNextCycle(config)
+	}
+
+	config.Logger.Info("emergency review monitor shutting down")
 	os.Exit(0)
 }
-
-

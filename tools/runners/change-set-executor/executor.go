@@ -1,7 +1,11 @@
-//# tools/runners/change-set-executor/executor.go
-
-go
 package executor
+
+import (
+	"fmt"
+	"sort"
+
+	runner "github.com/ghowland/opsdb/tools/opsdb-runner-lib"
+)
 
 // ChangeSetBatch holds the data read during the get phase for one cycle.
 type ChangeSetBatch struct {
@@ -27,7 +31,7 @@ type FieldChangeWork struct {
 	FieldName     string
 	AfterValue    interface{}
 	ApplyOrder    int
-	AppliedStatus string // pending, applied, failed
+	AppliedStatus string
 }
 
 // CycleSummary holds the results of one executor cycle.
@@ -41,79 +45,184 @@ type CycleSummary struct {
 }
 
 // GetApprovedChangeSets reads approved change sets from OpsDB.
-// Returns them ordered by submitted_time ascending (oldest first by default).
-func GetApprovedChangeSets(client interface{}, batchSize int, retryFailed bool) (*ChangeSetBatch, error) {
-	// TODO: build search filters:
-	//   status = "approved"
-	//   if not retryFailed: exclude change sets with any field_change in "failed" status
-	// TODO: call client.Search("change_set", filters, ordering=[submitted_time asc], limit=batchSize)
-	// TODO: for each change set in results:
-	//   call client.Search("change_set_field_change",
-	//     filters: change_set_id=cs.id, applied_status="pending",
-	//     ordering: [apply_order asc])
-	//   build ChangeSetWork with loaded field changes
-	// TODO: return ChangeSetBatch
-	return nil, nil
+// Returns them ordered by submitted_time ascending (oldest first).
+func GetApprovedChangeSets(client *runner.APIClient, batchSize int, retryFailed bool) (*ChangeSetBatch, error) {
+	filters := []runner.SearchFilter{
+		{Field: "status", Operator: "eq", Value: "approved"},
+	}
+
+	result, err := client.Search("change_set", filters,
+		[]runner.OrderSpec{{Field: "submitted_time", Direction: "asc"}},
+		batchSize, "")
+	if err != nil {
+		return nil, fmt.Errorf("searching approved change sets: %w", err)
+	}
+
+	batch := &ChangeSetBatch{
+		TotalFound: result.TotalCount,
+	}
+
+	for _, row := range result.Rows {
+		csID, _ := extractInt(row, "id")
+		name, _ := row["name"].(string)
+		isEmergency, _ := row["is_emergency"].(bool)
+		isBulk, _ := row["is_bulk"].(bool)
+		submittedTime := row["submitted_time"]
+
+		cs := ChangeSetWork{
+			ChangeSetID:   csID,
+			Name:          name,
+			SubmittedTime: submittedTime,
+			IsEmergency:   isEmergency,
+			IsBulk:        isBulk,
+		}
+
+		// Load field changes for this change set.
+		fcFilters := []runner.SearchFilter{
+			{Field: "change_set_id", Operator: "eq", Value: csID},
+		}
+
+		// Unless retrying failed, only load pending field changes.
+		if !retryFailed {
+			fcFilters = append(fcFilters, runner.SearchFilter{
+				Field: "applied_status", Operator: "eq", Value: "pending",
+			})
+		} else {
+			// Load both pending and failed for retry.
+			fcFilters = append(fcFilters, runner.SearchFilter{
+				Field: "applied_status", Operator: "in", Value: []string{"pending", "failed"},
+			})
+		}
+
+		fcResult, err := client.Search("change_set_field_change", fcFilters,
+			[]runner.OrderSpec{{Field: "apply_order", Direction: "asc"}},
+			1000, "")
+		if err != nil {
+			return nil, fmt.Errorf("loading field changes for change_set %d: %w", csID, err)
+		}
+
+		for _, fcRow := range fcResult.Rows {
+			fcID, _ := extractInt(fcRow, "id")
+			entityType, _ := fcRow["target_entity_type"].(string)
+			entityID, _ := extractInt(fcRow, "target_entity_id")
+			fieldName, _ := fcRow["field_name"].(string)
+			afterValue := fcRow["after_value"]
+			applyOrder, _ := extractInt(fcRow, "apply_order")
+			appliedStatus, _ := fcRow["applied_status"].(string)
+
+			cs.FieldChanges = append(cs.FieldChanges, FieldChangeWork{
+				FieldChangeID: fcID,
+				EntityType:    entityType,
+				EntityID:      entityID,
+				FieldName:     fieldName,
+				AfterValue:    afterValue,
+				ApplyOrder:    applyOrder,
+				AppliedStatus: appliedStatus,
+			})
+		}
+
+		// Ensure field changes are sorted by apply order.
+		sort.Slice(cs.FieldChanges, func(i, j int) bool {
+			return cs.FieldChanges[i].ApplyOrder < cs.FieldChanges[j].ApplyOrder
+		})
+
+		batch.ChangeSets = append(batch.ChangeSets, cs)
+	}
+
+	return batch, nil
 }
 
 // ApplyChangeSet processes one approved change set by applying each field
 // change in order via the API. Stops on first failure within a change set.
 // Returns the count of successfully applied field changes and any error.
-func ApplyChangeSet(client interface{}, cs *ChangeSetWork) (int, error) {
-	// TODO: appliedCount := 0
-	// TODO: for each field change in cs.FieldChanges (ordered by ApplyOrder):
-	//   if field change AppliedStatus != "pending": skip (already applied or failed)
-	//   err := client.ApplyFieldChange(cs.ChangeSetID, fc.FieldChangeID)
-	//   if err != nil:
-	//     log error with change set ID, field change ID, entity, field, error
-	//     return appliedCount, err (stop processing this change set)
-	//   appliedCount++
-	// TODO: return appliedCount, nil
-	return 0, nil
+func ApplyChangeSet(client *runner.APIClient, cs *ChangeSetWork) (int, error) {
+	appliedCount := 0
+
+	for _, fc := range cs.FieldChanges {
+		if fc.AppliedStatus != "pending" && fc.AppliedStatus != "failed" {
+			continue // already applied
+		}
+
+		err := client.ApplyFieldChange(cs.ChangeSetID, fc.FieldChangeID)
+		if err != nil {
+			return appliedCount, fmt.Errorf("field_change %d (%s.%s on %s/%d): %w",
+				fc.FieldChangeID, fc.EntityType, fc.FieldName, fc.EntityType, fc.EntityID, err)
+		}
+
+		appliedCount++
+	}
+
+	return appliedCount, nil
 }
 
 // FinalizeChangeSet marks a change set as fully applied after all its
 // field changes have been successfully applied.
-func FinalizeChangeSet(client interface{}, changeSetID int) error {
-	// TODO: call client.MarkChangeSetApplied(changeSetID)
-	// TODO: if error: log "failed to finalize change set" with ID and error
-	// TODO: return error
+func FinalizeChangeSet(client *runner.APIClient, changeSetID int) error {
+	err := client.MarkChangeSetApplied(changeSetID)
+	if err != nil {
+		return fmt.Errorf("finalizing change_set %d: %w", changeSetID, err)
+	}
 	return nil
 }
 
 // ProcessCycle runs one complete get/act/set cycle for the executor.
 // Reads approved change sets, applies field changes, finalizes, reports.
-func ProcessCycle(client interface{}, batchSize int, fieldChangeBatchSize int, retryFailed bool, dryRun bool) (*CycleSummary, error) {
+func ProcessCycle(client *runner.APIClient, batchSize int, fieldChangeBatchSize int, retryFailed bool, dryRun bool) (*CycleSummary, error) {
 	summary := &CycleSummary{}
 
-	// TODO: GET phase
-	//   batch, err := GetApprovedChangeSets(client, batchSize, retryFailed)
-	//   if err: return nil, err
-	//   log "found {batch.TotalFound} approved change sets, processing {len(batch.ChangeSets)}"
+	// GET phase.
+	batch, err := GetApprovedChangeSets(client, batchSize, retryFailed)
+	if err != nil {
+		return nil, fmt.Errorf("get phase: %w", err)
+	}
 
-	// TODO: if dryRun:
-	//   log plan: list each change set ID, name, field change count
-	//   return summary with counts but no actual applies
+	if dryRun {
+		summary.ChangeSetsProcessed = len(batch.ChangeSets)
+		return summary, nil
+	}
 
-	// TODO: ACT phase
-	//   for each cs in batch.ChangeSets:
-	//     summary.ChangeSetsProcessed++
-	//     applied, err := ApplyChangeSet(client, &cs)
-	//     summary.FieldChangesApplied += applied
-	//     if err != nil:
-	//       summary.ChangeSetsFailed++
-	//       summary.FieldChangesFailed += (len(cs.FieldChanges) - applied)
-	//       summary.Errors = append(summary.Errors, err.Error())
-	//       continue
-	//     if applied == len(cs.FieldChanges):
-	//       err = FinalizeChangeSet(client, cs.ChangeSetID)
-	//       if err != nil:
-	//         summary.Errors = append(summary.Errors, err.Error())
-	//         continue
-	//       summary.ChangeSetsFullyApplied++
+	// ACT phase.
+	for i := range batch.ChangeSets {
+		cs := &batch.ChangeSets[i]
+		summary.ChangeSetsProcessed++
 
-	// TODO: return summary, nil
+		applied, applyErr := ApplyChangeSet(client, cs)
+		summary.FieldChangesApplied += applied
+
+		if applyErr != nil {
+			summary.ChangeSetsFailed++
+			summary.FieldChangesFailed += len(cs.FieldChanges) - applied
+			summary.Errors = append(summary.Errors, applyErr.Error())
+			continue
+		}
+
+		if applied == len(cs.FieldChanges) {
+			finalizeErr := FinalizeChangeSet(client, cs.ChangeSetID)
+			if finalizeErr != nil {
+				summary.Errors = append(summary.Errors, finalizeErr.Error())
+				continue
+			}
+			summary.ChangeSetsFullyApplied++
+		}
+	}
+
 	return summary, nil
 }
 
-
+// extractInt reads an integer from a row map, handling JSON float64 numbers.
+func extractInt(row map[string]interface{}, field string) (int, bool) {
+	val, ok := row[field]
+	if !ok {
+		return 0, false
+	}
+	switch v := val.(type) {
+	case float64:
+		return int(v), true
+	case int:
+		return v, true
+	case int64:
+		return int(v), true
+	default:
+		return 0, false
+	}
+}
