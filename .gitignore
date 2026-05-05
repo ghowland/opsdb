@@ -1,1 +1,64 @@
-vendor
+# Binaries
+/bin/
+/build/
+/dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Go coverage / profiling
+coverage.out
+coverage.html
+*.cover
+*.prof
+*.pprof
+cpu.prof
+mem.prof
+
+# Go workspace / vendor
+vendor/
+go.work
+go.work.sum
+
+# Dependency manager leftovers
+Godeps/
+*.coverprofile
+
+# Test artifacts
+test-results/
+*.log
+
+# IDEs and editors
+.vscode/
+.idea/
+*.iml
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Python artifacts (for docs/code_diagrams and similar scripts)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.python-version
+.pytest_cache/
+.mypy_cache/
+.venv/
+venv/
+env/
+
+# Local env / secrets / overrides
+.env
+.env.*
+*.local
+
+# Temporary files
+tmp/
+temp/
+.cache/
