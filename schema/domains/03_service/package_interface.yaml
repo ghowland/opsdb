@@ -1,0 +1,61 @@
+
+# === package_interface.yaml ===
+name: package_interface
+description: "Exposed interface of a package version. HTTP endpoint, syslog listener, metrics scrape port, gRPC service."
+category: service
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: package_version_id
+    type: foreign_key
+    references: package
+    nullable: false
+    description: "Package version exposing this interface"
+
+  - name: name
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "Interface name. http, syslog_listener, metrics_scrape, grpc_api."
+
+  - name: interface_type
+    type: enum
+    enum_values:
+      - transaction
+      - message
+      - resource
+    nullable: false
+    description: "Nature of interaction through this interface"
+
+  - name: protocol
+    type: enum
+    enum_values:
+      - tcp
+      - udp
+      - unix_socket
+      - http
+      - grpc
+    nullable: false
+    description: "Transport protocol"
+
+  - name: default_port
+    type: int
+    nullable: true
+    min_value: 1
+    max_value: 65535
+    description: "Default listening port. Overridable at service_interface_mount."
+
+  - name: description
+    type: text
+    nullable: true
+    description: "What this interface provides"
+
+indexes:
+  - fields: [package_version_id, name]
+    unique: true
+  - fields: [package_version_id]
+
+governance: {}
+

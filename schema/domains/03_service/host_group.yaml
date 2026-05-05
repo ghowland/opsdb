@@ -1,0 +1,41 @@
+
+# === host_group.yaml ===
+name: host_group
+description: "Host role assignment. Groups machines by function: database, k8s_worker, edge_proxy, web_server."
+category: service
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: site_id
+    type: foreign_key
+    references: site
+    nullable: false
+    description: "Owning site"
+
+  - name: name
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "Host group name. database, k8s_worker, edge_proxy."
+    must_be_unique_within:
+      - site_id
+
+  - name: description
+    type: text
+    nullable: true
+    description: "Purpose of this host group"
+
+  - name: domain
+    type: varchar
+    max_length: 255
+    nullable: true
+    description: "FQDN suffix for machines in this group"
+
+indexes:
+  - fields: [site_id]
+
+governance: {}
+
+

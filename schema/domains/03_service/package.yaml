@@ -1,0 +1,38 @@
+
+
+# === package.yaml ===
+name: package
+description: "Installable functionality. nginx, postgres, kubelet, datadog-agent. Versioned through package_version sibling."
+category: service
+versioned: true
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: name
+    type: varchar
+    max_length: 255
+    nullable: false
+    unique: true
+    description: "Package name. nginx, postgres, kubelet, etc."
+
+  - name: package_type
+    type: enum
+    enum_values:
+      - platform
+      - service
+      - sidecar
+      - agent
+    nullable: false
+    description: "Classification of package role"
+
+  - name: description
+    type: text
+    nullable: true
+    description: "What this package provides"
+
+indexes:
+  - fields: [package_type]
+
+governance: {}
+

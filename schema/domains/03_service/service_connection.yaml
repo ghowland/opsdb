@@ -1,0 +1,47 @@
+
+# === service_connection.yaml ===
+name: service_connection
+description: "Service-to-service connection. Drives configuration generation, firewall rules, alert suppression, and capacity planning."
+category: service
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: source_service_version_id
+    type: foreign_key
+    references: service
+    nullable: false
+    description: "Service version initiating the connection"
+
+  - name: destination_service_id
+    type: foreign_key
+    references: service
+    nullable: false
+    description: "Target service"
+
+  - name: destination_service_interface_mount_id
+    type: foreign_key
+    references: service_interface_mount
+    nullable: false
+    description: "Specific interface on the target service"
+
+  - name: source_package_connection_id
+    type: foreign_key
+    references: package_connection
+    nullable: false
+    description: "Package connection declaration this satisfies"
+
+  - name: is_required
+    type: boolean
+    nullable: false
+    default: true
+    description: "Whether the source service fails without this connection"
+
+indexes:
+  - fields: [source_service_version_id]
+  - fields: [destination_service_id]
+  - fields: [source_service_version_id, destination_service_id]
+
+governance: {}
+

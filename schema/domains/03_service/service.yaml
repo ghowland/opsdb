@@ -1,0 +1,47 @@
+# === service.yaml ===
+name: service
+description: "Operational role. A logical service composed of packages, deployed to host groups, connected to other services. Hierarchical for service trees."
+category: service
+versioned: true
+soft_delete: true
+hierarchical: true
+
+fields:
+  - name: site_id
+    type: foreign_key
+    references: site
+    nullable: false
+    description: "Owning site"
+
+  - name: name
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "Service name"
+    must_be_unique_within:
+      - site_id
+
+  - name: description
+    type: text
+    nullable: true
+    description: "What this service does"
+
+  - name: service_type
+    type: enum
+    enum_values:
+      - standard
+      - database
+      - k8s_cluster_member
+      - cloud_managed
+    nullable: false
+    description: "Classification of service"
+
+indexes:
+  - fields: [site_id]
+  - fields: [service_type]
+
+governance:
+  _requires_group: true
+  _access_classification: true
+  _retention_policy_id: true
+

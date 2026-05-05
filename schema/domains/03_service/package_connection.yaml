@@ -1,0 +1,46 @@
+
+# === package_connection.yaml ===
+name: package_connection
+description: "Outbound interface dependency of a package version. Declares what this package needs to connect to."
+category: service
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: package_version_id
+    type: foreign_key
+    references: package
+    nullable: false
+    description: "Package version declaring this dependency"
+
+  - name: name
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "Connection name. syslog_upstream, database_primary, cache_cluster."
+
+  - name: target_interface_name
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "Name of the interface this connection targets"
+
+  - name: is_required
+    type: boolean
+    nullable: false
+    default: true
+    description: "Whether the package fails without this connection"
+
+  - name: description
+    type: text
+    nullable: true
+    description: "What this connection is for"
+
+indexes:
+  - fields: [package_version_id, name]
+    unique: true
+  - fields: [package_version_id]
+
+governance: {}
+

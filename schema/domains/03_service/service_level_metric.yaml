@@ -1,0 +1,49 @@
+
+# === service_level_metric.yaml ===
+name: service_level_metric
+description: "Metric-driven scaling rule. Defines a threshold on a metric query that triggers scaling decisions."
+category: service
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: name
+    type: varchar
+    max_length: 255
+    nullable: false
+    unique: true
+    description: "Metric rule name"
+
+  - name: metric_query
+    type: text
+    nullable: false
+    description: "PromQL or equivalent metric query"
+
+  - name: threshold_value
+    type: float
+    nullable: false
+    description: "Value at which scaling action triggers"
+
+  - name: threshold_operator
+    type: enum
+    enum_values:
+      - gt
+      - lt
+      - gte
+      - lte
+    nullable: false
+    description: "Comparison operator for threshold"
+
+  - name: rate_change_minimum_time_seconds
+    type: int
+    nullable: false
+    min_value: 0
+    max_value: 86400
+    description: "Minimum seconds between scaling actions. Prevents oscillation."
+
+indexes: []
+
+governance: {}
+
+

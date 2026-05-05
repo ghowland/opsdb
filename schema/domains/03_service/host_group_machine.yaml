@@ -1,0 +1,28 @@
+
+# === host_group_machine.yaml ===
+name: host_group_machine
+description: "Bridge: host group to machine. Denormalized alongside machine.host_group_id for query convenience."
+category: service
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: host_group_id
+    type: foreign_key
+    references: host_group
+    nullable: false
+    description: "Host group"
+
+  - name: machine_id
+    type: foreign_key
+    references: machine
+    nullable: false
+    description: "Machine in this group"
+
+indexes:
+  - fields: [host_group_id, machine_id]
+    unique: true
+  - fields: [machine_id]
+
+governance: {}

@@ -1,0 +1,54 @@
+
+# === service_interface_mount.yaml ===
+name: service_interface_mount
+description: "Exposed interface for a service version. Maps a package interface to a service-level endpoint with optional port and protocol override."
+category: service
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: service_version_id
+    type: foreign_key
+    references: service
+    nullable: false
+    description: "Service version exposing this interface"
+
+  - name: package_interface_id
+    type: foreign_key
+    references: package_interface
+    nullable: false
+    description: "Underlying package interface"
+
+  - name: exposed_name
+    type: varchar
+    max_length: 255
+    nullable: false
+    description: "Name as exposed at service level"
+
+  - name: exposed_port
+    type: int
+    nullable: true
+    min_value: 1
+    max_value: 65535
+    description: "Override of package default port"
+
+  - name: exposed_protocol
+    type: varchar
+    max_length: 50
+    nullable: true
+    description: "Override of package default protocol"
+
+  - name: is_external
+    type: boolean
+    nullable: false
+    default: false
+    description: "Whether this interface accepts external traffic"
+
+indexes:
+  - fields: [service_version_id, exposed_name]
+    unique: true
+  - fields: [service_version_id]
+
+governance: {}
+

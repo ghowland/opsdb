@@ -1,0 +1,54 @@
+
+# === service_level.yaml ===
+name: service_level
+description: "Scaling and capacity rule for a service version at a specific location. Minimum and maximum machine counts."
+category: service
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: service_version_id
+    type: foreign_key
+    references: service
+    nullable: false
+    description: "Service version this rule applies to"
+
+  - name: site_location_id
+    type: foreign_key
+    references: site_location
+    nullable: false
+    description: "Location this rule applies to"
+
+  - name: hardware_set_id
+    type: foreign_key
+    references: hardware_set
+    nullable: true
+    description: "Hardware constraint. Null if any hardware acceptable."
+
+  - name: machine_count_minimum
+    type: int
+    nullable: false
+    min_value: 0
+    max_value: 100000
+    description: "Minimum machines for this service at this location"
+
+  - name: machine_count_maximum
+    type: int
+    nullable: false
+    min_value: 0
+    max_value: 100000
+    description: "Maximum machines for this service at this location"
+
+  - name: service_level_metric_id
+    type: foreign_key
+    references: service_level_metric
+    nullable: true
+    description: "Optional SLO-driven scaling metric"
+
+indexes:
+  - fields: [service_version_id, site_location_id]
+    unique: true
+
+governance: {}
+

@@ -1,0 +1,43 @@
+
+
+# === site_location.yaml ===
+name: site_location
+description: "Per-service location preference with precedence order. Where a service should be deployed, in priority order."
+category: service
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: site_id
+    type: foreign_key
+    references: site
+    nullable: false
+    description: "Owning site"
+
+  - name: service_id
+    type: foreign_key
+    references: service
+    nullable: false
+    description: "Service this preference applies to"
+
+  - name: location_id
+    type: foreign_key
+    references: location
+    nullable: false
+    description: "Preferred location"
+
+  - name: precedence_order
+    type: int
+    nullable: false
+    min_value: 0
+    max_value: 9999
+    description: "Priority. 0 is most preferred."
+
+indexes:
+  - fields: [service_id, precedence_order]
+  - fields: [service_id, location_id]
+    unique: true
+
+governance: {}
+

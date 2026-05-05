@@ -1,0 +1,36 @@
+
+# === service_package.yaml ===
+name: service_package
+description: "Bridge: service version to package version with install order. Defines what packages compose a service."
+category: service
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: service_version_id
+    type: foreign_key
+    references: service
+    nullable: false
+    description: "Service version"
+
+  - name: package_version_id
+    type: foreign_key
+    references: package
+    nullable: false
+    description: "Package version included in this service"
+
+  - name: install_order
+    type: int
+    nullable: false
+    min_value: 0
+    max_value: 9999
+    description: "Installation sequence. Lower numbers installed first."
+
+indexes:
+  - fields: [service_version_id, package_version_id]
+    unique: true
+  - fields: [service_version_id, install_order]
+
+governance: {}
+

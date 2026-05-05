@@ -1,0 +1,35 @@
+
+# === host_group_package.yaml ===
+name: host_group_package
+description: "Bridge: host group to package version with install order. Defines what packages are deployed to machines in this group."
+category: service
+versioned: false
+soft_delete: true
+hierarchical: false
+
+fields:
+  - name: host_group_id
+    type: foreign_key
+    references: host_group
+    nullable: false
+    description: "Host group"
+
+  - name: package_version_id
+    type: foreign_key
+    references: package
+    nullable: false
+    description: "Package version deployed to this group"
+
+  - name: install_order
+    type: int
+    nullable: false
+    min_value: 0
+    max_value: 9999
+    description: "Installation sequence. Lower numbers installed first."
+
+indexes:
+  - fields: [host_group_id, package_version_id]
+    unique: true
+  - fields: [host_group_id, install_order]
+
+governance: {}
