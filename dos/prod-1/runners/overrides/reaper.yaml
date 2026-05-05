@@ -1,0 +1,17 @@
+# dos/prod-1/runners/overrides/reaper.yaml
+
+# yaml
+# Reaper Runner Overrides — prod-1
+
+overrides:
+  skip_during_hours:
+    enabled: false
+    start_hour_utc: 7   # 9am CET
+    end_hour_utc: 16    # 6pm CET
+
+  table_overrides:
+    observation_cache_metric:
+      batch_size: 50000
+    runner_job:
+      batch_size: 5000
+

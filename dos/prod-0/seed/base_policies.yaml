@@ -1,0 +1,179 @@
+# dos/prod-0/seed/base_policies.yaml
+
+# Base Policies — prod-0
+#
+# Foundational policy rows that govern how this substrate operates.
+# These are seeded at bootstrap and then managed through change sets.
+#
+# Policy types use the typed payload pattern: policy_type discriminator
+# with policy_data_json holding the type-specific configuration.
+
+entity_type: policy
+records:
+  # --- Security Zones ---
+  - name: default_security_zone
+    description: "Default security zone for entities without explicit assignment"
+    policy_type: security_zone
+    policy_data_json:
+      zone_name: default
+      allow_inbound_from: []
+      allow_outbound_to: []
+      default_classification: internal
+      require_encryption_in_transit: true
+
+  # --- Data Classification ---
+  - name: classification_public
+    description: "Public data — no access restrictions"
+    policy_type: data_classification
+    policy_data_json:
+      level: public
+      level_ordinal: 0
+      description: "Publicly accessible information"
+      requires_encryption_at_rest: false
+
+  - name: classification_internal
+    description: "Internal data — standard role-based access"
+    policy_type: data_classification
+    policy_data_json:
+      level: internal
+      level_ordinal: 1
+      description: "Internal operational data accessible to authorized personnel"
+      requires_encryption_at_rest: false
+
+  - name: classification_confidential
+    description: "Confidential data — requires group membership"
+    policy_type: data_classification
+    policy_data_json:
+      level: confidential
+      level_ordinal: 2
+      description: "Sensitive data requiring explicit group authorization"
+      requires_encryption_at_rest: true
+
+  - name: classification_restricted
+    description: "Restricted data — strictest access controls"
+    policy_type: data_classification
+    policy_data_json:
+      level: restricted
+      level_ordinal: 3
+      description: "Highly sensitive data with need-to-know access"
+      requires_encryption_at_rest: true
+
+  # --- Retention Policies ---
+  - name: retention_observation_cache_30d
+    description: "Observation cache data retained for 30 days"
+    policy_type: retention
+    policy_data_json:
+      target_entity_types:
+        - observation_cache_metric
+        - observation_cache_state
+        - observation_cache_config
+      retention_days: 30
+      deletion_mode: hard_delete
+      time_field: _observed_time
+
+  - name: retention_runner_job_90d
+    description: "Runner job records retained for 90 days"
+    policy_type: retention
+    policy_data_json:
+      target_entity_types:
+        - runner_job
+        - runner_job_output_var
+        - runner_job_target_machine
+        - runner_job_target_service
+        - runner_job_target_k8s_workload
+        - runner_job_target_cloud_resource
+      retention_days: 90
+      deletion_mode: hard_delete
+      time_field: created_time
+
+  - name: retention_audit_log_2555d
+    description: "Audit log retained for 7 years (compliance minimum)"
+    policy_type: retention
+    policy_data_json:
+      target_entity_types:
+        - audit_log_entry
+      retention_days: 2555
+      deletion_mode: skip
+      time_field: acted_time
+      force_audit_reap: false
+
+  - name: retention_evidence_record_2555d
+    description: "Evidence records retained for 7 years"
+    policy_type: retention
+    policy_data_json:
+      target_entity_types:
+        - evidence_record
+      retention_days: 2555
+      deletion_mode: skip
+      time_field: created_time
+      force_audit_reap: false
+
+  # --- Approval Rules ---
+  - name: approval_standard_config
+    description: "Standard configuration changes require one approver from owners"
+    policy_type: approval_rule
+    policy_data_json:
+      match:
+        entity_types: ["service", "machine", "k8s_cluster", "cloud_resource"]
+        exclude_fields: []
+      require:
+        approver_count: 1
+        approver_source: ownership
+      auto_approve: false
+      rejection_behavior: any_rejects_halts
+
+  - name: approval_security_policy
+    description: "Security policy changes require two approvers including a security group member"
+    policy_type: approval_rule
+    policy_data_json:
+      match:
+        entity_types: ["policy", "security_zone", "data_classification"]
+      require:
+        approver_count: 2
+        approver_source: ownership
+        required_groups: ["security_reviewers"]
+      auto_approve: false
+      rejection_behavior: any_rejects_halts
+
+  - name: approval_schema_evolution
+    description: "Schema changes require schema steward approval"
+    policy_type: approval_rule
+    policy_data_json:
+      match:
+        entity_types: ["_schema_change_set"]
+      require:
+        approver_count: 1
+        required_groups: ["schema_stewards"]
+      auto_approve: false
+      rejection_behavior: any_rejects_halts
+
+  - name: approval_auto_drift_staging
+    description: "Drift corrections in non-production auto-approve"
+    policy_type: approval_rule
+    policy_data_json:
+      match:
+        entity_types: ["service", "machine", "k8s_workload"]
+        context:
+          security_zone: ["staging", "development"]
+      auto_approve: true
+
+  # --- Change Management Rules ---
+  - name: cm_emergency_review_window
+    description: "Emergency changes must be reviewed within 72 hours"
+    policy_type: change_management
+    policy_data_json:
+      emergency_review_window_hours: 72
+      escalation_interval_hours: 24
+      require_post_incident_review: true
+
+  # --- Schedule Governance ---
+  - name: schedule_governance_default
+    description: "Default schedule governance — runners must run at least once per interval"
+    policy_type: schedule_governance
+    policy_data_json:
+      max_missed_cycles_before_alert: 3
+      alert_severity: warning
+      escalate_after_missed: 10
+      escalation_severity: high
+
+

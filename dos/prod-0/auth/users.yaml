@@ -1,0 +1,44 @@
+# dos/prod-0/auth/users.yaml
+
+# Bootstrap Users — prod-0
+#
+# YAML auth provider user file. Used during bootstrap and development.
+# In production, OIDC replaces this for human authentication.
+# Service accounts use separate token-based auth.
+#
+# Passwords are bcrypt hashes. Generate with:
+#   htpasswd -nbBC 10 "" 'your-password' | cut -d: -f2
+#
+# This file is read at API startup. Changes require API restart.
+
+users:
+  - username: admin
+    password_bcrypt: "$2y$10$abcdefghijklmnopqrstuuABCDEFGHIJKLMNOPQRSTUVWXYZ012"
+    ops_user_id: 1
+    roles:
+      - admin
+      - operator
+      - approver
+    groups:
+      - opsdb_admins
+      - schema_stewards
+      - all_approvers
+
+  - username: operator
+    password_bcrypt: "$2y$10$abcdefghijklmnopqrstuuABCDEFGHIJKLMNOPQRSTUVWXYZ013"
+    ops_user_id: 2
+    roles:
+      - operator
+    groups:
+      - operators
+      - all_approvers
+
+  - username: readonly
+    password_bcrypt: "$2y$10$abcdefghijklmnopqrstuuABCDEFGHIJKLMNOPQRSTUVWXYZ014"
+    ops_user_id: 3
+    roles:
+      - viewer
+    groups:
+      - viewers
+
+

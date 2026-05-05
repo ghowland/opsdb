@@ -1,0 +1,31 @@
+# dos/prod-1/runners/enabled.yaml
+
+# Enabled Runners — prod-1
+
+runners:
+  - name: change-set-executor
+    enabled: true
+    instances: 1
+    service_account: sa-change-set-executor
+
+  - name: schema-executor
+    enabled: true
+    instances: 1
+    service_account: sa-schema-executor
+
+  - name: reaper
+    enabled: true
+    instances: 1
+    service_account: sa-reaper
+
+  - name: emergency-review-monitor
+    enabled: true
+    instances: 1
+    service_account: sa-emergency-review-monitor
+
+  - name: notification-runner
+    enabled: true
+    instances: 1
+    service_account: sa-notification-runner
+
+

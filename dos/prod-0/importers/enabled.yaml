@@ -1,0 +1,66 @@
+# dos/prod-0/importers/enabled.yaml
+
+# Enabled Importers — prod-0
+#
+# Controls which importers run against this substrate.
+# Each entry references an importer binary and points to its credential config.
+# The importer reads this file to determine what to import and where
+# to find credentials.
+
+importers:
+  - name: opsdb-import-aws
+    enabled: true
+    credential_config: credentials/aws.yaml
+    schedule: "*/5 * * * *"  # every 5 minutes
+    resource_types:
+      - ec2
+      - rds
+      - s3
+      - iam
+      - vpc
+      - route53
+
+  - name: opsdb-import-gcp
+    enabled: false  # not used in this substrate
+    credential_config: credentials/gcp.yaml
+
+  - name: opsdb-import-k8s
+    enabled: true
+    credential_config: credentials/k8s.yaml
+    schedule: "*/2 * * * *"  # every 2 minutes
+    clusters:
+      - name: prod-us-east-1
+        kubeconfig_env_var: KUBECONFIG_PROD_USE1
+      - name: prod-us-west-2
+        kubeconfig_env_var: KUBECONFIG_PROD_USW2
+
+  - name: opsdb-import-identity
+    enabled: true
+    schedule: "*/15 * * * *"  # every 15 minutes
+    provider: okta
+    credential_env_var: OPSDB_OKTA_TOKEN
+
+  - name: opsdb-import-monitoring
+    enabled: true
+    credential_config: ""
+    schedule: "*/5 * * * *"
+    providers:
+      - type: prometheus
+        endpoints:
+          - name: prod-prometheus
+            url_env_var: OPSDB_PROM_URL
+
+  - name: opsdb-import-oncall
+    enabled: true
+    credential_config: credentials/pagerduty.yaml
+    schedule: "*/10 * * * *"
+
+  - name: opsdb-import-secrets
+    enabled: true
+    schedule: "*/30 * * * *"
+    providers:
+      - type: vault
+        address_env_var: VAULT_ADDR
+        token_env_var: VAULT_TOKEN
+
+

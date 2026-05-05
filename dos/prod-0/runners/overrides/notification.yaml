@@ -1,0 +1,26 @@
+# dos/prod-0/runners/overrides/notification.yaml
+
+# Notification Runner Overrides — prod-0
+#
+# Per-substrate overrides for the notification runner.
+# These merge with the runner spec's runner_data_json.
+# Use overrides for substrate-specific backend config
+# without modifying the shared runner spec.
+
+overrides:
+  # Override the from address to identify this substrate
+  backends:
+    - type: email
+      config:
+        from_address: "opsdb-prod-0@example.com"
+
+  # Substrate-specific notification routing
+  # In prod-0, escalations also go to the US on-call team
+  extra_webhook_endpoints:
+    - name: us-oncall-slack
+      url_env_var: OPSDB_US_ONCALL_WEBHOOK
+      trigger_types:
+        - emergency_change_filed
+        - escalation_overdue
+
+

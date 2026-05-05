@@ -1,0 +1,20 @@
+# dos/prod-0/seed/admin_user.yaml
+
+# Admin User — prod-0
+#
+# Initial operational identity. This ops_user record corresponds to the
+# "admin" entry in auth/users.yaml. The auth file maps credentials to
+# ops_user_id; this seed file creates the ops_user row that ID points to.
+#
+# After bootstrap, additional users are created through the normal
+# change management pipeline or synced via the identity importer.
+
+entity_type: ops_user
+records:
+  - username: admin
+    display_name: "OpsDB Administrator"
+    email: "opsdb-admin@example.com"
+    auth_source: yaml
+    is_active: true
+
+

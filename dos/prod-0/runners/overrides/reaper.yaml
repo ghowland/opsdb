@@ -1,0 +1,24 @@
+# dos/prod-0/runners/overrides/reaper.yaml
+
+# yaml
+# Reaper Runner Overrides — prod-0
+#
+# Per-substrate overrides for the reaper runner.
+# Adjust retention behavior based on this substrate's requirements.
+
+overrides:
+  # In prod-0, run the reaper less aggressively during business hours
+  # (the cycle interval in the spec is the base; this adjusts behavior)
+  skip_during_hours:
+    enabled: false  # set true if reaper load impacts query performance
+    start_hour_utc: 13  # 9am EST
+    end_hour_utc: 21    # 5pm EST
+
+  # Override batch sizes for specific tables if needed
+  table_overrides:
+    observation_cache_metric:
+      batch_size: 50000  # metrics accumulate fast, reap aggressively
+    runner_job:
+      batch_size: 5000
+
+

@@ -1,0 +1,14 @@
+# dos/prod-0/seed/site.yaml
+
+# Site Identity — prod-0
+#
+# The site is the top-level identity record for this OpsDB substrate.
+# It is the first record seeded and is referenced by almost everything else.
+# There is exactly one site per substrate.
+
+entity_type: site
+records:
+  - name: prod-0
+    description: "Production OpsDB — primary security perimeter"
+
+

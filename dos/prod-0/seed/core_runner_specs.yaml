@@ -1,0 +1,93 @@
+# dos/prod-0/seed/core_runner_specs.yaml
+
+# Core Runner Specs — prod-0
+#
+# These are the runner specifications for the self-management runners.
+# Every OpsDB substrate needs these to operate itself. They are seeded
+# at bootstrap and then managed through change sets like everything else.
+#
+# Runner specs define WHAT a runner does (via runner_data_json) and are
+# versioned. The runner binary reads its spec from OpsDB at startup.
+
+entity_type: runner_spec
+records:
+  - name: change-set-executor
+    description: "Drains approved change sets by applying field changes"
+    runner_spec_type: change_set_executor
+    is_active: true
+    runner_data_json:
+      batch_size: 50
+      field_change_batch_size: 500
+      apply_order: oldest_first
+      retry_failed: false
+      max_cycle_duration_seconds: 120
+      cycle_interval_seconds: 10
+      dry_run: false
+
+  - name: schema-executor
+    description: "Applies approved schema change sets"
+    runner_spec_type: schema_executor
+    is_active: true
+    runner_data_json:
+      schema_repo_path: "/opt/opsdb/schema"
+      max_changes_per_cycle: 1
+      require_git_clean: true
+      auto_pull: true
+      cycle_interval_seconds: 30
+      dry_run: false
+
+  - name: reaper
+    description: "Enforces retention policies on expired data"
+    runner_spec_type: reaper
+    is_active: true
+    runner_data_json:
+      batch_size: 10000
+      tables_per_cycle: 10
+      max_cycle_duration_seconds: 300
+      cycle_interval_seconds: 3600
+      dry_run: false
+
+  - name: emergency-review-monitor
+    description: "Escalates overdue emergency change reviews"
+    runner_spec_type: emergency_review_monitor
+    is_active: true
+    runner_data_json:
+      review_window_hours: 72
+      escalation_interval_hours: 24
+      max_findings_per_cycle: 100
+      notify_on_overdue: true
+      cycle_interval_seconds: 900
+      dry_run: false
+
+  - name: notification-runner
+    description: "Dispatches notifications for state transitions"
+    runner_spec_type: notification_dispatch
+    is_active: true
+    runner_data_json:
+      batch_size: 200
+      dedup_window_seconds: 300
+      cycle_interval_seconds: 15
+      dry_run: false
+      notification_types:
+        change_set_pending_approval: true
+        change_set_approved: true
+        change_set_rejected: true
+        emergency_change_filed: true
+        compliance_finding_created: true
+        escalation_overdue: true
+      backends:
+        - type: email
+          config:
+            smtp_host_env_var: OPSDB_SMTP_HOST
+            smtp_port: 587
+            username_env_var: OPSDB_SMTP_USER
+            password_env_var: OPSDB_SMTP_PASSWORD
+            from_address: "opsdb-prod-0@example.com"
+            use_tls: true
+        - type: webhook
+          config:
+            url_env_var: OPSDB_WEBHOOK_URL
+            auth_token_env_var: OPSDB_WEBHOOK_TOKEN
+            timeout_seconds: 30
+
+

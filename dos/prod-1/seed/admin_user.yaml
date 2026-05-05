@@ -1,0 +1,13 @@
+# dos/prod-1/seed/admin_user.yaml
+
+# Admin User — prod-1
+
+entity_type: ops_user
+records:
+  - username: admin
+    display_name: "OpsDB Administrator"
+    email: "opsdb-admin@example.com"
+    auth_source: yaml
+    is_active: true
+
+

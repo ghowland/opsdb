@@ -1,0 +1,59 @@
+# dos/prod-1/importers/enabled.yaml
+
+# Enabled Importers — prod-1
+
+importers:
+  - name: opsdb-import-aws
+    enabled: true
+    credential_config: credentials/aws.yaml
+    schedule: "*/5 * * * *"
+    resource_types:
+      - ec2
+      - rds
+      - s3
+      - iam
+      - vpc
+      - route53
+
+  - name: opsdb-import-gcp
+    enabled: false
+    credential_config: credentials/gcp.yaml
+
+  - name: opsdb-import-k8s
+    enabled: true
+    credential_config: credentials/k8s.yaml
+    schedule: "*/2 * * * *"
+    clusters:
+      - name: prod-eu-west-1
+        kubeconfig_env_var: KUBECONFIG_PROD_EUW1
+
+  - name: opsdb-import-identity
+    enabled: true
+    schedule: "*/15 * * * *"
+    provider: okta
+    credential_env_var: OPSDB_OKTA_TOKEN
+
+  - name: opsdb-import-monitoring
+    enabled: true
+    credential_config: ""
+    schedule: "*/5 * * * *"
+    providers:
+      - type: prometheus
+        endpoints:
+          - name: prod-prometheus-eu
+            url_env_var: OPSDB_PROM_URL
+
+  - name: opsdb-import-oncall
+    enabled: true
+    credential_config: credentials/pagerduty.yaml
+    schedule: "*/10 * * * *"
+
+  - name: opsdb-import-secrets
+    enabled: true
+    schedule: "*/30 * * * *"
+    providers:
+      - type: vault
+        address_env_var: VAULT_ADDR
+        token_env_var: VAULT_TOKEN
+
+

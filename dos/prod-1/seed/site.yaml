@@ -1,0 +1,10 @@
+# dos/prod-1/seed/site.yaml
+
+# Site Identity — prod-1
+
+entity_type: site
+records:
+  - name: prod-1
+    description: "Production OpsDB — secondary security perimeter"
+
+

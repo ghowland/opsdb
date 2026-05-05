@@ -1,0 +1,18 @@
+# dos/prod-1/runners/overrides/notification.yaml
+
+# Notification Runner Overrides — prod-1
+
+overrides:
+  backends:
+    - type: email
+      config:
+        from_address: "opsdb-prod-1@example.com"
+
+  extra_webhook_endpoints:
+    - name: eu-oncall-slack
+      url_env_var: OPSDB_EU_ONCALL_WEBHOOK
+      trigger_types:
+        - emergency_change_filed
+        - escalation_overdue
+
+

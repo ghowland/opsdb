@@ -1,0 +1,39 @@
+# dos/prod-1/auth/users.yaml
+
+# Bootstrap Users — prod-1
+#
+# Same structure as prod-0. In a real deployment, different people
+# may be authorized for each substrate based on organizational boundaries
+# or security perimeter requirements.
+
+users:
+  - username: admin
+    password_bcrypt: "$2y$10$abcdefghijklmnopqrstuuABCDEFGHIJKLMNOPQRSTUVWXYZ012"
+    ops_user_id: 1
+    roles:
+      - admin
+      - operator
+      - approver
+    groups:
+      - opsdb_admins
+      - schema_stewards
+      - all_approvers
+
+  - username: operator
+    password_bcrypt: "$2y$10$abcdefghijklmnopqrstuuABCDEFGHIJKLMNOPQRSTUVWXYZ013"
+    ops_user_id: 2
+    roles:
+      - operator
+    groups:
+      - operators
+      - all_approvers
+
+  - username: readonly
+    password_bcrypt: "$2y$10$abcdefghijklmnopqrstuuABCDEFGHIJKLMNOPQRSTUVWXYZ014"
+    ops_user_id: 3
+    roles:
+      - viewer
+    groups:
+      - viewers
+
+

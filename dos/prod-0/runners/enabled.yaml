@@ -1,0 +1,36 @@
+# dos/prod-0/runners/enabled.yaml
+
+# Enabled Runners — prod-0
+#
+# Controls which runners are deployed for this substrate.
+# Each runner reads its spec from OpsDB (seeded via core_runner_specs.yaml)
+# and its overrides from the overrides/ directory.
+
+runners:
+  # Self-management runners (required for OpsDB to operate itself)
+  - name: change-set-executor
+    enabled: true
+    instances: 1
+    service_account: sa-change-set-executor
+
+  - name: schema-executor
+    enabled: true
+    instances: 1
+    service_account: sa-schema-executor
+
+  - name: reaper
+    enabled: true
+    instances: 1
+    service_account: sa-reaper
+
+  - name: emergency-review-monitor
+    enabled: true
+    instances: 1
+    service_account: sa-emergency-review-monitor
+
+  - name: notification-runner
+    enabled: true
+    instances: 1
+    service_account: sa-notification-runner
+
+
