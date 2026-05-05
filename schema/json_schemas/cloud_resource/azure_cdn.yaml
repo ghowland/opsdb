@@ -1,0 +1,22 @@
+
+# === azure_cdn.yaml ===
+name: azure_cdn
+description: "Azure CDN payload"
+discriminator_field: cloud_resource_type
+discriminator_value: azure_cdn
+
+fields:
+  - name: resource_group
+    type: string
+    max_length: 255
+    required: true
+  - name: sku
+    type: string
+    allowed_values: [standard_microsoft, standard_akamai, standard_verizon, premium_verizon, standard_azure_front_door, premium_azure_front_door]
+    required: true
+  - name: endpoint_count
+    type: int
+    min_value: 0
+    max_value: 500
+    required: false
+

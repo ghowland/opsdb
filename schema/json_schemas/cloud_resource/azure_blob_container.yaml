@@ -1,0 +1,28 @@
+
+# === azure_blob_container.yaml ===
+name: azure_blob_container
+description: "Azure Blob Storage container payload"
+discriminator_field: cloud_resource_type
+discriminator_value: azure_blob_container
+
+fields:
+  - name: resource_group
+    type: string
+    max_length: 255
+    required: true
+  - name: storage_account_name
+    type: string
+    max_length: 255
+    required: true
+  - name: access_level
+    type: string
+    allowed_values: [private, blob, container]
+    required: true
+  - name: encryption_scope
+    type: string
+    max_length: 255
+    required: false
+  - name: immutability_policy_enabled
+    type: boolean
+    required: false
+

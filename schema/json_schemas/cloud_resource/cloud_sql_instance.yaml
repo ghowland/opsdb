@@ -1,0 +1,40 @@
+
+# === cloud_sql_instance.yaml ===
+name: cloud_sql_instance
+description: "GCP Cloud SQL instance payload"
+discriminator_field: cloud_resource_type
+discriminator_value: cloud_sql_instance
+
+fields:
+  - name: database_version
+    type: string
+    max_length: 50
+    required: true
+  - name: tier
+    type: string
+    max_length: 64
+    required: true
+  - name: data_disk_size_gb
+    type: int
+    min_value: 10
+    max_value: 65536
+    required: true
+  - name: availability_type
+    type: string
+    allowed_values: [zonal, regional]
+    required: true
+  - name: ip_address
+    type: string
+    max_length: 45
+    required: true
+  - name: connection_name
+    type: string
+    max_length: 512
+    required: true
+  - name: backup_enabled
+    type: boolean
+    required: true
+  - name: ssl_required
+    type: boolean
+    required: false
+

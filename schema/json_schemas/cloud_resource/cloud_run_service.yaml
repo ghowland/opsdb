@@ -1,0 +1,41 @@
+
+# === cloud_run_service.yaml ===
+name: cloud_run_service
+description: "GCP Cloud Run service payload"
+discriminator_field: cloud_resource_type
+discriminator_value: cloud_run_service
+
+fields:
+  - name: image
+    type: string
+    max_length: 512
+    required: true
+  - name: memory_mb
+    type: int
+    min_value: 128
+    max_value: 32768
+    required: true
+  - name: cpu_limit
+    type: string
+    max_length: 16
+    required: true
+  - name: max_instances
+    type: int
+    min_value: 0
+    max_value: 1000
+    required: true
+  - name: min_instances
+    type: int
+    min_value: 0
+    max_value: 1000
+    required: false
+  - name: concurrency
+    type: int
+    min_value: 1
+    max_value: 1000
+    required: false
+  - name: ingress
+    type: string
+    allowed_values: [all, internal, internal_and_cloud_load_balancing]
+    required: true
+

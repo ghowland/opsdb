@@ -1,0 +1,26 @@
+
+
+# === cloud_cdn.yaml ===
+name: cloud_cdn
+description: "GCP Cloud CDN payload"
+discriminator_field: cloud_resource_type
+discriminator_value: cloud_cdn
+
+fields:
+  - name: backend_service
+    type: string
+    max_length: 512
+    required: true
+  - name: cache_mode
+    type: string
+    allowed_values: [use_origin_headers, force_cache_all, cache_all_static]
+    required: true
+  - name: default_ttl_seconds
+    type: int
+    min_value: 0
+    max_value: 31536000
+    required: false
+  - name: signed_url_enabled
+    type: boolean
+    required: false
+

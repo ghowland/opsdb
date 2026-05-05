@@ -1,0 +1,29 @@
+
+# === cloudwatch_log_group.yaml ===
+name: cloudwatch_log_group
+description: "AWS CloudWatch Logs log group payload"
+discriminator_field: cloud_resource_type
+discriminator_value: cloudwatch_log_group
+
+fields:
+  - name: retention_days
+    type: int
+    min_value: 0
+    max_value: 3653
+    required: true
+    description: "0 means never expire"
+  - name: stored_bytes
+    type: int
+    min_value: 0
+    max_value: 9999999999999999
+    required: false
+  - name: kms_key_id
+    type: string
+    max_length: 512
+    required: false
+  - name: metric_filter_count
+    type: int
+    min_value: 0
+    max_value: 100
+    required: false
+

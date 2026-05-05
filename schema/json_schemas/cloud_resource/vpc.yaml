@@ -1,0 +1,26 @@
+
+# === vpc.yaml ===
+name: vpc
+description: "AWS VPC payload"
+discriminator_field: cloud_resource_type
+discriminator_value: vpc
+
+fields:
+  - name: cidr_block
+    type: string
+    max_length: 18
+    required: true
+  - name: is_default
+    type: boolean
+    required: true
+  - name: dns_support_enabled
+    type: boolean
+    required: true
+  - name: dns_hostnames_enabled
+    type: boolean
+    required: true
+  - name: tenancy
+    type: string
+    allowed_values: [default, dedicated, host]
+    required: true
+

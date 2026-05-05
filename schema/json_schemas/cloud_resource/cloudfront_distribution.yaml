@@ -1,0 +1,32 @@
+
+# === cloudfront_distribution.yaml ===
+name: cloudfront_distribution
+description: "AWS CloudFront distribution payload"
+discriminator_field: cloud_resource_type
+discriminator_value: cloudfront_distribution
+
+fields:
+  - name: domain_name
+    type: string
+    max_length: 512
+    required: true
+  - name: origin_count
+    type: int
+    min_value: 1
+    max_value: 25
+    required: true
+  - name: price_class
+    type: string
+    allowed_values: [price_class_100, price_class_200, price_class_all]
+    required: true
+  - name: is_enabled
+    type: boolean
+    required: true
+  - name: http_version
+    type: string
+    allowed_values: [http1_1, http2, http3]
+    required: false
+  - name: waf_web_acl_id
+    type: string
+    max_length: 512
+    required: false

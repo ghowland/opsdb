@@ -1,0 +1,33 @@
+
+# === log_analytics_workspace.yaml ===
+name: log_analytics_workspace
+description: "Azure Log Analytics workspace payload"
+discriminator_field: cloud_resource_type
+discriminator_value: log_analytics_workspace
+
+fields:
+  - name: resource_group
+    type: string
+    max_length: 255
+    required: true
+  - name: sku
+    type: string
+    allowed_values: [free, per_node, per_gb_2018, standalone, capacity_reservation]
+    required: true
+  - name: retention_days
+    type: int
+    min_value: 30
+    max_value: 730
+    required: true
+  - name: daily_quota_gb
+    type: int
+    min_value: -1
+    max_value: 10000
+    required: false
+    description: "-1 means no cap"
+  - name: workspace_id
+    type: string
+    max_length: 255
+    required: true
+    description: "Workspace GUID"
+    

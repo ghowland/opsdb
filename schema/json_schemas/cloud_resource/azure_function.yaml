@@ -1,0 +1,29 @@
+
+# === azure_function.yaml ===
+name: azure_function
+description: "Azure Function payload"
+discriminator_field: cloud_resource_type
+discriminator_value: azure_function
+
+fields:
+  - name: resource_group
+    type: string
+    max_length: 255
+    required: true
+  - name: runtime
+    type: string
+    max_length: 64
+    required: true
+  - name: runtime_version
+    type: string
+    max_length: 50
+    required: true
+  - name: app_service_plan
+    type: string
+    max_length: 255
+    required: false
+  - name: os_type
+    type: string
+    allowed_values: [linux, windows]
+    required: true
+

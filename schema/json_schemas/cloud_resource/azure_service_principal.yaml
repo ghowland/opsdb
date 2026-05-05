@@ -1,0 +1,30 @@
+
+
+# === azure_service_principal.yaml ===
+name: azure_service_principal
+description: "Azure service principal payload"
+discriminator_field: cloud_resource_type
+discriminator_value: azure_service_principal
+
+fields:
+  - name: app_id
+    type: string
+    max_length: 255
+    required: true
+  - name: display_name
+    type: string
+    max_length: 255
+    required: true
+  - name: is_enabled
+    type: boolean
+    required: true
+  - name: credential_count
+    type: int
+    min_value: 0
+    max_value: 10
+    required: false
+  - name: sign_in_audience
+    type: string
+    allowed_values: [azure_ad_my_org, azure_ad_multiple_orgs, personal_microsoft_account]
+    required: false
+

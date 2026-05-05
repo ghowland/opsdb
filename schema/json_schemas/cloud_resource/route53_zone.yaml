@@ -1,0 +1,26 @@
+
+# === route53_zone.yaml ===
+name: route53_zone
+description: "AWS Route53 hosted zone payload"
+discriminator_field: cloud_resource_type
+discriminator_value: route53_zone
+
+fields:
+  - name: zone_name
+    type: string
+    max_length: 255
+    required: true
+  - name: is_private
+    type: boolean
+    required: true
+  - name: record_count
+    type: int
+    min_value: 0
+    max_value: 100000
+    required: false
+  - name: associated_vpc_ids
+    type: string
+    max_length: 2048
+    required: false
+    description: "Comma-separated VPC IDs for private zones"
+

@@ -1,0 +1,29 @@
+
+# === application_gateway.yaml ===
+name: application_gateway
+description: "Azure Application Gateway payload"
+discriminator_field: cloud_resource_type
+discriminator_value: application_gateway
+
+fields:
+  - name: resource_group
+    type: string
+    max_length: 255
+    required: true
+  - name: sku_name
+    type: string
+    max_length: 64
+    required: true
+  - name: sku_tier
+    type: string
+    allowed_values: [standard, standard_v2, waf, waf_v2]
+    required: true
+  - name: capacity
+    type: int
+    min_value: 1
+    max_value: 125
+    required: true
+  - name: waf_enabled
+    type: boolean
+    required: false
+

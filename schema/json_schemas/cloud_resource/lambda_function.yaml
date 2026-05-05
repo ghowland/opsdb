@@ -1,0 +1,40 @@
+
+# === lambda_function.yaml ===
+name: lambda_function
+description: "AWS Lambda function payload"
+discriminator_field: cloud_resource_type
+discriminator_value: lambda_function
+
+fields:
+  - name: runtime
+    type: string
+    max_length: 64
+    required: true
+  - name: handler
+    type: string
+    max_length: 512
+    required: true
+  - name: memory_size_mb
+    type: int
+    min_value: 128
+    max_value: 10240
+    required: true
+  - name: timeout_seconds
+    type: int
+    min_value: 1
+    max_value: 900
+    required: true
+  - name: vpc_id
+    type: string
+    max_length: 255
+    required: false
+  - name: role_arn
+    type: string
+    max_length: 512
+    required: true
+  - name: code_size_bytes
+    type: int
+    min_value: 0
+    max_value: 262144000
+    required: false
+

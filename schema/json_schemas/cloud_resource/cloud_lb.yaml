@@ -1,0 +1,26 @@
+
+# === cloud_lb.yaml ===
+name: cloud_lb
+description: "GCP Cloud Load Balancer payload"
+discriminator_field: cloud_resource_type
+discriminator_value: cloud_lb
+
+fields:
+  - name: lb_scheme
+    type: string
+    allowed_values: [external, internal]
+    required: true
+  - name: lb_type
+    type: string
+    allowed_values: [http, tcp, udp, ssl]
+    required: true
+  - name: ip_address
+    type: string
+    max_length: 45
+    required: true
+  - name: backend_service_count
+    type: int
+    min_value: 0
+    max_value: 1000
+    required: false
+

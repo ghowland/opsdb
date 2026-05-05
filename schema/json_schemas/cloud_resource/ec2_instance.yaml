@@ -1,0 +1,53 @@
+
+# === ec2_instance.yaml ===
+name: ec2_instance
+description: "AWS EC2 instance payload"
+discriminator_field: cloud_resource_type
+discriminator_value: ec2_instance
+
+fields:
+  - name: instance_type
+    type: string
+    max_length: 64
+    required: true
+  - name: ami_id
+    type: string
+    max_length: 255
+    required: true
+  - name: vpc_id
+    type: string
+    max_length: 255
+    required: true
+  - name: subnet_id
+    type: string
+    max_length: 255
+    required: true
+  - name: private_ip
+    type: string
+    max_length: 45
+    required: true
+  - name: public_ip
+    type: string
+    max_length: 45
+    required: false
+  - name: instance_state
+    type: string
+    allowed_values: [running, stopped, terminated, pending, shutting_down, stopping]
+    required: true
+  - name: ebs_optimized
+    type: boolean
+    required: false
+  - name: iam_instance_profile_arn
+    type: string
+    max_length: 512
+    required: false
+  - name: key_name
+    type: string
+    max_length: 255
+    required: false
+  - name: launch_time
+    type: string
+    max_length: 30
+    required: true
+    description: "ISO 8601 timestamp"
+

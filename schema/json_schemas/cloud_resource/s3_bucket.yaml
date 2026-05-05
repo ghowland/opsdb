@@ -1,0 +1,34 @@
+
+# === s3_bucket.yaml ===
+name: s3_bucket
+description: "AWS S3 bucket payload"
+discriminator_field: cloud_resource_type
+discriminator_value: s3_bucket
+
+fields:
+  - name: versioning_enabled
+    type: boolean
+    required: true
+  - name: encryption_type
+    type: string
+    allowed_values: [none, sse_s3, sse_kms, sse_c]
+    required: true
+  - name: kms_key_id
+    type: string
+    max_length: 512
+    required: false
+  - name: public_access_blocked
+    type: boolean
+    required: true
+  - name: lifecycle_rules_count
+    type: int
+    min_value: 0
+    max_value: 1000
+    required: false
+  - name: logging_enabled
+    type: boolean
+    required: false
+  - name: replication_enabled
+    type: boolean
+    required: false
+

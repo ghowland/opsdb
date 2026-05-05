@@ -1,0 +1,58 @@
+
+# === rds_database.yaml ===
+name: rds_database
+description: "AWS RDS database instance payload"
+discriminator_field: cloud_resource_type
+discriminator_value: rds_database
+
+fields:
+  - name: engine
+    type: string
+    allowed_values: [postgres, mysql, mariadb, oracle, sqlserver, aurora_postgres, aurora_mysql]
+    required: true
+  - name: engine_version
+    type: string
+    max_length: 50
+    required: true
+  - name: instance_class
+    type: string
+    max_length: 64
+    required: true
+  - name: allocated_storage_gb
+    type: int
+    min_value: 1
+    max_value: 65536
+    required: true
+  - name: is_multi_az
+    type: boolean
+    required: true
+  - name: is_read_replica
+    type: boolean
+    required: false
+  - name: primary_instance_id
+    type: string
+    max_length: 255
+    required: false
+    description: "Set when is_read_replica is true"
+  - name: endpoint_address
+    type: string
+    max_length: 512
+    required: true
+  - name: endpoint_port
+    type: int
+    min_value: 1
+    max_value: 65535
+    required: true
+  - name: parameter_group_name
+    type: string
+    max_length: 255
+    required: false
+  - name: storage_encrypted
+    type: boolean
+    required: true
+  - name: backup_retention_days
+    type: int
+    min_value: 0
+    max_value: 35
+    required: false
+

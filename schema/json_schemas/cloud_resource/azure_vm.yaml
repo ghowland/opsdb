@@ -1,0 +1,45 @@
+
+# === azure_vm.yaml ===
+name: azure_vm
+description: "Azure Virtual Machine payload"
+discriminator_field: cloud_resource_type
+discriminator_value: azure_vm
+
+fields:
+  - name: vm_size
+    type: string
+    max_length: 128
+    required: true
+  - name: resource_group
+    type: string
+    max_length: 255
+    required: true
+  - name: vnet_name
+    type: string
+    max_length: 255
+    required: true
+  - name: subnet_name
+    type: string
+    max_length: 255
+    required: true
+  - name: private_ip
+    type: string
+    max_length: 45
+    required: true
+  - name: public_ip
+    type: string
+    max_length: 45
+    required: false
+  - name: power_state
+    type: string
+    allowed_values: [running, stopped, deallocated, starting, stopping]
+    required: true
+  - name: os_type
+    type: string
+    allowed_values: [linux, windows]
+    required: true
+  - name: image_reference
+    type: string
+    max_length: 512
+    required: true
+

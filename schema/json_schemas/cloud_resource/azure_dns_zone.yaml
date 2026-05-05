@@ -1,0 +1,27 @@
+
+# === azure_dns_zone.yaml ===
+name: azure_dns_zone
+description: "Azure DNS zone payload"
+discriminator_field: cloud_resource_type
+discriminator_value: azure_dns_zone
+
+fields:
+  - name: resource_group
+    type: string
+    max_length: 255
+    required: true
+  - name: zone_type
+    type: string
+    allowed_values: [public, private]
+    required: true
+  - name: record_set_count
+    type: int
+    min_value: 0
+    max_value: 100000
+    required: false
+  - name: name_servers
+    type: string
+    max_length: 2048
+    required: false
+    description: "Comma-separated assigned name servers"
+

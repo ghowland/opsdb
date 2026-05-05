@@ -1,0 +1,34 @@
+
+# === load_balancer.yaml ===
+name: load_balancer
+description: "AWS Elastic Load Balancer payload (ALB/NLB/CLB)"
+discriminator_field: cloud_resource_type
+discriminator_value: load_balancer
+
+fields:
+  - name: lb_type
+    type: string
+    allowed_values: [application, network, classic, gateway]
+    required: true
+  - name: scheme
+    type: string
+    allowed_values: [internet_facing, internal]
+    required: true
+  - name: vpc_id
+    type: string
+    max_length: 255
+    required: true
+  - name: dns_name
+    type: string
+    max_length: 512
+    required: true
+  - name: target_group_count
+    type: int
+    min_value: 0
+    max_value: 1000
+    required: false
+  - name: ssl_policy
+    type: string
+    max_length: 255
+    required: false
+

@@ -1,0 +1,25 @@
+
+# === cloud_dns_zone.yaml ===
+name: cloud_dns_zone
+description: "GCP Cloud DNS managed zone payload"
+discriminator_field: cloud_resource_type
+discriminator_value: cloud_dns_zone
+
+fields:
+  - name: dns_name
+    type: string
+    max_length: 255
+    required: true
+  - name: visibility
+    type: string
+    allowed_values: [public, private]
+    required: true
+  - name: record_set_count
+    type: int
+    min_value: 0
+    max_value: 100000
+    required: false
+  - name: dnssec_enabled
+    type: boolean
+    required: false
+

@@ -1,0 +1,26 @@
+
+# === vnet.yaml ===
+name: vnet
+description: "Azure Virtual Network payload"
+discriminator_field: cloud_resource_type
+discriminator_value: vnet
+
+fields:
+  - name: resource_group
+    type: string
+    max_length: 255
+    required: true
+  - name: address_space
+    type: string
+    max_length: 255
+    required: true
+    description: "CIDR blocks comma-separated"
+  - name: dns_servers
+    type: string
+    max_length: 512
+    required: false
+    description: "Custom DNS servers comma-separated. Empty for Azure-provided."
+  - name: ddos_protection_enabled
+    type: boolean
+    required: false
+

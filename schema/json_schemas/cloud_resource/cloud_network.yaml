@@ -1,0 +1,21 @@
+
+# === cloud_network.yaml ===
+name: cloud_network
+description: "GCP VPC network payload"
+discriminator_field: cloud_resource_type
+discriminator_value: cloud_network
+
+fields:
+  - name: auto_create_subnetworks
+    type: boolean
+    required: true
+  - name: routing_mode
+    type: string
+    allowed_values: [regional, global]
+    required: true
+  - name: mtu
+    type: int
+    min_value: 1300
+    max_value: 8896
+    required: false
+

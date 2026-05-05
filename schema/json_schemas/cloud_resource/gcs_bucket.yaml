@@ -1,0 +1,32 @@
+
+# === gcs_bucket.yaml ===
+name: gcs_bucket
+description: "GCP Cloud Storage bucket payload"
+discriminator_field: cloud_resource_type
+discriminator_value: gcs_bucket
+
+fields:
+  - name: storage_class
+    type: string
+    allowed_values: [standard, nearline, coldline, archive]
+    required: true
+  - name: versioning_enabled
+    type: boolean
+    required: true
+  - name: encryption_type
+    type: string
+    allowed_values: [google_managed, cmek]
+    required: true
+  - name: kms_key_name
+    type: string
+    max_length: 512
+    required: false
+  - name: uniform_bucket_level_access
+    type: boolean
+    required: true
+  - name: lifecycle_rules_count
+    type: int
+    min_value: 0
+    max_value: 1000
+    required: false
+

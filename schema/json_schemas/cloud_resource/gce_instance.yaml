@@ -1,0 +1,48 @@
+
+# === gce_instance.yaml ===
+name: gce_instance
+description: "GCP Compute Engine instance payload"
+discriminator_field: cloud_resource_type
+discriminator_value: gce_instance
+
+fields:
+  - name: machine_type
+    type: string
+    max_length: 128
+    required: true
+  - name: zone
+    type: string
+    max_length: 128
+    required: true
+  - name: network
+    type: string
+    max_length: 512
+    required: true
+  - name: subnetwork
+    type: string
+    max_length: 512
+    required: true
+  - name: internal_ip
+    type: string
+    max_length: 45
+    required: true
+  - name: external_ip
+    type: string
+    max_length: 45
+    required: false
+  - name: status
+    type: string
+    allowed_values: [running, stopped, terminated, staging, provisioning, suspended]
+    required: true
+  - name: image
+    type: string
+    max_length: 512
+    required: true
+  - name: service_account_email
+    type: string
+    max_length: 512
+    required: false
+  - name: preemptible
+    type: boolean
+    required: false
+

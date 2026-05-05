@@ -1,0 +1,33 @@
+
+# === azure_sql.yaml ===
+name: azure_sql
+description: "Azure SQL Database payload"
+discriminator_field: cloud_resource_type
+discriminator_value: azure_sql
+
+fields:
+  - name: resource_group
+    type: string
+    max_length: 255
+    required: true
+  - name: server_name
+    type: string
+    max_length: 255
+    required: true
+  - name: edition
+    type: string
+    allowed_values: [basic, standard, premium, general_purpose, business_critical, hyperscale]
+    required: true
+  - name: max_size_gb
+    type: int
+    min_value: 1
+    max_value: 4096
+    required: true
+  - name: endpoint_fqdn
+    type: string
+    max_length: 512
+    required: true
+  - name: transparent_data_encryption
+    type: boolean
+    required: true
+

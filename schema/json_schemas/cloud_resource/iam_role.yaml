@@ -1,0 +1,31 @@
+
+# === iam_role.yaml ===
+name: iam_role
+description: "AWS IAM role payload"
+discriminator_field: cloud_resource_type
+discriminator_value: iam_role
+
+fields:
+  - name: path
+    type: string
+    max_length: 512
+    required: true
+  - name: max_session_duration_seconds
+    type: int
+    min_value: 3600
+    max_value: 43200
+    required: true
+  - name: attached_policy_count
+    type: int
+    min_value: 0
+    max_value: 20
+    required: true
+  - name: trust_policy_summary
+    type: string
+    max_length: 2048
+    required: true
+    description: "Summary of trust policy principals. Full policy stays in AWS."
+  - name: permissions_boundary_arn
+    type: string
+    max_length: 512
+    required: false

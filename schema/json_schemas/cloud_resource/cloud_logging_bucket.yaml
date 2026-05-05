@@ -1,0 +1,22 @@
+
+# === cloud_logging_bucket.yaml ===
+name: cloud_logging_bucket
+description: "GCP Cloud Logging bucket payload"
+discriminator_field: cloud_resource_type
+discriminator_value: cloud_logging_bucket
+
+fields:
+  - name: retention_days
+    type: int
+    min_value: 1
+    max_value: 3650
+    required: true
+  - name: locked
+    type: boolean
+    required: true
+    description: "Whether retention is locked and cannot be reduced"
+  - name: cmek_key_name
+    type: string
+    max_length: 512
+    required: false
+
