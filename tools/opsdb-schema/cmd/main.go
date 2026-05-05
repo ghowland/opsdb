@@ -1,39 +1,35 @@
-//# tools/opsdb-schema/cmd/main.go
-
-go
 package main
 
 import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/ghowland/opsdb/internal/pg"
+	"github.com/ghowland/opsdb/tools/opsdb-schema/loader"
 )
 
-// main is the CLI entrypoint for the opsdb-schema binary.
-// Parses command-line flags and dispatches to the appropriate loader function.
-//
-// Commands:
-//   validate  - parse and validate schema YAML files, report errors
-//   plan      - show what DDL would be generated (diff against database)
-//   apply     - execute DDL against database within advisory-locked transaction
-//   diff      - show differences between YAML and current database schema
-//   export    - dump current database schema as YAML (reverse engineering)
-//   init      - create a new schema repository with directory.yaml and meta-schema
-func main() {
-	// TODO: define subcommand flags
-	//   --repo     string  path to schema repository root (default ".")
-	//   --dsn      string  postgres connection string (or OPSDB_DSN env var)
-	//   --scope    string  limit to specific entity or entity/field
-	//   --verbose  bool    print DDL statements as they execute
-	//   --dry-run  bool    for apply: execute in transaction then rollback
-	//   --version  bool    print version and exit
+// Version and BuildTime are set via ldflags at build time.
+var (
+	Version   = "dev"
+	BuildTime = "unknown"
+)
 
+func main() {
 	repoPath := flag.String("repo", ".", "path to schema repository root")
 	dsn := flag.String("dsn", "", "postgres connection string (or set OPSDB_DSN)")
 	scope := flag.String("scope", "", "limit to entity or entity/field")
 	verbose := flag.Bool("verbose", false, "verbose output")
 	dryRun := flag.Bool("dry-run", false, "apply: rollback instead of commit")
+	showVersion := flag.Bool("version", false, "print version and exit")
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Printf("opsdb-schema %s (built %s)\n", Version, BuildTime)
+		os.Exit(0)
+	}
 
 	if flag.NArg() < 1 {
 		fmt.Fprintf(os.Stderr, "usage: opsdb-schema <command> [flags]\n")
@@ -43,69 +39,646 @@ func main() {
 
 	command := flag.Arg(0)
 
-	// TODO: resolve DSN: if --dsn empty, read OPSDB_DSN env var
-	// TODO: for commands that need database (plan, apply, diff, export):
-	//   if DSN still empty: error "database connection required for {command}"
+	// Resolve DSN: flag takes precedence, then environment variable.
+	resolvedDSN := *dsn
+	if resolvedDSN == "" {
+		resolvedDSN = os.Getenv("OPSDB_DSN")
+	}
+
+	// Commands that require a database connection.
+	dbRequired := map[string]bool{
+		"plan":   true,
+		"apply":  true,
+		"diff":   true,
+		"export": true,
+	}
+
+	if dbRequired[command] && resolvedDSN == "" {
+		fmt.Fprintf(os.Stderr, "error: database connection required for %q (use --dsn or set OPSDB_DSN)\n", command)
+		os.Exit(2)
+	}
 
 	switch command {
 	case "validate":
-		// TODO: loader.Load(repoPath) to parse and validate all YAML files
-		// TODO: if errors: print each error with file, line, field, message
-		// TODO: exit 1 if errors, 0 if clean
-		_ = repoPath
+		exitCode := cmdValidate(*repoPath, *scope)
+		os.Exit(exitCode)
 
 	case "plan":
-		// TODO: loader.Load(repoPath) to get desired schema
-		// TODO: pg.Connect(dsn) to open database
-		// TODO: differ.ReadCurrentState(db) to get current schema
-		// TODO: differ.Diff(desired, current) to get changes
-		// TODO: evolution.CheckEvolution(diff) to classify changes
-		// TODO: if forbidden changes: print each with error and alternative, exit 1
-		// TODO: generator.GenerateDDL(schema, allowedChanges) to get DDL
-		// TODO: print each DDL statement with entity and description
-		// TODO: print summary: N tables to create, N columns to add, N constraints to modify
-		_ = dsn
+		exitCode := cmdPlan(*repoPath, resolvedDSN, *scope, *verbose)
+		os.Exit(exitCode)
 
 	case "apply":
-		// TODO: same as plan through DDL generation
-		// TODO: if dryRun: applier.DryRun(db, statements)
-		// TODO: else: applier.Apply(db, statements, verbose)
-		// TODO: if apply succeeds: meta.PopulateMeta(db, schema, changes)
-		// TODO: print result summary
-		// TODO: exit 0 on success, 1 on error
-		_ = dryRun
-		_ = verbose
+		exitCode := cmdApply(*repoPath, resolvedDSN, *scope, *verbose, *dryRun)
+		os.Exit(exitCode)
 
 	case "diff":
-		// TODO: loader.Load(repoPath) to get desired
-		// TODO: pg.Connect(dsn)
-		// TODO: differ.Diff(desired, current)
-		// TODO: print human-readable diff:
-		//   + new entity: {name}
-		//   + new field: {entity}.{field} ({type})
-		//   ~ changed constraint: {entity}.{field}.{constraint}: {old} -> {new}
-		//   ! forbidden: {entity}.{field}: {reason}
+		exitCode := cmdDiff(*repoPath, resolvedDSN, *scope)
+		os.Exit(exitCode)
 
 	case "export":
-		// TODO: pg.Connect(dsn)
-		// TODO: differ.ReadCurrentState(db)
-		// TODO: convert SchemaState to YAML format
-		// TODO: write to stdout or --output path
+		exitCode := cmdExport(resolvedDSN)
+		os.Exit(exitCode)
 
 	case "init":
-		// TODO: create directory structure:
-		//   {repo}/schema/meta/_schema_meta.yaml (copy template)
-		//   {repo}/schema/conventions/reserved.yaml (copy template)
-		//   {repo}/schema/directory.yaml (empty imports list)
-		//   {repo}/schema/domains/ (empty directory)
-		// TODO: print "initialized schema repository at {repo}"
+		exitCode := cmdInit(*repoPath)
+		os.Exit(exitCode)
 
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command: %s\n", command)
 		os.Exit(2)
 	}
-
-	_ = scope
 }
 
+// cmdValidate parses and validates schema YAML files. No database required.
+func cmdValidate(repoPath string, scope string) int {
+	fmt.Println("validating schema...")
 
+	schema, err := loader.Load(repoPath)
+	if err != nil {
+		// Load returns the schema even with errors so we can report them.
+		if schema != nil && len(schema.Errors) > 0 {
+			printSchemaErrors(schema.Errors)
+			fmt.Fprintf(os.Stderr, "\n%d validation error(s) found\n", len(schema.Errors))
+			return 1
+		}
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return 2
+	}
+
+	if len(schema.Errors) > 0 {
+		printSchemaErrors(schema.Errors)
+		fmt.Fprintf(os.Stderr, "\n%d validation error(s) found\n", len(schema.Errors))
+		return 1
+	}
+
+	entityCount := len(schema.Entities)
+	fieldCount := 0
+	for _, entity := range schema.Entities {
+		fieldCount += len(entity.Fields)
+	}
+	relCount := len(schema.Relationships)
+
+	fmt.Printf("schema valid: %d entities, %d fields, %d relationships\n", entityCount, fieldCount, relCount)
+	_ = scope
+	return 0
+}
+
+// cmdPlan loads schema, diffs against database, checks evolution rules,
+// and prints the DDL that would be generated.
+func cmdPlan(repoPath string, dsn string, scope string, verbose bool) int {
+	schema, err := loader.Load(repoPath)
+	if err != nil {
+		if schema != nil && len(schema.Errors) > 0 {
+			printSchemaErrors(schema.Errors)
+		}
+		fmt.Fprintf(os.Stderr, "error loading schema: %v\n", err)
+		return 1
+	}
+
+	db, err := pg.Connect(dsn)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error connecting to database: %v\n", err)
+		return 2
+	}
+	defer db.Close()
+
+	current, err := loader.ReadCurrentState(db)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error reading current state: %v\n", err)
+		return 2
+	}
+
+	diff, err := loader.Diff(schema, current)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error computing diff: %v\n", err)
+		return 2
+	}
+
+	evolution, err := loader.CheckEvolution(diff)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error checking evolution: %v\n", err)
+		return 2
+	}
+
+	// Print forbidden changes as errors.
+	if len(evolution.Forbidden) > 0 {
+		fmt.Println("\n=== Forbidden Changes ===")
+		for _, fc := range evolution.Forbidden {
+			fmt.Printf("  ! %s", fc.Entity)
+			if fc.Field != "" {
+				fmt.Printf(".%s", fc.Field)
+			}
+			fmt.Printf(": %s\n", fc.Rule)
+			fmt.Printf("    reason: %s\n", fc.Reason)
+			fmt.Printf("    alternative: %s\n", fc.Alternative)
+		}
+		fmt.Fprintf(os.Stderr, "\n%d forbidden change(s) — cannot apply\n", len(evolution.Forbidden))
+		return 1
+	}
+
+	if len(evolution.Allowed) == 0 {
+		fmt.Println("no changes needed — schema matches database")
+		return 0
+	}
+
+	// Generate DDL.
+	statements, err := loader.GenerateDDL(schema, evolution.Allowed)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error generating DDL: %v\n", err)
+		return 2
+	}
+
+	fmt.Println("\n=== Plan ===")
+	for _, stmt := range statements {
+		fmt.Printf("  [%s] %s\n", stmt.Entity, stmt.Description)
+		if verbose {
+			fmt.Printf("    %s\n", stmt.SQL)
+		}
+	}
+
+	// Summary.
+	tables, columns, constraints, indexes := countChanges(evolution.Allowed)
+	fmt.Printf("\nplan: %d tables to create, %d columns to add, %d constraints to modify, %d indexes to create\n",
+		tables, columns, constraints, indexes)
+	fmt.Printf("total: %d DDL statements\n", len(statements))
+
+	_ = scope
+	return 0
+}
+
+// cmdApply loads schema, diffs, generates DDL, and applies to the database.
+func cmdApply(repoPath string, dsn string, scope string, verbose bool, dryRun bool) int {
+	schema, err := loader.Load(repoPath)
+	if err != nil {
+		if schema != nil && len(schema.Errors) > 0 {
+			printSchemaErrors(schema.Errors)
+		}
+		fmt.Fprintf(os.Stderr, "error loading schema: %v\n", err)
+		return 1
+	}
+
+	db, err := pg.Connect(dsn)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error connecting to database: %v\n", err)
+		return 2
+	}
+	defer db.Close()
+
+	current, err := loader.ReadCurrentState(db)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error reading current state: %v\n", err)
+		return 2
+	}
+
+	diff, err := loader.Diff(schema, current)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error computing diff: %v\n", err)
+		return 2
+	}
+
+	evolution, err := loader.CheckEvolution(diff)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error checking evolution: %v\n", err)
+		return 2
+	}
+
+	if len(evolution.Forbidden) > 0 {
+		fmt.Println("\n=== Forbidden Changes ===")
+		for _, fc := range evolution.Forbidden {
+			fmt.Printf("  ! %s", fc.Entity)
+			if fc.Field != "" {
+				fmt.Printf(".%s", fc.Field)
+			}
+			fmt.Printf(": %s\n", fc.Rule)
+			fmt.Printf("    reason: %s\n", fc.Reason)
+			fmt.Printf("    alternative: %s\n", fc.Alternative)
+		}
+		fmt.Fprintf(os.Stderr, "\n%d forbidden change(s) — refusing to apply\n", len(evolution.Forbidden))
+		return 1
+	}
+
+	if len(evolution.Allowed) == 0 {
+		fmt.Println("no changes needed — schema matches database")
+		return 0
+	}
+
+	statements, err := loader.GenerateDDL(schema, evolution.Allowed)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error generating DDL: %v\n", err)
+		return 2
+	}
+
+	if dryRun {
+		fmt.Println("=== Dry Run ===")
+		result, err := loader.DryRun(db, statements)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "dry run failed: %v\n", err)
+			return 1
+		}
+		fmt.Printf("dry run successful: %d statements validated in %s\n",
+			result.StatementsExecuted, result.Duration)
+		fmt.Println("(no changes persisted — rolled back)")
+		return 0
+	}
+
+	fmt.Println("=== Applying ===")
+	result, err := loader.Apply(db, statements, verbose)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "apply failed: %v\n", err)
+		return 1
+	}
+
+	fmt.Printf("applied: %d statements in %s\n", result.StatementsExecuted, result.Duration)
+	fmt.Printf("  entities created: %d\n", result.EntitiesCreated)
+	fmt.Printf("  fields added: %d\n", result.FieldsAdded)
+	fmt.Printf("  constraints modified: %d\n", result.ConstraintsModified)
+	fmt.Printf("  indexes created: %d\n", result.IndexesCreated)
+
+	// Populate _schema_* metadata tables.
+	fmt.Println("\npopulating schema metadata...")
+	err = pg.WithTransaction(db, func(tx *pg.Tx) error {
+		return loader.PopulateMeta(tx, schema, evolution.Allowed, fmt.Sprintf("apply-%s", Version))
+	})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "warning: schema applied but metadata population failed: %v\n", err)
+		fmt.Fprintf(os.Stderr, "  tables are created but _schema_* tables may be incomplete\n")
+		return 1
+	}
+
+	fmt.Println("schema metadata populated")
+	_ = scope
+	return 0
+}
+
+// cmdDiff shows differences between YAML and current database schema.
+func cmdDiff(repoPath string, dsn string, scope string) int {
+	schema, err := loader.Load(repoPath)
+	if err != nil {
+		if schema != nil && len(schema.Errors) > 0 {
+			printSchemaErrors(schema.Errors)
+		}
+		fmt.Fprintf(os.Stderr, "error loading schema: %v\n", err)
+		return 1
+	}
+
+	db, err := pg.Connect(dsn)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error connecting to database: %v\n", err)
+		return 2
+	}
+	defer db.Close()
+
+	current, err := loader.ReadCurrentState(db)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error reading current state: %v\n", err)
+		return 2
+	}
+
+	diff, err := loader.Diff(schema, current)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error computing diff: %v\n", err)
+		return 2
+	}
+
+	hasChanges := false
+
+	if len(diff.NewEntities) > 0 {
+		hasChanges = true
+		for _, name := range diff.NewEntities {
+			fmt.Printf("+ new entity: %s\n", name)
+		}
+	}
+
+	if len(diff.NewFields) > 0 {
+		hasChanges = true
+		for _, item := range diff.NewFields {
+			fmt.Printf("+ new field: %s.%s (%v)\n", item.Entity, item.Field, item.DesiredValue)
+		}
+	}
+
+	if len(diff.ChangedConstraints) > 0 {
+		hasChanges = true
+		for _, item := range diff.ChangedConstraints {
+			fmt.Printf("~ changed constraint: %s.%s: %v -> %v\n",
+				item.Entity, item.Field, item.CurrentValue, item.DesiredValue)
+		}
+	}
+
+	if len(diff.NewIndexes) > 0 {
+		hasChanges = true
+		for _, item := range diff.NewIndexes {
+			fmt.Printf("+ new index: %s.%s\n", item.Entity, item.Description)
+		}
+	}
+
+	if len(diff.RemovedFields) > 0 {
+		hasChanges = true
+		for _, item := range diff.RemovedFields {
+			fmt.Printf("! forbidden removal: %s.%s\n", item.Entity, item.Field)
+		}
+	}
+
+	if len(diff.RemovedEntities) > 0 {
+		hasChanges = true
+		for _, name := range diff.RemovedEntities {
+			fmt.Printf("! forbidden removal: entity %s\n", name)
+		}
+	}
+
+	if len(diff.TypeChanges) > 0 {
+		hasChanges = true
+		for _, item := range diff.TypeChanges {
+			fmt.Printf("! forbidden type change: %s.%s: %v -> %v\n",
+				item.Entity, item.Field, item.CurrentValue, item.DesiredValue)
+		}
+	}
+
+	if !hasChanges {
+		fmt.Println("no changes — schema matches database")
+	}
+
+	_ = scope
+	return 0
+}
+
+// cmdExport dumps current database schema to stdout.
+func cmdExport(dsn string) int {
+	db, err := pg.Connect(dsn)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error connecting to database: %v\n", err)
+		return 2
+	}
+	defer db.Close()
+
+	current, err := loader.ReadCurrentState(db)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error reading current state: %v\n", err)
+		return 2
+	}
+
+	fmt.Printf("# Exported schema — %d entities\n", len(current.Entities))
+	fmt.Printf("# Schema version: %d\n\n", current.Version)
+
+	for name, entity := range current.Entities {
+		fmt.Printf("--- %s ---\n", name)
+		for fieldName, field := range entity.Fields {
+			nullable := ""
+			if field.IsNullable {
+				nullable = " nullable"
+			}
+			fmt.Printf("  %s: %s%s\n", fieldName, field.Type, nullable)
+		}
+		fmt.Println()
+	}
+
+	return 0
+}
+
+// cmdInit creates a new empty schema repository.
+func cmdInit(repoPath string) int {
+	schemaDir := filepath.Join(repoPath, "schema")
+
+	dirs := []string{
+		filepath.Join(schemaDir, "meta"),
+		filepath.Join(schemaDir, "conventions"),
+		filepath.Join(schemaDir, "domains"),
+		filepath.Join(schemaDir, "json_schemas"),
+	}
+
+	for _, dir := range dirs {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			fmt.Fprintf(os.Stderr, "error creating directory %s: %v\n", dir, err)
+			return 2
+		}
+	}
+
+	// Write minimal directory.yaml.
+	directoryContent := "# OpsDB Schema Directory\n# List entity files in dependency order.\nimports: []\n"
+	directoryPath := filepath.Join(schemaDir, "directory.yaml")
+	if err := os.WriteFile(directoryPath, []byte(directoryContent), 0644); err != nil {
+		fmt.Fprintf(os.Stderr, "error writing directory.yaml: %v\n", err)
+		return 2
+	}
+
+	// Write minimal meta-schema.
+	metaContent := `version: "1.0"
+
+allowed_top_level_keys:
+  - name
+  - description
+  - category
+  - versioned
+  - soft_delete
+  - hierarchical
+  - append_only
+  - fields
+  - indexes
+  - governance
+
+allowed_field_keys:
+  - name
+  - type
+  - nullable
+  - description
+  - default
+  - unique
+  - references
+  - max_length
+  - min_length
+  - max_value
+  - min_value
+  - precision_decimal_places
+  - enum_values
+  - json_type_discriminator
+  - must_be_unique_within
+
+allowed_index_keys:
+  - fields
+  - unique
+  - name
+
+allowed_governance_keys:
+  - _requires_group
+  - _access_classification
+  - _audit_chain_hash
+  - _retention_policy_id
+  - _schema_version_introduced_id
+  - _schema_version_deprecated_id
+  - _observed_time
+  - _authority_id
+  - _puller_runner_job_id
+
+allowed_categories:
+  - identity
+  - substrate
+  - service
+  - kubernetes
+  - authority
+  - schedule
+  - policy
+  - documentation
+  - runner
+  - monitoring
+  - observation
+  - config
+  - change_mgmt
+  - audit
+  - schema_meta
+`
+	metaPath := filepath.Join(schemaDir, "meta", "_schema_meta.yaml")
+	if err := os.WriteFile(metaPath, []byte(metaContent), 0644); err != nil {
+		fmt.Fprintf(os.Stderr, "error writing meta-schema: %v\n", err)
+		return 2
+	}
+
+	// Write minimal reserved.yaml.
+	reservedContent := `universal:
+  fields:
+    - name: id
+      type: int
+      nullable: false
+      description: "primary key auto-increment"
+    - name: created_time
+      type: datetime
+      nullable: false
+      description: "set on insert"
+    - name: updated_time
+      type: datetime
+      nullable: false
+      description: "set on insert and update"
+
+soft_delete:
+  fields:
+    - name: is_active
+      type: boolean
+      nullable: false
+      default: true
+      description: "soft delete state"
+
+hierarchical:
+  fields: []
+
+versioning_sibling:
+  fields:
+    - name: version_serial
+      type: int
+      nullable: false
+      description: "monotonic version number"
+    - name: is_active_version
+      type: boolean
+      nullable: false
+      default: false
+      description: "true for current version"
+    - name: approved_for_production_time
+      type: datetime
+      nullable: true
+      description: "when version went live"
+
+governance:
+  fields:
+    - name: _requires_group
+      type: varchar
+      nullable: true
+      max_length: 255
+      description: "group required for access"
+    - name: _access_classification
+      type: enum
+      nullable: true
+      enum_values: [public, internal, confidential, restricted, regulated]
+      description: "data sensitivity level"
+
+observation:
+  fields:
+    - name: _observed_time
+      type: datetime
+      nullable: true
+      description: "when observation sampled"
+    - name: _authority_id
+      type: foreign_key
+      nullable: true
+      references: authority
+      description: "source authority"
+    - name: _puller_runner_job_id
+      type: foreign_key
+      nullable: true
+      references: runner_job
+      description: "runner job that wrote"
+
+schema_metadata:
+  fields:
+    - name: _schema_version_introduced_id
+      type: foreign_key
+      nullable: true
+      references: _schema_version
+      description: "schema version introduced"
+    - name: _schema_version_deprecated_id
+      type: foreign_key
+      nullable: true
+      references: _schema_version
+      description: "schema version deprecated"
+
+append_only:
+  revoke_operations: [UPDATE, DELETE]
+  revoke_from_roles: [opsdb_app_role, opsdb_runner_role, opsdb_readonly_role]
+
+database_roles:
+  - name: opsdb_app_role
+    permissions: [SELECT, INSERT, UPDATE, DELETE]
+    applies_to: all
+    description: "application role for API"
+  - name: opsdb_admin_role
+    permissions: [ALL]
+    applies_to: all
+    description: "admin role for substrate operators"
+  - name: opsdb_readonly_role
+    permissions: [SELECT]
+    applies_to: all
+    description: "read-only role for auditors"
+  - name: opsdb_runner_role
+    permissions: [SELECT, INSERT, UPDATE]
+    applies_to: all
+    description: "runner role"
+`
+	reservedPath := filepath.Join(schemaDir, "conventions", "reserved.yaml")
+	if err := os.WriteFile(reservedPath, []byte(reservedContent), 0644); err != nil {
+		fmt.Fprintf(os.Stderr, "error writing reserved.yaml: %v\n", err)
+		return 2
+	}
+
+	fmt.Printf("initialized schema repository at %s\n", repoPath)
+	fmt.Println("  schema/meta/_schema_meta.yaml")
+	fmt.Println("  schema/conventions/reserved.yaml")
+	fmt.Println("  schema/directory.yaml")
+	fmt.Println("  schema/domains/")
+	fmt.Println("  schema/json_schemas/")
+	return 0
+}
+
+// printSchemaErrors prints validation errors in a human-readable format.
+func printSchemaErrors(errors []loader.SchemaError) {
+	for _, e := range errors {
+		severity := strings.ToUpper(e.Severity)
+		if e.Field != "" {
+			fmt.Fprintf(os.Stderr, "  [%s] %s.%s: %s\n", severity, e.Entity, e.Field, e.Message)
+		} else {
+			fmt.Fprintf(os.Stderr, "  [%s] %s: %s\n", severity, e.Entity, e.Message)
+		}
+	}
+}
+
+// countChanges summarizes allowed changes by type.
+func countChanges(allowed []loader.AllowedChange) (tables, columns, constraints, indexes int) {
+	for _, c := range allowed {
+		switch c.ChangeType {
+		case "new_entity":
+			tables++
+		case "new_field":
+			columns++
+		case "widen_range", "add_enum", "widen_length":
+			constraints++
+		case "new_index":
+			indexes++
+		}
+	}
+	return
+}

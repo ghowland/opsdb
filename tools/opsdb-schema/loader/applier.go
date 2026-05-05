@@ -1,10 +1,8 @@
-//# tools/opsdb-schema/loader/applier.go
-
-go
 package loader
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/ghowland/opsdb/internal/pg"
@@ -12,13 +10,13 @@ import (
 
 // ApplyResult holds the outcome of a schema apply operation.
 type ApplyResult struct {
-	StatementsExecuted int
-	EntitiesCreated    int
-	FieldsAdded        int
+	StatementsExecuted  int
+	EntitiesCreated     int
+	FieldsAdded         int
 	ConstraintsModified int
-	IndexesCreated     int
-	Duration           time.Duration
-	DryRun             bool
+	IndexesCreated      int
+	Duration            time.Duration
+	DryRun              bool
 }
 
 // Apply executes generated DDL against Postgres within a transaction.
@@ -28,30 +26,40 @@ func Apply(db *pg.DB, statements []DDLStatement, verbose bool) (*ApplyResult, er
 	startTime := time.Now()
 	result := &ApplyResult{}
 
-	// TODO: acquire advisory lock via pg.WaitForAdvisoryLock(db, pg.SchemaApplyLockID(), 30*time.Second)
-	//   if timeout: return error "another schema apply is in progress"
-	// TODO: defer pg.ReleaseAdvisoryLock(db, pg.SchemaApplyLockID())
+	// Acquire advisory lock to prevent concurrent schema applies.
+	err := pg.WaitForAdvisoryLock(db, pg.SchemaApplyLockID(), 30*time.Second)
+	if err != nil {
+		return nil, fmt.Errorf("could not acquire schema apply lock: %w", err)
+	}
+	defer func() {
+		_ = pg.ReleaseAdvisoryLock(db, pg.SchemaApplyLockID())
+	}()
 
-	// TODO: begin transaction via pg.WithTransaction(db, func(tx *pg.Tx) error {
-	//   for each statement in statements:
-	//     if verbose: print statement.SQL to stdout
-	//     _, err := pg.ExecInTx(tx, statement.SQL)
-	//     if err: return fmt.Errorf("failed at %s: %w", statement.Description, err)
-	//     result.StatementsExecuted++
-	//     count by type:
-	//       if statement.Description starts with "create table": result.EntitiesCreated++
-	//       if statement.Description starts with "add column": result.FieldsAdded++
-	//       if statement.Phase == 2: result.ConstraintsModified++
-	//       if statement.Phase == 3: result.IndexesCreated++
-	//   return nil
-	// })
+	err = pg.WithSerializableTransaction(db, func(tx *pg.Tx) error {
+		for i, stmt := range statements {
+			if verbose {
+				fmt.Printf("  [%d/%d] %s: %s\n", i+1, len(statements), stmt.Entity, stmt.Description)
+				fmt.Printf("    %s\n", stmt.SQL)
+			}
 
-	// TODO: if transaction error: return nil, error
-	// TODO: result.Duration = time.Since(startTime)
-	// TODO: return result
+			_, execErr := pg.ExecInTx(tx, stmt.SQL)
+			if execErr != nil {
+				return fmt.Errorf("statement %d/%d failed (%s: %s): %w",
+					i+1, len(statements), stmt.Entity, stmt.Description, execErr)
+			}
 
-	_ = startTime
-	return result, fmt.Errorf("not implemented")
+			result.StatementsExecuted++
+			classifyStatement(result, stmt)
+		}
+		return nil
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("schema apply failed: %w", err)
+	}
+
+	result.Duration = time.Since(startTime)
+	return result, nil
 }
 
 // DryRun executes generated DDL within a transaction then rolls back.
@@ -61,26 +69,55 @@ func DryRun(db *pg.DB, statements []DDLStatement) (*ApplyResult, error) {
 	startTime := time.Now()
 	result := &ApplyResult{DryRun: true}
 
-	// TODO: acquire advisory lock (same as Apply)
-	// TODO: defer release
+	// Acquire advisory lock even for dry run to prevent interference
+	// with a concurrent real apply.
+	err := pg.WaitForAdvisoryLock(db, pg.SchemaApplyLockID(), 30*time.Second)
+	if err != nil {
+		return nil, fmt.Errorf("could not acquire schema apply lock for dry run: %w", err)
+	}
+	defer func() {
+		_ = pg.ReleaseAdvisoryLock(db, pg.SchemaApplyLockID())
+	}()
 
-	// TODO: begin transaction manually (not using WithTransaction since we always rollback)
-	//   tx, err := db.Begin()
-	//   defer tx.Rollback() // always rollback for dry run
-	//
-	//   for each statement in statements:
-	//     _, err := tx.Exec(statement.SQL)
-	//     if err: return nil, fmt.Errorf("dry run failed at %s: %w", statement.Description, err)
-	//     result.StatementsExecuted++
-	//     count by type (same as Apply)
-	//
-	//   tx.Rollback() // explicit rollback, DDL validated but not persisted
+	err = pg.RollbackOnly(db, func(tx *pg.Tx) error {
+		for i, stmt := range statements {
+			_, execErr := pg.ExecInTx(tx, stmt.SQL)
+			if execErr != nil {
+				return fmt.Errorf("dry run statement %d/%d failed (%s: %s): %w",
+					i+1, len(statements), stmt.Entity, stmt.Description, execErr)
+			}
 
-	// TODO: result.Duration = time.Since(startTime)
-	// TODO: return result
+			result.StatementsExecuted++
+			classifyStatement(result, stmt)
+		}
+		return nil
+	})
 
-	_ = startTime
-	return result, fmt.Errorf("not implemented")
+	if err != nil {
+		return nil, fmt.Errorf("dry run failed: %w", err)
+	}
+
+	result.Duration = time.Since(startTime)
+	return result, nil
 }
 
-
+// classifyStatement increments the appropriate counter on ApplyResult
+// based on the statement's phase and description.
+func classifyStatement(result *ApplyResult, stmt DDLStatement) {
+	switch stmt.Phase {
+	case 1:
+		desc := strings.ToLower(stmt.Description)
+		if strings.HasPrefix(desc, "create table") {
+			result.EntitiesCreated++
+		} else if strings.HasPrefix(desc, "add column") {
+			result.FieldsAdded++
+		}
+	case 2:
+		result.ConstraintsModified++
+	case 3:
+		result.IndexesCreated++
+	// Phase 4 (REVOKE for append-only) counted as constraints for reporting.
+	case 4:
+		result.ConstraintsModified++
+	}
+}
