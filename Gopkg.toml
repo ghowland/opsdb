@@ -1,26 +1,138 @@
+# Gopkg.toml
 
-# Gopkg.toml example
-#
-# Refer to https://github.com/golang/dep/blob/master/docs/Gopkg.toml.md
-# for detailed Gopkg.toml documentation.
-#
-# required = ["github.com/user/thing/cmd/thing"]
-# ignored = ["github.com/user/project/pkgX", "bitbucket.org/user/project/pkgA/pkgY"]
-#
-# [[constraint]]
-#   name = "github.com/user/project"
-#   version = "1.0.0"
-#
-# [[constraint]]
-#   name = "github.com/user/project2"
-#   branch = "dev"
-#   source = "github.com/myfork/project2"
-#
-# [[override]]
-#  name = "github.com/x/y"
-#  version = "2.4.0"
+toml
+# OpsDB Dependency Configuration
+# This file documents the dependency rationale for the project.
+# Actual dependency management uses go.mod (Go modules).
+# This file is retained as a human-readable dependency manifest.
 
+# --- Database ---
 
 [[constraint]]
-  name = "gopkg.in/ldap.v2"
-  version = "2.5.0"
+  name = "github.com/jackc/pgx/v5"
+  version = "5.7.*"
+  # Pure Go Postgres driver with connection pooling, LISTEN/NOTIFY,
+  # advisory locks, COPY protocol, and pgx-native query interface.
+  # Used by: internal/pg/conn.go, internal/pg/tx.go, internal/pg/advisory_lock.go,
+  #          tools/opsdb-schema/loader/applier.go, tools/opsdb-schema/loader/differ.go,
+  #          tools/opsdb-schema/loader/meta.go,
+  #          tools/opsdb-api/gate/step_execute.go, tools/opsdb-api/operations/*.go
+
+[[constraint]]
+  name = "github.com/lib/pq"
+  version = "1.10.*"
+  # Stable Postgres driver registered as database/sql driver.
+  # Used for database/sql compatibility where pgx native interface not needed.
+  # Used by: internal/pg/conn.go (driver registration), internal/testutil/pg.go
+
+# --- YAML Parsing ---
+
+[[constraint]]
+  name = "gopkg.in/yaml.v3"
+  version = "3.0.*"
+  # YAML parser and emitter. Handles all schema YAML files, DOS config,
+  # seed data, meta-schema, reserved conventions, JSON payload schemas,
+  # directory.yaml manifests.
+  # Used by: tools/opsdb-schema/loader/parser.go,
+  #          tools/opsdb-api/config/config.go,
+  #          tools/opsdb-api/auth/yaml_provider.go,
+  #          tools/opsdb-runner-lib/config.go,
+  #          internal/conventions/reserved.go,
+  #          all importers (DOS config parsing)
+
+# --- Cryptography ---
+
+[[constraint]]
+  name = "golang.org/x/crypto"
+  version = "0.31.*"
+  # bcrypt for YAML auth provider password hashing.
+  # Used by: tools/opsdb-api/auth/yaml_provider.go (bcrypt.CompareHashAndPassword),
+  #          scripts and tooling for generating bcrypt hashes for seed users
+
+# --- Authentication ---
+
+[[constraint]]
+  name = "github.com/coreos/go-oidc/v3"
+  version = "3.12.*"
+  # OIDC token validation, JWKS fetching and caching, issuer discovery.
+  # Used by: tools/opsdb-api/auth/oidc_provider.go
+
+[[constraint]]
+  name = "golang.org/x/oauth2"
+  version = "0.25.*"
+  # OAuth2 client for OIDC token refresh and service account token exchange.
+  # Used by: tools/opsdb-api/auth/oidc_provider.go (token refresh),
+  #          tools/opsdb-api/auth/serviceaccount_provider.go
+
+[[constraint]]
+  name = "github.com/go-jose/go-jose/v4"
+  version = "4.0.*"
+  # JOSE/JWT signing and verification for service account tokens.
+  # Used by: tools/opsdb-api/auth/serviceaccount_provider.go (JWT validation),
+  #          tools/opsdb-api/auth/oidc_provider.go (JWT parsing)
+
+# --- Identifiers ---
+
+[[constraint]]
+  name = "github.com/google/uuid"
+  version = "1.6.*"
+  # UUID generation for correlation IDs, request IDs, idempotency keys.
+  # Used by: tools/opsdb-runner-lib/logging.go (correlation ID generation),
+  #          tools/opsdb-runner-lib/api_client.go (request IDs),
+  #          tools/opsdb-api/gate/gate.go (request ID generation),
+  #          tools/opsdb-api/gate/step_audit.go (audit entry correlation)
+
+# --- Standard Library Usage (no external dependency) ---
+# These are documented here for completeness but require no constraint.
+#
+# net/http           - API HTTP server and client for all API operations and importers
+# crypto/tls         - TLS configuration for API server and outbound connections
+# database/sql       - Standard database interface used alongside pgx
+# encoding/json      - JSON marshal/unmarshal for API request/response, typed payloads
+# os/exec            - Git operations in schema-executor runner
+# os/signal          - Graceful shutdown signal handling in all runners
+# text/template      - NOT USED (templates are deliberately dumb, no Go templates)
+# regexp             - NOT USED (forbidden by schema construction principles)
+# log/slog           - Structured logging foundation in runner library
+# testing            - Test framework for all _test.go files
+# net/smtp           - Email backend for notification runner
+# time               - Duration, ticker, timeout handling throughout
+# sync               - Mutex, Once for runner lifecycle and caching
+# context            - Request context propagation through API gate pipeline
+# fmt, strings,      - Standard string and I/O operations
+# strconv, sort,
+# path/filepath,
+# io, bufio, bytes
+
+# --- Not Used (and why) ---
+#
+# No ORM (gorm, ent, sqlc)
+#   OpsDB generates its own DDL from schema YAML. The schema loader IS the ORM.
+#   Runtime queries are built from _schema_* metadata, not code-generated models.
+#
+# No HTTP framework (gin, echo, fiber, chi)
+#   net/http with a thin handler layer. The gate pipeline IS the middleware.
+#   Adding a framework adds a dependency that changes at a different pace.
+#
+# No configuration library (viper, envconfig)
+#   Configuration is YAML parsed by gopkg.in/yaml.v3. Environment variables
+#   read with os.Getenv. No layered config merging needed.
+#
+# No logging framework (zap, zerolog, logrus)
+#   log/slog in standard library provides structured logging.
+#   Runner library wraps slog with runner context fields.
+#
+# No retry library (go-retryablehttp, backoff)
+#   Retry logic is 40 lines in opsdb-runner-lib/retry.go.
+#   External library would add dependency for trivial code.
+#
+# No test container library (testcontainers-go)
+#   test-integration.sh manages the Postgres container via docker CLI.
+#   internal/testutil/pg.go connects to it. No Go-side container management.
+#
+# No migration tool (flyway, golang-migrate, atlas)
+#   The schema loader IS the migration tool. It diffs desired vs current
+#   and generates DDL. External migration tools would bypass evolution rules.
+#
+# No regex (regexp)
+#   Forbidden by schema construction principles. Not imported anywhere.
