@@ -1,9 +1,5 @@
 ## Patterns From Silo That Extend the OpsDB Application Taxonomy
 
-### Scope
-
-The Silo infrastructure is a data-only execution system where the compiled binary contains zero application-domain types and all behavior is expressed as data tables interpreted by fixed infrastructure. Many of its patterns operate at a level of abstraction available to OpsDB — application-layer execution, validation, scoring, isolation, and tracing. Patterns that require ring-0 control, hardware exception handling, ownership of the execution runtime, or control over the transport parsing layer beneath HTTP are excluded. Partial geometric security is included as the deployable subset for systems running on standard stacks.
-
 ---
 
 ### New Mechanism Patterns
