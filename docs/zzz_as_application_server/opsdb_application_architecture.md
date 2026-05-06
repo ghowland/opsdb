@@ -96,7 +96,7 @@ Every one of these is changeable through the standard change set pipeline. Every
 
 This means your application can change its behavior without deployment. And every behavioral change has the same governance properties as every data change: validation, attribution, approval, versioning, and audit.
 
-![Fig. 5: Data-Driven Behavior — all application logic configurable as OpsDB rows radiating from a single substrate.](./figures/opsdb_app_05_data_driven_behavior.png)
+![Fig. 5: Data-Driven Behavior — all application logic configurable as OpsDB rows radiating from a single substrate.](../figures/opsdb_app_05_data_driven_behavior.png)
 
 ---
 
@@ -122,7 +122,7 @@ Different tables can have different configurations. A `document` table might hav
 
 The flags themselves are changeable through change sets. Enabling or disabling draft mode on a table is a governed decision, versioned and auditable like any other schema change.
 
-![Fig. 3: Draft Mode vs Full Governance — two paths through the gate pipeline diverge at step 6 and reconverge at version commit.](./figures/opsdb_app_03_draft_vs_governance.png)
+![Fig. 3: Draft Mode vs Full Governance — two paths through the gate pipeline diverge at step 6 and reconverge at version commit.](../figures/opsdb_app_03_draft_vs_governance.png)
 
 ---
 
@@ -136,7 +136,7 @@ Business SaaS products, internal tools, case management systems, compliance plat
 
 This is the largest category of software by count. CRM systems, HR platforms, project management tools, inventory systems, procurement tools, invoicing systems, customer portals, admin dashboards — all are governed-state-dominant. The typical development pattern for these applications involves building authentication, authorization, validation, versioning, and audit incrementally over months or years, usually incompletely. OpsDB provides all of them from the first entity definition.
 
-![Fig. 1: Governed State Ratio Spectrum — most software clusters at the governed-state-dominant end.](./figures/opsdb_app_01_governed_state_spectrum.png)
+![Fig. 1: Governed State Ratio Spectrum — most software clusters at the governed-state-dominant end.](../figures/opsdb_app_01_governed_state_spectrum.png)
 
 #### Applications with specialized processing
 
@@ -148,7 +148,7 @@ The ratio of governed state to hot-path processing is typically 90/10 or higher.
 
 This connection pattern uses two existing OpsDB mechanisms. The local replica pattern provides the specialized system with a cached copy of its configuration that survives partition. The passive substrate commitment means OpsDB answers queries and accepts writes but never invokes work, so the specialized system's availability is not coupled to OpsDB's.
 
-![Fig. 7: Hot-Path Connection Pattern — runners bridge governed state to specialized systems with no runtime coupling.](./figures/opsdb_app_07_hot_path_connection.png)
+![Fig. 7: Hot-Path Connection Pattern — runners bridge governed state to specialized systems with no runtime coupling.](../figures/opsdb_app_07_hot_path_connection.png)
 
 #### Applications where OpsDB manages the operational wrapper
 
@@ -182,7 +182,7 @@ For applications requiring read patterns beyond what the search API provides —
 
 ### 9. Schema Evolution
 
-![Fig. 6: Version Reconstruction Cost — full-state rows stay O(1) while chain replay diverges to O(N).](./figures/opsdb_app_06_version_cost_divergence.png)
+![Fig. 6: Version Reconstruction Cost — full-state rows stay O(1) while chain replay diverges to O(N).](../figures/opsdb_app_06_version_cost_divergence.png)
 
 The schema evolves through additive changes governed by strict rules. Allowed changes: adding new fields (nullable), adding new enum values, widening numeric ranges, widening string length bounds, adding new entity types, adding new indexes. Forbidden changes: deleting fields, renaming fields or entities, changing field types, narrowing ranges, removing enum values, tightening uniqueness constraints.
 
@@ -194,9 +194,9 @@ Schema changes flow through a specialized change management path with stricter a
 
 The schema metadata tables — `_schema_entity_type`, `_schema_field`, `_schema_relationship`, `_schema_version` — make the schema itself queryable as data. Your application can discover at runtime what entity types exist, what fields they have, what constraints apply, and when each was introduced or deprecated. This self-describing property enables tooling that adapts to schema changes without hardcoded knowledge of the data model.
 
-![Fig. 4: Schema Evolution Regions — the duplication bridge converts forbidden changes into allowed ones.](./figures/opsdb_app_04_schema_evolution_regions.png)
+![Fig. 4: Schema Evolution Regions — the duplication bridge converts forbidden changes into allowed ones.](../figures/opsdb_app_04_schema_evolution_regions.png)
 
-![Fig. 8: Closed Constraint Vocabulary — 18 bounded primitives inside, forbidden patterns outside, each with an alternative path back in.](./figures/opsdb_app_08_closed_vocabulary.png)
+![Fig. 8: Closed Constraint Vocabulary — 18 bounded primitives inside, forbidden patterns outside, each with an alternative path back in.](../figures/opsdb_app_08_closed_vocabulary.png)
 
 ---
 
@@ -234,7 +234,7 @@ In a conventional application, preparing for a compliance audit is a project: as
 
 In an OpsDB-backed application, these properties exist from the first entity definition because the gate pipeline produces them on every operation. The audit log is the evidence. The version history is the change record. The approval trails are the authorization documentation. The evidence records produced by verifier runners are the control effectiveness proof. An auditor queries the same system that operators and automation use. Compliance is not a separate activity — it is a consequence of using the system normally.
 
-![Fig. 2: Compliance Coverage Map — each mechanism satisfies requirements across multiple frameworks.](./figures/opsdb_app_02_compliance_coverage.png)
+![Fig. 2: Compliance Coverage Map — each mechanism satisfies requirements across multiple frameworks.](../figures/opsdb_app_02_compliance_coverage.png)
 
 ---
 
@@ -304,7 +304,7 @@ Each application built on OpsDB Application Architecture should be named as its 
 
 This is not a metaphor. It is the same DOS concept from the operational design applied to applications. A DOS is an environment operated as one coordinated system across heterogeneous nodes. An application is exactly that: a schema defining the data model, an API gate enforcing governance, runners implementing backend logic, shared libraries mediating world-side operations, and one or more frontends consuming the API. Each AppDB is a self-contained operational unit with its own schema, its own policies, its own runners, its own audit trail, and its own versioned state.
 
-![Fig. 9: AppDB Isolation — each application is a self-contained DOS with own schema, API, runners, and policies. Cross-references are narrow typed pointers.](./figures/opsdb_app_09_appdb_isolation.png)
+![Fig. 9: AppDB Isolation — each application is a self-contained DOS with own schema, API, runners, and policies. Cross-references are narrow typed pointers.](../figures/opsdb_app_09_appdb_isolation.png)
 
 #### One DOS per application
 
@@ -332,7 +332,7 @@ This means every deployment of a distributed application has the same governance
 
 The prototype AppDB's documentation — its enumerated mechanisms, principles, and properties — ships with the release as the application's operational specification. Deploying organizations know what governance the application provides, what policies they need to configure, and what properties they can claim to auditors. The specification is not prose. It is structured data that their AppDB instance can import and query.
 
-![Fig. 10: AppDB Version Flow — deployed instances track the prototype through forward-only schema upgrades. Each deployment configures own policies locally.](./figures/opsdb_app_10_appdb_version_flow.png)
+![Fig. 10: AppDB Version Flow — deployed instances track the prototype through forward-only schema upgrades. Each deployment configures own policies locally.](../figures/opsdb_app_10_appdb_version_flow.png)
 
 ---
 
