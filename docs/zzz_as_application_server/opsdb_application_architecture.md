@@ -340,7 +340,7 @@ The prototype AppDB's documentation — its enumerated mechanisms, principles, a
 
 The draft mode governance flags described in Section 5 — `_autoversion_disabled`, `_edit_latest_version`, `_audit_logs_disabled` — are one instance of a general pattern. OpsDB Application Architecture permits the introduction of additional governance flags as application requirements demand them. This addendum describes the discipline for doing so.
 
-![Fig. 11: Property Loss Matrix — governance flags only affect recording properties (versioning, audit, change mgmt). Validation and authorization are never weakened.](./figures/opsdb_app_11_property_loss_matrix.png)
+![Fig. 11: Property Loss Matrix — governance flags only affect recording properties (versioning, audit, change mgmt). Validation and authorization are never weakened.](../figures/opsdb_app_11_property_loss_matrix.png)
 
 #### Introduce Flags When Needed, Not Before
 
@@ -350,7 +350,7 @@ The draft mode flags emerged from a specific use case: interactive document edit
 
 New flags follow the same path. A team building a logging dashboard discovers that high-frequency observation writes from a metrics puller are creating audit entries that dwarf the operational audit trail in volume. The response is not to design a comprehensive audit filtering framework. The response is to introduce a specific flag — perhaps `_audit_log_sampling_rate` — that allows a table to declare that only a configurable fraction of observation writes produce audit entries. The flag is declared in the schema, versioned, change-managed, and auditable like any other governance field. It solves the concrete problem. If the pattern recurs across other AppDBs, it becomes a candidate for inclusion in the standard governance field set.
 
-![Fig. 12: Property Radar — the area reduction from full governance to draft mode or change-set bypass shows the cost of each flag. Left axes hold; right axes contract.](./figures/opsdb_app_12_property_radar.png)
+![Fig. 12: Property Radar — the area reduction from full governance to draft mode or change-set bypass shows the cost of each flag. Left axes hold; right axes contract.](../figures/opsdb_app_12_property_radar.png)
 
 #### Slice the Pie Before Adding a Flag
 
