@@ -336,6 +336,80 @@ The prototype AppDB's documentation — its enumerated mechanisms, principles, a
 
 ---
 
+### Addendum: Governance Flag Engineering and Property-Aware Customization
+
+The draft mode governance flags described in Section 5 — `_autoversion_disabled`, `_edit_latest_version`, `_audit_logs_disabled` — are one instance of a general pattern. OpsDB Application Architecture permits the introduction of additional governance flags as application requirements demand them. This addendum describes the discipline for doing so.
+
+#### Introduce Flags When Needed, Not Before
+
+Governance flags should not be designed speculatively. A flag earns its place when a concrete use case encounters friction from the default governance model and the friction cannot be resolved by adjusting policy data alone.
+
+The draft mode flags emerged from a specific use case: interactive document editing where per-keystroke versioning and audit logging created noise without value. The flags were not designed as a general "relaxation framework." They were designed to solve one problem. That the solution generalized is a consequence of the architecture, not a design goal.
+
+New flags follow the same path. A team building a logging dashboard discovers that high-frequency observation writes from a metrics puller are creating audit entries that dwarf the operational audit trail in volume. The response is not to design a comprehensive audit filtering framework. The response is to introduce a specific flag — perhaps `_audit_log_sampling_rate` — that allows a table to declare that only a configurable fraction of observation writes produce audit entries. The flag is declared in the schema, versioned, change-managed, and auditable like any other governance field. It solves the concrete problem. If the pattern recurs across other AppDBs, it becomes a candidate for inclusion in the standard governance field set.
+
+#### Slice the Pie Before Adding a Flag
+
+Every governance flag modifies how the gate pipeline behaves for a specific table. Each modification changes which properties the system provides for data in that table. Before introducing a flag, enumerate which properties are affected and whether the application can afford to lose them.
+
+The draft mode flags illustrate this. When `_autoversion_disabled` is set, the versioning property weakens: interim states between committed versions are not individually recoverable. The application accepts this because the editing use case values fluidity over per-keystroke recovery. When `_audit_logs_disabled` is set, the auditability property weakens: interim saves are not individually attributable. The application accepts this because the noise of per-keystroke audit entries reduces the audit trail's usefulness for its actual purpose.
+
+The discipline is: for each proposed flag, identify every property it affects, determine whether each affected property is required for the table's role in the application, and document the tradeoff explicitly. This is the book's "slicing the pie" applied to governance: subdivide the property space comprehensively, examine each slice, and make the tradeoff with full knowledge of what is being traded.
+
+A concrete example. A team wants to introduce `_change_set_bypass` to allow certain high-frequency automated writes to skip change set creation entirely while still producing audit entries. The property analysis:
+
+Versioning is lost for bypassed writes. If the table holds configuration data that needs point-in-time reconstruction, this is unacceptable. If the table holds ephemeral coordination state that is overwritten every cycle, this is acceptable.
+
+Change management attribution is lost. If the data is compliance-relevant and an auditor needs to see the approval chain for every value, this is unacceptable. If the data is operational telemetry that no approval workflow governs, this is acceptable.
+
+Audit logging is preserved. Every write still produces an audit entry. The trail of who wrote what and when remains intact.
+
+Schema validation is preserved. Every write still passes through field-level validation. Malformed data is still rejected.
+
+Authorization is preserved. Every write still passes through the five-layer authorization check. Unauthorized writes are still denied.
+
+The result: `_change_set_bypass` is acceptable for observation-like tables where versioning and change management are not required, and unacceptable for governed entities where those properties are load-bearing. The flag's documentation states which properties it weakens and under which conditions its use is appropriate.
+
+#### Property Loss is Per-Table, Not Global
+
+A governance flag set on one table does not affect any other table. The billing AppDB can have draft mode on its `invoice_note` table while maintaining full governance on its `invoice` table. The healthcare AppDB can have audit sampling on its `telemetry_cache` table while maintaining full audit on its `patient_record` table. Each table's governance configuration is independent.
+
+This means the property analysis is local. The question is not "does this AppDB have auditability" but "does this table have auditability, and does this table need auditability for the application's purposes." The system's properties are the composition of its per-table properties. A compliance auditor examining the system asks about specific tables holding specific data, not about the platform in general.
+
+#### Document the Tradeoff in the Schema
+
+When a governance flag is set on a table, the schema file's `notes` field should document which properties are weakened and why the tradeoff is acceptable for this table's role. This documentation is not enforced by the loader — the `notes` field is prose for human readers — but it is part of the schema steward's review responsibility.
+
+The pattern:
+
+```
+notes: |
+  Draft mode enabled (_autoversion_disabled, _edit_latest_version,
+  _audit_logs_disabled). Interim editing states are not individually
+  versioned or audited. Version commits engage full governance.
+  Acceptable because: document content is iterative drafting work
+  where per-keystroke versioning creates noise. Point-in-time
+  reconstruction is available at committed version granularity,
+  which matches the application's recovery requirements.
+  Properties weakened: per-write versioning, per-write audit.
+  Properties preserved: schema validation, authorization,
+  committed-version history, committed-version audit.
+```
+
+This documentation survives in the schema repository. When a future maintainer encounters the flags, the rationale is present. When the schema steward reviews a proposed flag addition, the property analysis is part of the review material.
+
+#### The Discipline is Engineering, Not Policy
+
+The decision to introduce a governance flag is an engineering decision, not an administrative one. It follows the same method as any other architectural tradeoff: identify the axes, evaluate each axis for the specific context, make the tradeoff explicitly, and document the reasoning.
+
+The book's axiomatic engineering framework applies directly. The relevant axes are the properties from the infrastructure taxonomy: auditability, versioning, atomicity, consistency, boundedness, and the others. Each governance flag shifts the system's position on one or more of these axes for the affected table. The engineer's job is to verify that the resulting position is acceptable for the table's role in the application, not to apply a universal policy about which flags are allowed.
+
+Different AppDBs will make different tradeoffs. A compliance-heavy AppDB may never use draft mode on any table because per-write auditability is a regulatory requirement for all data it holds. A personal AppDB may use draft mode on most tables because the single user values fluidity and has no external audit requirements. A SaaS AppDB may use draft mode on user-facing editing tables and full governance on billing and access control tables. Each decision is local, explicit, and documented.
+
+The common discipline across all cases is: understand which properties the flag affects, verify that the affected properties are not required for the table's purpose, and document the tradeoff in the schema. The pie is sliced. The tradeoff is inspectable. The decision is engineering.
+
+---
+
 ### Appendix A: Application Type Suitability Matrix
 
 | id | application\_type | position | governed\_state\_ratio | hot\_path\_present | hot\_path\_nature | opsdb\_role | notes |
