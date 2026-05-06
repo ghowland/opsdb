@@ -304,6 +304,8 @@ Each application built on OpsDB Application Architecture should be named as its 
 
 This is not a metaphor. It is the same DOS concept from the operational design applied to applications. A DOS is an environment operated as one coordinated system across heterogeneous nodes. An application is exactly that: a schema defining the data model, an API gate enforcing governance, runners implementing backend logic, shared libraries mediating world-side operations, and one or more frontends consuming the API. Each AppDB is a self-contained operational unit with its own schema, its own policies, its own runners, its own audit trail, and its own versioned state.
 
+![Fig. 9: AppDB Isolation — each application is a self-contained DOS with own schema, API, runners, and policies. Cross-references are narrow typed pointers.](./figures/opsdb_app_09_appdb_isolation.png)
+
 #### One DOS per application
 
 Each AppDB hosts exactly one DOS. The project management application does not share a DOS with the billing application. They are separate OpsDB instances with separate schemas, separate databases, separate API deployments, and separate runner populations. They may reference each other through cross-OpsDB typed pointers if needed, but they do not share governed state.
@@ -329,6 +331,8 @@ Released versions of the application are versioned instances of the prototype Ap
 This means every deployment of a distributed application has the same governance properties as the prototype: validated writes, versioned state, attributed changes, audit trail, and configurable policies. The deploying organization configures their own approval rules, their own access policies, their own retention settings, and their own runner schedules. The schema and the structural governance are inherited from the prototype. The operational policies are local.
 
 The prototype AppDB's documentation — its enumerated mechanisms, principles, and properties — ships with the release as the application's operational specification. Deploying organizations know what governance the application provides, what policies they need to configure, and what properties they can claim to auditors. The specification is not prose. It is structured data that their AppDB instance can import and query.
+
+![Fig. 10: AppDB Version Flow — deployed instances track the prototype through forward-only schema upgrades. Each deployment configures own policies locally.](./figures/opsdb_app_10_appdb_version_flow.png)
 
 ---
 
