@@ -226,3 +226,411 @@ Every successful application writes one of these retrospectives. There is no thi
 
 ---
 
+# YAreGNI Addendum: The Velocity Comparison
+
+## Why Planning and Alignment Produce Faster Delivery Than "Just Writing Code"
+
+**Companion paper:** [htmx_app_dev_method.md](htmx_app_dev_method.md) (Building Web Applications with HTMX and OpsDB)
+
+---
+
+## 1. The Velocity Illusion
+
+Writing a Rails controller or an Express route handler feels fast. The feedback loop is immediate: write the handler, hit the endpoint, see the response. The developer is productive. Lines of code accumulate. Features appear to ship.
+
+Measure what those lines actually contain. A booking creation endpoint in Express:
+
+```javascript
+router.post('/bookings', authenticate, async (req, res) => {
+  try {
+    // Parse and validate input
+    const validated = bookingSchema.parse(req.body);
+    
+    // Check authorization
+    if (!req.user.hasPermission('create', 'booking')) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    
+    // Check resource exists
+    const resource = await Resource.findById(validated.resource_id);
+    if (!resource) {
+      return res.status(404).json({ error: 'Resource not found' });
+    }
+    
+    // Check availability (domain logic)
+    const conflicts = await Booking.find({
+      resource_id: validated.resource_id,
+      status: { $in: ['pending', 'confirmed'] },
+      start_time: { $lt: validated.end_time },
+      end_time: { $gt: validated.start_time }
+    });
+    if (conflicts.length > 0) {
+      return res.status(409).json({ error: 'Time slot unavailable' });
+    }
+    
+    // Create booking
+    const booking = await Booking.create(validated);
+    
+    // Audit log (if you remembered to add it)
+    await AuditLog.create({
+      action: 'create',
+      entity: 'booking',
+      entity_id: booking.id,
+      user_id: req.user.id,
+      timestamp: new Date()
+    });
+    
+    // Format response
+    res.status(201).json(serializeBooking(booking));
+  } catch (err) {
+    if (err instanceof ZodError) {
+      return res.status(400).json({ errors: err.errors });
+    }
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+```
+
+Count the lines by concern:
+
+- Input parsing and validation: 1 line (Zod), but Zod schema is defined elsewhere — another 15-20 lines
+- Authorization check: 3 lines
+- Foreign key existence check: 3 lines
+- Domain logic (availability check): 8 lines
+- Database write: 1 line
+- Audit logging: 6 lines
+- Response serialization: 1 line (serializer defined elsewhere — another 10-15 lines)
+- Error handling: 7 lines
+
+Domain logic: 8 lines. Infrastructure: everything else. The ratio is roughly 25% domain, 75% infrastructure. Three quarters of the code the developer wrote is infrastructure they wouldn't write with a governed substrate.
+
+The same booking creation in the OpsDB+HTMX method. The infrastructure — validation, authorization, FK existence, audit logging, versioning, error response formatting — is the gate pipeline. The developer writes:
+
+```python
+def booking_validator(context):
+    conflicts = context.api.search("booking", filters={
+        "resource_id": context.request_data["resource_id"],
+        "status__in": ["pending", "confirmed"],
+        "start_time__lt": context.request_data["end_time"],
+        "end_time__gt": context.request_data["start_time"]
+    })
+    if conflicts.count > 0:
+        return reject([{"field": "start_time",
+                        "reason": "Time slot unavailable"}])
+    return accept(context.request_data)
+```
+
+Eight lines. All domain logic. The infrastructure is handled by the gate pipeline and the logic path step sequence. The developer wrote 8 lines instead of 35+ lines (plus the Zod schema, plus the serializer, plus the audit log table design, plus the authentication middleware configuration).
+
+The velocity illusion: the Express developer feels productive writing 35 lines. The OpsDB developer writes 8 lines and feels like they didn't do much. The Express developer shipped more code. The OpsDB developer shipped more application.
+
+---
+
+## 2. Building a Booking System — Side by Side
+
+The same application built three ways. A booking system with resources, customers, bookings, blackout dates, availability checking, and payment integration. Track every artifact created.
+
+### 2.1 Entity Definition
+
+**Rails (per entity: resource, booking, customer, blackout_date):**
+
+| Artifact | Files | Lines (approx) |
+|----------|-------|-----------------|
+| Migration | 4 | 80 |
+| Model with validations | 4 | 120 |
+| Controller with CRUD | 4 | 280 |
+| Serializer | 4 | 60 |
+| Routes | 1 | 12 |
+| Model tests | 4 | 160 |
+| Controller tests | 4 | 240 |
+| **Total** | **25** | **~950** |
+
+**Express/Next (per entity):**
+
+| Artifact | Files | Lines (approx) |
+|----------|-------|-----------------|
+| Prisma schema | 1 | 60 |
+| Migration (generated) | 4 | 80 |
+| Zod validation schemas | 4 | 100 |
+| Route handlers | 4 | 320 |
+| Middleware (auth per route) | 4 | 60 |
+| Type definitions | 4 | 80 |
+| Tests | 4 | 200 |
+| **Total** | **25** | **~900** |
+
+**OpsDB+HTMX:**
+
+| Artifact | Files | Lines (approx) |
+|----------|-------|-----------------|
+| Schema YAML | 4 | 80 |
+| Route manifest | 1 | 15 |
+| **Total** | **5** | **~95** |
+
+The CRUD endpoints, validation, authorization, versioning, audit logging, serialization, error handling, and pagination are provided by the gate pipeline and the compiler's CRUD generation. The 5 YAML files replace 25 files. The 95 lines replace 900-950 lines. Every entity has full governance from the moment the loader runs.
+
+### 2.2 Validation
+
+**Rails:** Model validations in Ruby — `validates :priority, inclusion: { in: 1..5 }`. Separate from the migration's database constraints. Separate from the controller's strong parameters. Three places defining the same constraint, maintained independently.
+
+**Express:** Zod schemas — `z.number().min(1).max(5)`. Separate from the Prisma schema's database constraints. Separate from the route handler's input parsing. Three places.
+
+**OpsDB:** `min_value: 1, max_value: 5` in the YAML field declaration. One place. The database constraint, the API validation, and the HTMX form attribute (`min="1" max="5"`) are derived from it.
+
+### 2.3 Authorization
+
+**Rails:** Install Pundit. Write a policy class per model. Call `authorize` in each controller action. Miss one action and that endpoint has no authorization. The gap is a security hole discovered during a security review or, worse, an incident.
+
+**Express:** Write authorization middleware. Apply it per route. Miss one route and that endpoint is unprotected. The same gap.
+
+**OpsDB:** Five authorization layers active on every operation from the first entity definition. No per-endpoint wiring. No gaps. The developer configures roles, groups, and per-entity governance through data — not through code applied per endpoint.
+
+### 2.4 Audit Logging
+
+**Rails:** Install PaperTrail. Configure it per model — `has_paper_trail` in each model class. Wire `PaperTrail.request.whodunnit = current_user.id` in the application controller. Forget it in a background job context and the version entry has null attribution. Forget to add `has_paper_trail` to a new model and that model has no audit trail.
+
+**Express:** Build custom audit middleware. Design the audit table. Write the middleware that captures request data, response data, caller identity, and outcome. Apply it per route. Maintain it as routes change. Accept that some code paths (admin scripts, data migrations, REPL sessions) bypass it.
+
+**OpsDB:** Gate step 8. Every operation. Every entity. Attribution from the authenticated identity. No configuration per model. No middleware to apply per route. No code paths that bypass it.
+
+### 2.5 Domain Logic (Availability Checking)
+
+**Rails:** Write a service class or model method that queries for conflicting bookings. Approximately 15-25 lines of Ruby.
+
+**Express:** Write a function that queries for conflicting bookings. Approximately 15-25 lines of JavaScript.
+
+**OpsDB:** Write a handler function that queries for conflicting bookings. Approximately 10-15 lines of Python/Go.
+
+This is roughly equivalent across all three. The domain logic is the same work regardless of substrate. The difference is that in Rails and Express, this domain logic is embedded in a controller alongside 30+ lines of infrastructure code. In OpsDB, the handler function contains only the domain logic.
+
+### 2.6 Payment Integration
+
+**Rails:** Write a service class that calls the Stripe API. Handle authentication, retry, error handling, and response parsing. Approximately 40-60 lines, or use the Stripe gem and write 20-30 lines.
+
+**Express:** Same pattern with the Stripe npm package. 20-30 lines.
+
+**OpsDB:** Write a handler function that calls Stripe through the library suite. The library handles authentication, retry, circuit breaking, and correlation ID propagation. The handler is 15-20 lines of domain logic — which payment method, what amount, what to do on success/failure.
+
+The difference is modest for the initial implementation. It compounds over time because the library suite handles retry and circuit breaking consistently across all external integrations, while the Rails/Express approach handles them per-integration with different strategies, different error handling, and different logging.
+
+### 2.7 Total Comparison at Launch
+
+| Concern | Rails | Express | OpsDB+HTMX |
+|---------|-------|---------|-------------|
+| Entity definition | 25 files, ~950 lines | 25 files, ~900 lines | 5 files, ~95 lines |
+| Validation | In models + migrations | In Zod + Prisma | In YAML (done) |
+| Authorization | Pundit policies per model | Middleware per route | Five layers (done) |
+| Audit logging | PaperTrail + config | Custom middleware | Gate step 8 (done) |
+| Version history | PaperTrail (partial) | Not built yet | versioned: true (done) |
+| Change management | Not built | Not built | Change sets (done) |
+| Domain logic | ~50 lines | ~50 lines | ~50 lines |
+| Payment integration | ~30 lines | ~30 lines | ~20 lines |
+| CRUD UI | Views + forms (manual) | Components (manual) | Generated from schema |
+| **Total files** | **~35** | **~35** | **~10** |
+| **Total lines** | **~1200** | **~1100** | **~250** |
+| **Governance gaps** | Version partial, no change mgmt | No versions, no change mgmt | None |
+
+At launch, the OpsDB approach has produced fewer files, fewer lines, and more governance. The Rails and Express approaches have produced more code with less governance. The code difference is 4-5x. The governance difference is total vs partial.
+
+---
+
+## 3. The Rework Ledger
+
+Track what gets rewritten over 24 months as governance requirements arrive.
+
+**Month 6 — Per-entity access control.**
+
+Rails: Refactor Pundit policies from role-based to entity-scoped. Add `_requires_group` equivalent logic to each policy. Update each controller to pass the entity to the policy for per-row checks. Test every endpoint. Estimated: 2-3 weeks.
+
+Express: Refactor authorization middleware to query entity-level permissions. Add a permission table and query it in the middleware. Update each route handler. Test. Estimated: 2-3 weeks.
+
+OpsDB: Add `_requires_group` field to entity YAML files. Assign group values to entities. The gate pipeline already evaluates layer 2 on every operation. Estimated: 1-2 hours.
+
+**Month 12 — SOC2 Type II compliance.**
+
+Rails: Audit PaperTrail coverage — discover 40% of models don't have it. Add it to remaining models (migration + config per model). Fix null-attribution entries in background jobs. Build change management — pending changes table, approval model, notification integration, approver UI. Build access review reporting. Assemble evidence from 12 months of partial logs. Estimated: 3-5 months.
+
+Express: Similar scope. Build audit system if not built yet. Build change management from scratch. Build access review tooling. Estimated: 3-5 months.
+
+OpsDB: Run search queries against the audit log filtered by time range and entity type. Run search queries against change sets filtered by approval status. Show version history. Show access classification configuration. Estimated: 2-3 days of query writing and report formatting.
+
+**Month 18 — Version history for data recovery.**
+
+Rails: Add PaperTrail to remaining models. Write migrations for version tables. Configure callbacks. Accept that history starts at month 18 for newly versioned models. Estimated: 2-4 weeks.
+
+Express: Build custom version tables. Implement versioning middleware or callbacks. Same historical gap. Estimated: 3-6 weeks.
+
+OpsDB: Already done since day one. Every versioned entity has complete history from creation. Estimated: zero.
+
+**Month 24 — Field-level access classification.**
+
+Rails: Add a classification system for fields. Refactor every serializer to check the caller's clearance and omit classified fields. Test every endpoint to verify classified fields are actually omitted. Estimated: 3-6 weeks.
+
+Express: Refactor every response formatter. Add field-level filtering middleware. Test. Estimated: 3-6 weeks.
+
+OpsDB: Add `_access_classification` values to fields in the YAML. The API already omits unauthorized fields from responses. Estimated: 1-2 hours.
+
+**Rework summary over 24 months:**
+
+| Approach | Rework events | Total rework time | Features shipped during rework |
+|----------|---------------|--------------------|---------------------------------|
+| Rails | 4 major retrofits | 5-8 months | Zero — team is doing infrastructure |
+| Express | 4 major retrofits | 5-8 months | Zero — team is doing infrastructure |
+| OpsDB | 0 retrofits | ~2 days total | Features shipped continuously |
+
+The rework time for Rails and Express — 5-8 months over 24 months — is 20-33% of the team's total capacity spent on infrastructure that could have been free. During those months, the OpsDB team shipped features.
+
+---
+
+## 4. The Shared Mechanism Advantage
+
+When infrastructure is shared across all entities, improvements apply everywhere simultaneously. When infrastructure is per-entity or per-endpoint, improvements are per-entity work.
+
+**A security vulnerability in the authorization layer:**
+
+Rails: The vulnerability is in the Pundit policy logic or in a controller's authorization check. The fix is per-policy or per-controller. If the vulnerability is a pattern (missing authorization on a specific action type), every controller must be audited and potentially fixed. The fix is proportional to the number of controllers.
+
+OpsDB: The vulnerability is in the gate pipeline's authorization step. The fix is in one place. Every entity, every operation, every caller benefits from the fix in one deployment. The fix is O(1) regardless of how many entities exist.
+
+**A performance improvement in query execution:**
+
+Rails: An index optimization or query refactoring in one controller's index action improves that one endpoint. The same optimization in another controller requires separate implementation.
+
+OpsDB: An improvement in the search API benefits every search query for every entity. One improvement, universal benefit.
+
+**A new governance feature — configurable retention policies:**
+
+Rails: Build a retention system from scratch. Design retention policy tables. Write a reaper job. Configure per-model. Test. Deploy. Every application that needs retention builds its own.
+
+OpsDB: Retention policies are data rows. The reaper runner reads them and enforces them. Adding retention to a new entity type means creating a policy row through a change set. No code. Every application on the substrate gets the same capability through the same mechanism.
+
+**The compound effect:**
+
+At 5 entities, the shared mechanism advantage is modest — 5x leverage on each fix or improvement. At 50 entities, it is 50x leverage. At 200 entities across 10 applications on the same substrate, it is 2000x leverage. A single security fix protects 200 entity types across 10 applications. The alternative is auditing and fixing 200 controllers across 10 codebases.
+
+The advantage grows linearly with the number of entities and applications. The cost of maintaining per-entity infrastructure grows linearly too — but in the wrong direction. More entities means more controllers to audit, more serializers to update, more policies to review, more test suites to maintain. The shared mechanism flattens that cost to a constant.
+
+---
+
+## 5. The Alignment Dividend
+
+Alignment errors occur when two parts of the system disagree about what the data looks like. They are a major source of bugs, rework, and incidents in conventional development. They cannot occur when there is one definition.
+
+**The Rails alignment problem — one field, five definitions:**
+
+The migration says: `add_column :tasks, :priority, :integer`. The field exists in the database as an integer with no constraints.
+
+The model says: `validates :priority, inclusion: { in: 1..5 }`. The model rejects values outside 1-5 — but only when saving through ActiveRecord. A direct SQL insert bypasses this.
+
+The controller says: `params.require(:task).permit(:priority)`. The controller accepts the field — but if someone forgets to add it to the permit list, the API silently drops the field from the input.
+
+The serializer says: `attributes :id, :title, :priority`. The serializer includes the field in responses — but if someone forgets to add it, the API returns the entity without the field and the frontend doesn't know it exists.
+
+The frontend says: `<input type="number" min="0" max="10">`. The frontend allows 0-10. The model allows 1-5. A user enters 0, the frontend accepts it, the controller permits it, ActiveRecord rejects it, the user gets an error that the frontend should have prevented.
+
+Five definitions. Any two can disagree. The disagreements are bugs. Some are caught by tests (if tests exist for every combination). Most are caught by users in production or by security reviewers months later.
+
+How many bugs in a typical Rails application trace to alignment errors? Consider every case where: a validation doesn't match the database constraint, a controller permit list is missing a field, a serializer exposes a field that should be access-controlled, a frontend validation allows values the backend rejects, a background job writes data that bypasses model validations, a data migration introduces values that violate model constraints. Each category produces bugs. The aggregate is a significant fraction of total bugs in the application.
+
+**The OpsDB alignment solution — one field, one definition:**
+
+```yaml
+priority:
+  type: int
+  min_value: 1
+  max_value: 5
+```
+
+The database column has a CHECK constraint for 1-5. The API validates at gate step 4 against the same bounds. The HTMX form renders `<input min="1" max="5">` derived from the same declaration. The error message says "priority must be at most 5" generated from the same constraint metadata.
+
+These cannot disagree because they are not independent definitions. They are derived from one YAML declaration. A change to the YAML — widening the range to 1-10 — propagates to the database constraint, the API validation, and the form attributes simultaneously.
+
+The alignment dividend is not "fewer bugs." It is "an entire category of bugs that does not exist." Every alignment error between validation, database, controller, serializer, and frontend is eliminated structurally. The developer does not prevent these bugs through discipline or testing. The architecture prevents them through single-source derivation.
+
+---
+
+## 6. The CRUD Acceleration
+
+The companion paper ([htmx_app_dev_method.md](htmx_app_dev_method.md)) describes the HTMX+OpsDB development method in detail. The velocity implication is summarized here.
+
+For pure CRUD entities — which are the majority of entities in most applications — the development time approaches zero beyond the schema definition. Define the YAML. Run the loader. The API serves the entity with full governance. The compiler generates HTMX templates: list views with filter controls derived from field types, detail views, edit forms with constraints mapped to HTML attributes, create forms.
+
+The generated CRUD is not a scaffold that the developer immediately starts modifying. It is a finished product. The forms validate against the schema. The authorization filters what each user can see. The change management routes writes through approval when policy data requires it. The version history is available through the API. The audit trail is active.
+
+In Rails, `rails generate scaffold Task title:string priority:integer` produces seven files that the developer immediately modifies — adding validations, authorization, custom views, serialization logic, and tests. The scaffold is a starting point. The developer's work begins after the scaffold.
+
+In OpsDB+HTMX, `crud: true` in the route manifest produces the equivalent of those seven files from schema metadata, with full governance active. The developer's work begins only if the entity needs custom domain logic (a handler function) or custom presentation (a custom HTMX template). For entities that are pure data management — and most entities are — the developer's work is done when the YAML is written.
+
+This means the developer spends time on two things: schema design (what entities exist, what fields they have, how they relate) and domain logic (handler functions for business rules that schema constraints can't express). The infrastructure is free. The CRUD is free. The governance is free. The developer works on what only a developer can decide.
+
+---
+
+## 7. The Planning Paradox
+
+The objection: "We don't have time to plan a schema. We need to ship."
+
+The paradox: planning and alignment produce faster shipping.
+
+**Week 1, the "just write code" approach:**
+
+Day 1: Write the User model, migration, controller, serializer, routes. Get the auth endpoint working.
+
+Day 2: Write the Project model, migration, controller. Discover that the User serializer needs updating to include project associations. Fix it.
+
+Day 3: Write the Task model. Discover that Tasks need to reference both Project and User. Write two migrations — one for the table, one for the foreign keys that were forgotten. Update the User and Project serializers to include task associations. Write task controller with CRUD.
+
+Day 4: Add validation. Discover that the priority field should have been an enum, not an integer. Write another migration to change the type. Update the model validation. Update the frontend form. Update the controller's strong parameters. Update the serializer.
+
+Day 5: Add basic authorization. Install Pundit. Write policies for User, Project, and Task. Discover that the Task controller's `index` action doesn't call `authorize` — it was missed. Fix it. Write tests for the authorization.
+
+End of week 1: Three entities with CRUD, partial validation, basic authorization with a gap that was found and fixed, no audit logging, no versioning, no change management. Four migrations, three of which are fixes for things that should have been right the first time. Fourteen files across models, controllers, serializers, policies, and tests.
+
+**Week 1, the OpsDB approach:**
+
+Day 1: Write four schema YAML files: user, project, task, task_assignment. Design the relationships. Set field types, constraints, and enum values. Review the naming. Run the loader. The API serves all four entities with full governance.
+
+Day 2: Write the route manifest declaring CRUD routes for all entities. Run the compiler. Generated HTMX pages serve list, detail, edit, and create views for all entities. Test by creating data through the forms, verifying validation rejects invalid input, verifying authorization filters correctly.
+
+Day 3: Write handler functions for any domain logic that the schema can't express. Task assignment validation that checks project membership and capacity limits. Write the logic path YAML composing the handler with the write step.
+
+Day 4-5: Custom HTMX templates for any views that need presentation beyond the generated CRUD. Dashboard, project overview, task board.
+
+End of week 1: Four entities with full CRUD, full validation, full five-layer authorization, full version history, full audit logging, change management active, custom domain logic for task assignment. Five YAML files, two handler functions, a few custom templates. Zero migrations. Zero fixes for things that should have been right the first time, because the YAML was designed before anything was built.
+
+**The comparison at day 5:**
+
+| Metric | "Just write code" | OpsDB |
+|--------|-------------------|-------|
+| Entities with CRUD | 3 | 4 |
+| Validation coverage | Partial | Complete |
+| Authorization coverage | Basic with gaps found and fixed | Five layers, complete |
+| Audit logging | None | Complete |
+| Version history | None | Complete |
+| Change management | None | Active |
+| Files created | 14+ | 7 |
+| Rework done (fixes to own code) | 3 migrations, 2 serializer updates | 0 |
+
+The team that planned the schema shipped more, with more governance, in less time, with no rework. The planning was not overhead. The planning was the implementation. The YAML files were both the plan and the working system.
+
+---
+
+## 8. The Compound Effect
+
+Each velocity source is a multiplier. They compound.
+
+**No infrastructure code.** The developer writes 80% fewer lines because infrastructure is provided by the pipeline. Fewer lines means fewer bugs possible. Fewer bugs means less debugging time. Less debugging means more time on features. Multiplier: the developer's effective output per hour increases because they spend that hour on domain logic, not on reimplementing validation, auth, and audit.
+
+**One definition, zero alignment errors.** Every alignment bug that would exist in a multi-definition system — validation disagreeing with database constraints, serializers exposing classified fields, frontend allowing values the backend rejects — does not exist. Zero alignment debugging. Zero alignment rework. The bug category is structurally eliminated. Multiplier: the bugs that consume the most debugging time (the ones where "it works on my machine" because the local validation differs from the production database constraint) never occur.
+
+**Shared mechanisms, universal upgrades.** A security fix in the gate pipeline protects every entity. A performance improvement in the search API accelerates every query. A new governance feature is available to every entity through configuration. The cost of improvement is O(1) regardless of entity count. Multiplier: maintenance and improvement effort is divided by the number of entities rather than multiplied by it.
+
+**Governance from day one, zero retrofit projects.** The 5-8 months of retrofit work that Rails and Express teams spend over 24 months does not happen. That engineering time goes to features. Multiplier: 20-33% of total engineering capacity that would be consumed by retrofit is available for feature development.
+
+**CRUD generation, zero UI code for standard operations.** For entities that are pure data management, the developer writes zero UI code. The forms, the list views, the detail pages, the filter controls, the pagination — all generated from schema metadata. Multiplier: the majority of entities require zero frontend development effort.
+
+**Planning as implementation.** The YAML file is the plan and the working system simultaneously. There is no phase where the team plans without producing working artifacts. There is no phase where the team builds without a plan. Multiplier: the overhead of planning is zero because the plan is the deliverable.
+
+Each multiplier individually is a 20-50% improvement. Combined across a 24-month application lifecycle, they produce an application that requires one-fifth to one-tenth the total engineering effort of the conventional approach.
+
+The difference is not visible in the first day. On day 1, the Rails developer has a controller and the OpsDB developer has a YAML file. They look equivalent. By day 30, the OpsDB developer has 20 entities with full governance and is working on domain logic. The Rails developer has 20 entities with partial governance, three retrofit tasks in the backlog, and alignment bugs in the issue tracker. By month 12, the OpsDB developer's velocity has compounded — each new entity takes minutes, each governance requirement is already met, each domain logic addition is a handler function with no infrastructure code. The Rails developer's velocity has decelerated — each new entity touches 7 files, each governance requirement triggers a retrofit project, each domain logic addition is buried in a controller alongside infrastructure code that must be maintained alongside it.
+
+The compound effect is the answer to "but we need to ship fast." Planning and alignment do not slow down delivery. They accelerate it. The acceleration is not visible on day 1. It is undeniable by month 6 and transformative by month 12. Every team that has tried both approaches knows this. The ones who haven't tried the governed approach assume it's slower because they haven't experienced the compound effect. They are measuring the cost of the YAML file without measuring the cost of the controllers, the middlewares, the validators, the serializers, the audit callbacks, the versioning libraries, the authorization policies, the retrofits, the alignment bugs, and the compliance scrambles that the YAML file replaces.
