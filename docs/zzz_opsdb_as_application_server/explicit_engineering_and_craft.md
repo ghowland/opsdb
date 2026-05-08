@@ -18,13 +18,13 @@ The standard development method mixes them in every file, every function, every 
 
 This paper names the distinction, shows its consequences, and describes what happens when the two activities are structurally separated into different artifacts that signal to the developer, the reviewer, and the organization which activity is in play.
 
-![Fig. 1: Mixed vs Separated — controller with interleaved engineering and craft (left) vs separated YAML and template artifacts (right).](./figures/engcraft_01_mixed_vs_separated.png)
+![Fig. 1: Mixed vs Separated — controller with interleaved engineering and craft (left) vs separated YAML and template artifacts (right).](../figures/engcraft_01_mixed_vs_separated.png)
 
 ---
 
 ## 2. How to Tell Which You Are Doing
 
-![Fig. 5: The True Cost Boundary — engineering decisions above the line carry permanent consequences for users; craft decisions below are reversible.](./figures/engcraft_05_true_cost_boundary.png)
+![Fig. 5: The True Cost Boundary — engineering decisions above the line carry permanent consequences for users; craft decisions below are reversible.](../figures/engcraft_05_true_cost_boundary.png)
 
 Three diagnostic questions. Apply them to the task in front of you, not to your role or your title or your project.
 
@@ -40,7 +40,7 @@ If any answer is no: craft. Move at normal speed. Iterate based on feedback. The
 
 The gray zone exists inside handler functions. A function that formats data for display is craft. A function that decides what data to show based on business rules is engineering. A function that validates a booking request against availability is engineering. A function that renders the booking confirmation is craft. The line runs through the function at the point where decisions go from "how to present" to "what to allow." When both are present in the same function, the developer needs to know where the line is — which lines of code are permanent decisions with True Cost and which are reversible presentation choices.
 
-![Fig. 3: Decision Permanence Spectrum — from instantly reversible CSS to permanent schema fields, with the engineering/craft boundary marked.](./figures/engcraft_03_permanence_spectrum.png)
+![Fig. 3: Decision Permanence Spectrum — from instantly reversible CSS to permanent schema fields, with the engineering/craft boundary marked.](../figures/engcraft_03_permanence_spectrum.png)
 
 ---
 
@@ -78,7 +78,7 @@ The team estimates the story at 5 points. They're averaging two different activi
 
 The estimate was wrong not because the team is bad at estimating but because they estimated a blend of engineering and craft as if it were one activity. Engineering estimates should be conservative — permanent decisions with real consequences carry risk. Craft estimates should be normal — reversible decisions with forgiving substrates are predictable. Blending them produces estimates that are too aggressive for the engineering and too conservative for the craft.
 
-![Fig. 6: Estimation Risk — engineering tasks have a wide right-skewed distribution; craft tasks are narrow and predictable; blended estimation is wrong on both.](./figures/engcraft_06_estimation_risk.png)
+![Fig. 6: Estimation Risk — engineering tasks have a wide right-skewed distribution; craft tasks are narrow and predictable; blended estimation is wrong on both.](../figures/engcraft_06_estimation_risk.png)
 
 **Dysfunction 5: Career development conflates different skills.**
 
@@ -98,7 +98,7 @@ Both get the same label in the backlog. Both compete for the same "tech debt spr
 
 The team addresses the craft debt first because it's easier and produces visible results. The engineering debt stays in the backlog, growing, compounding, waiting for the compliance audit or the data incident that forces the organization to address it at emergency pace.
 
-![Fig. 2: Six Dysfunctions — mixed method produces large dysfunction polygon across all axes; separated method collapses it.](./figures/engcraft_02_dysfunctions_radar.png)
+![Fig. 2: Six Dysfunctions — mixed method produces large dysfunction polygon across all axes; separated method collapses it.](../figures/engcraft_02_dysfunctions_radar.png)
 
 ---
 
@@ -148,7 +148,7 @@ When the artifacts separate the activities, the developer's mode switches with t
 
 Every experienced developer already does this intuitively. They slow down on database schema decisions and speed up on CSS tweaks. They think harder about authorization rules than about button styling. They agonize over API design and iterate quickly on form layout. The intuition is correct. The separation makes it structural, explicit, and shared across the team rather than individual, implicit, and inconsistent.
 
-![Fig. 4: Cognitive Mode Switching — rapid jagged switching in mixed method vs smooth stepped transitions in separated method.](./figures/engcraft_04_mode_switching.png)
+![Fig. 4: Cognitive Mode Switching — rapid jagged switching in mixed method vs smooth stepped transitions in separated method.](../figures/engcraft_04_mode_switching.png)
 
 ---
 
@@ -170,7 +170,7 @@ Each of these is a trade-off evaluation against externalities where failure has 
 
 Each of these decisions has the structure the engineering definition requires: trade-offs evaluated against externalities where failure has a True Cost borne by goal-seekers and users. Each deserves the review depth, the estimation conservatism, and the cognitive attention that engineering requires.
 
-![Fig. 7: Externality Fan-Out — a schema decision fans out to every consumer forever; a template decision reaches one page view until next deploy.](./figures/engcraft_07_externality_fanout.png)
+![Fig. 7: Externality Fan-Out — a schema decision fans out to every consumer forever; a template decision reaches one page view until next deploy.](../figures/engcraft_07_externality_fanout.png)
 
 ---
 
@@ -251,4 +251,4 @@ The developer who opens a schema YAML file knows they are doing engineering. The
 
 The separation is always present, always visible, always signaling which activity is in play. The developer always knows what they are doing. The organization always knows what kind of work is being reviewed, estimated, and prioritized. The distinction between engineering and craft — which every experienced developer feels intuitively — is made structural, explicit, and shared.
 
-![Fig. 8: Controller Anatomy — each line color-coded by activity type showing 85% engineering interleaved with 15% craft in a single function.](./figures/engcraft_08_controller_anatomy.png)
+![Fig. 8: Controller Anatomy — each line color-coded by activity type showing 85% engineering interleaved with 15% craft in a single function.](../figures/engcraft_08_controller_anatomy.png)
