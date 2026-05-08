@@ -570,7 +570,7 @@ These exist on every entity from the moment you define it in the schema. You don
 
 ![Fig. 4: Governance Property Radar — draft mode contracts recording axes while enforcement axes hold constant.](../figures/opsdb_htmx_04_governance_radar.png)
 
-![Fig. 6: Version Reconstruction Cost — O(N) chain replay diverges from O(1) full-state lookup.](./figures/opsdb_htmx_06_version_cost.png)
+![Fig. 6: Version Reconstruction Cost — O(N) chain replay diverges from O(1) full-state lookup.](../figures/opsdb_htmx_06_version_cost.png)
 
 ---
 
