@@ -18,7 +18,7 @@ The design is complete. The engineering remaining is implementation, not researc
 
 ## 2. Three Paths, One Backend
 
-![Fig. 1: Three Paths, One Backend — every endpoint takes one of three paths through the system.](./figures/opsdb_htmx_01_three_path_flow.png)
+![Fig. 1: Three Paths, One Backend — every endpoint takes one of three paths through the system.](../figures/opsdb_htmx_01_three_path_flow.png)
 
 Every endpoint in your application takes one of three paths. There is no fourth.
 
@@ -38,7 +38,7 @@ The decision framework:
 
 Every endpoint is one of these three. When designing an endpoint, ask the question. The answer determines what you write and what you skip.
 
-![Fig. 7: System Layer Nesting — four concentric layers from presentation to storage, three paths crossing boundaries.](./figures/opsdb_htmx_07_system_layers.png)
+![Fig. 7: System Layer Nesting — four concentric layers from presentation to storage, three paths crossing boundaries.](../figures/opsdb_htmx_07_system_layers.png)
 
 ---
 
@@ -179,7 +179,7 @@ You defined four YAML files. You now have a validated, authorized, versioned, au
 
 The schema is the single definition. The API validates against it. HTMX forms are generated from it. There is no second definition that could disagree.
 
-![Fig. 3: Schema-to-UI Derivation — one YAML declaration produces database, API, HTML, and error artifacts.](./figures/opsdb_htmx_03_schema_derivation.png)
+![Fig. 3: Schema-to-UI Derivation — one YAML declaration produces database, API, HTML, and error artifacts.](../figures/opsdb_htmx_03_schema_derivation.png)
 
 ---
 
@@ -538,13 +538,13 @@ The planting notes are governed entities written by users through the API. The w
 
 For most application read patterns — showing payment status, displaying weather, rendering dashboards with aggregated metrics, showing sync status from external systems — this model is simpler than real-time push. The HTMX `hx-trigger="every Ns"` provides the refresh. The observation cache provides the data. The freshness annotation provides staleness detection.
 
-![Fig. 8: Observation Cache Communication — runner and HTMX both connect to OpsDB, never to each other.](./figures/opsdb_htmx_08_observation_cache.png)
+![Fig. 8: Observation Cache Communication — runner and HTMX both connect to OpsDB, never to each other.](../figures/opsdb_htmx_08_observation_cache.png)
 
 ---
 
 ## 8. What the Substrate Handles
 
-![Fig. 2: Gate Pipeline Governance Modes — enforcement steps always run, recording steps are conditional.](./figures/opsdb_htmx_02_gate_pipeline_modes.png)
+![Fig. 2: Gate Pipeline Governance Modes — enforcement steps always run, recording steps are conditional.](../figures/opsdb_htmx_02_gate_pipeline_modes.png)
 
 When you define an entity in the schema and run the loader, that entity immediately has all of the following. You do not build any of it.
 
@@ -568,9 +568,9 @@ When you define an entity in the schema and run the loader, that entity immediat
 
 These exist on every entity from the moment you define it in the schema. You don't add them later. You don't build them. The first entity you define has all of them.
 
-![Fig. 4: Governance Property Radar — draft mode contracts recording axes while enforcement axes hold constant.](./figures/opsdb_htmx_04_governance_radar.png)
+![Fig. 4: Governance Property Radar — draft mode contracts recording axes while enforcement axes hold constant.](../figures/opsdb_htmx_04_governance_radar.png)
 
-![Fig. 5: Mistake Surface — Rails web of potential disagreements vs OpsDB single-source star topology.](./figures/opsdb_htmx_05_mistake_surface.png)
+![Fig. 5: Mistake Surface — Rails web of potential disagreements vs OpsDB single-source star topology.](../figures/opsdb_htmx_05_mistake_surface.png)
 
 ---
 
@@ -1236,7 +1236,7 @@ What the developer did not write: authentication, authorization, input validatio
 
 **The YAML is the documentation.** Read the route manifest — you see every endpoint. Read a logic path — you see every step a request passes through. Read the schema — you see every entity, field, and constraint. A new developer reads three YAML files and understands the application's structure without reading implementation code. The implementation code is just the handler functions — the domain logic — which is the only part that requires domain expertise to understand.
 
-![Fig. 5: Mistake Surface — Rails web of potential disagreements vs OpsDB single-source star topology.](./figures/opsdb_htmx_05_mistake_surface.png)
+![Fig. 5: Mistake Surface — Rails web of potential disagreements vs OpsDB single-source star topology.](../figures/opsdb_htmx_05_mistake_surface.png)
 
 ---
 
