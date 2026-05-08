@@ -816,7 +816,7 @@ Unification is the core operation. Given two terms and a current set of variable
 
 ### 5.1 The Bindings Map
 
-![Fig. 2: Variable Binding Accumulation — the binding map grows from empty to three variables as each goal adds its binding through unification.](./figures/proql_02_binding_flow.png)
+![Fig. 2: Variable Binding Accumulation — the binding map grows from empty to three variables as each goal adds its binding through unification.](../figures/proql_02_binding_flow.png)
 
 ```go
 type Bindings map[string]Term
@@ -955,7 +955,7 @@ This binding is discarded. Backtracking tries the next fact.
 
 ## 6. Backtracking
 
-![Fig. 1: Backtracking Tree — three choice points branching through three goals, with pruning and two result leaves.](./figures/proql_01_backtracking_tree.png)
+![Fig. 1: Backtracking Tree — three choice points branching through three goals, with pruning and two result leaves.](../figures/proql_01_backtracking_tree.png)
 
 Backtracking explores all possible variable bindings. A goal may match multiple facts. The engine tries each one. If a subsequent goal fails with a given binding, the engine returns to the last choice point and tries the next alternative.
 
@@ -1534,7 +1534,7 @@ func compareTerm(a, b Term) int {
 
 ## 9. Rules
 
-![Fig. 8: Recursive Ancestor Traversal — two rules traverse a location hierarchy, each recursion level shown with its clause and accumulated results.](./figures/proql_08_recursive_ancestor.png)
+![Fig. 8: Recursive Ancestor Traversal — two rules traverse a location hierarchy, each recursion level shown with its clause and accumulated results.](../figures/proql_08_recursive_ancestor.png)
 
 A rule is a named query that can be called from other queries. Rules enable composition and recursion.
 
@@ -1639,7 +1639,7 @@ Then expands against the second rule: look up `location.42.parent_location_id`, 
 
 ## 10. Bidirectional Write-Back
 
-![Fig. 3: Bidirectional Edit Cycle — query to results to edit to change set through the gate pipeline to requery, completing the governed loop.](./figures/proql_03_edit_cycle.png)
+![Fig. 3: Bidirectional Edit Cycle — query to results to edit to change set through the gate pipeline to requery, completing the governed loop.](../figures/proql_03_edit_cycle.png)
 
 Query results are editable. Each binding set carries enough information to construct a change set when a value is modified.
 
@@ -1841,7 +1841,7 @@ The select options come from the enum set on the Term — the EnumValue term car
 
 ## 11. Authorization in the Query Engine
 
-![Fig. 4: Authorization Silent Filtering — same query, two users, different visible facts, different result sets with no error.](./figures/proql_04_auth_filtering.png)
+![Fig. 4: Authorization Silent Filtering — same query, two users, different visible facts, different result sets with no error.](../figures/proql_04_auth_filtering.png)
 
 Every fact access during query resolution passes through authorization. The five layers evaluate for each entity and field the query touches. Unauthorized access doesn't error — the binding fails silently.
 
@@ -2031,7 +2031,7 @@ Find entities past their retention horizon that haven't been reaped:
 
 ## 13. Application Query Examples
 
-![Fig. 7: Multi-Entity Join Graph — five entity types connected by shared variables, each variable an implicit join with no declaration needed.](./figures/proql_07_variable_join_graph.png)
+![Fig. 7: Multi-Entity Join Graph — five entity types connected by shared variables, each variable an implicit join with no declaration needed.](../figures/proql_07_variable_join_graph.png)
 
 ### 13.1 Booking Availability
 
@@ -2553,7 +2553,7 @@ The caller sees: "Query halted: backtrack limit 100000 reached after 87 results 
 
 ### 16.1 Indexed Knowledge Base
 
-![Fig. 5: Indexing Performance — O(N) unindexed scan diverges from O(1) indexed lookup as entity count grows.](./figures/proql_05_indexing_performance.png)
+![Fig. 5: Indexing Performance — O(N) unindexed scan diverges from O(1) indexed lookup as entity count grows.](../figures/proql_05_indexing_performance.png)
 
 The naive approach scans all facts for every goal. The indexed approach looks up by entity type and optionally by entity ID:
 
@@ -2646,7 +2646,7 @@ func PreResolvePath(path DRPath,
 
 ### 16.3 Goal Ordering
 
-![Fig. 6: Goal Ordering — restrictive-first narrows the search space early (funnel) while permissive-first scans wide before filtering late.](./figures/proql_06_goal_ordering.png)
+![Fig. 6: Goal Ordering — restrictive-first narrows the search space early (funnel) while permissive-first scans wide before filtering late.](../figures/proql_06_goal_ordering.png)
 
 The solver evaluates goals left to right. Goals that bind variables early reduce the search space for later goals. A goal with a bound entity ID does one lookup. A goal with an unbound entity ID iterates all entities of that type.
 
