@@ -1,3 +1,5 @@
+//# internal/conventions/naming.go
+
 package conventions
 
 import (
@@ -31,25 +33,12 @@ var knownPluralExceptions = map[string]bool{
 	"tls":          true,
 	"https":        true,
 	"cors":         true,
-	"metrics":      true, // used as uncountable noun in ops context
+	"metrics":      true,
 	"credentials":  true,
 	"contents":     true,
 	"headquarters": true,
 	"series":       true,
 	"species":      true,
-}
-
-// knownGovernanceFields lists field names that are allowed to start with underscore.
-var knownGovernanceFields = map[string]bool{
-	"_requires_group":                true,
-	"_access_classification":         true,
-	"_audit_chain_hash":              true,
-	"_retention_policy_id":           true,
-	"_schema_version_introduced_id":  true,
-	"_schema_version_deprecated_id":  true,
-	"_observed_time":                 true,
-	"_authority_id":                  true,
-	"_puller_runner_job_id":          true,
 }
 
 // ValidateEntityName checks that an entity name follows conventions:
@@ -79,7 +68,6 @@ func ValidateEntityName(name string) error {
 		return fmt.Errorf("entity name %q has leading underscore but is not a _schema_ entity", name)
 	}
 
-	// Singular check: reject trailing 's' unless the final component is a known exception.
 	if err := checkSingular(name); err != nil {
 		return fmt.Errorf("entity name %q: %w", name, err)
 	}
@@ -101,11 +89,9 @@ func ValidateFieldName(name string, fieldType string) error {
 
 	// Governance fields start with underscore — validate against known set.
 	if strings.HasPrefix(name, "_") {
-		if !knownGovernanceFields[name] {
+		if !IsGovernanceFieldName(name) {
 			return fmt.Errorf("field name %q starts with underscore but is not a recognized governance field", name)
 		}
-		// Governance fields skip remaining naming checks since they follow
-		// their own conventions defined in the reserved config.
 		return nil
 	}
 
@@ -120,7 +106,6 @@ func ValidateFieldName(name string, fieldType string) error {
 		return fmt.Errorf("field name %q has trailing underscore", name)
 	}
 
-	// Type-specific suffix/prefix checks.
 	switch fieldType {
 	case "datetime":
 		if !strings.HasSuffix(name, "_time") {
@@ -175,7 +160,6 @@ func ValidateFKName(fieldName string, referencedEntity string) error {
 	// Special case for self-referential version chain:
 	// parent_{entity}_version_id references {entity}_version
 	if strings.HasPrefix(fieldName, "parent_") && strings.HasSuffix(fieldName, "_id") {
-		// Extract what's between "parent_" and "_id"
 		inner := fieldName[7 : len(fieldName)-3]
 		if inner == referencedEntity {
 			return nil
@@ -212,12 +196,33 @@ func ValidateCompositeName(name string) error {
 		return fmt.Errorf("composite name %q has leading underscore", name)
 	}
 
-	// Must contain at least one underscore to be composite.
 	if !strings.Contains(name, "_") {
 		return fmt.Errorf("composite name %q has no underscore (not composite)", name)
 	}
 
 	return nil
+}
+
+// IsGovernanceFieldName returns true if the name is a recognized governance,
+// observation, or schema metadata field. Sourced from GovernanceFieldNames().
+func IsGovernanceFieldName(name string) bool {
+	return GovernanceFieldNames()[name]
+}
+
+// GovernanceFieldNames returns the set of all governance field names.
+// Used by naming validation and by reserved.go for consistency.
+func GovernanceFieldNames() map[string]bool {
+	return map[string]bool{
+		"_requires_group":               true,
+		"_access_classification":        true,
+		"_audit_chain_hash":             true,
+		"_retention_policy_id":          true,
+		"_schema_version_introduced_id": true,
+		"_schema_version_deprecated_id": true,
+		"_observed_time":                true,
+		"_authority_id":                 true,
+		"_puller_runner_job_id":         true,
+	}
 }
 
 // checkLowercaseUnderscoreOnly validates that a string contains only
@@ -251,16 +256,13 @@ func checkLowercaseUnderscoreOnly(s string) error {
 // Uses a trailing-s heuristic with known exception handling.
 // Only checks the last component of underscore-separated names.
 func checkSingular(name string) error {
-	// Split on underscore, check only the last component.
 	parts := strings.Split(name, "_")
 	last := parts[len(parts)-1]
 
-	// Skip very short components — can't meaningfully pluralize.
 	if len(last) < 3 {
 		return nil
 	}
 
-	// Check if the entire name or last component is a known exception.
 	if knownPluralExceptions[name] {
 		return nil
 	}
@@ -268,8 +270,6 @@ func checkSingular(name string) error {
 		return nil
 	}
 
-	// Heuristic: reject if last component ends in 's' but not 'ss', 'us', 'is'.
-	// These suffixes are common singular endings (process, status, basis).
 	if strings.HasSuffix(last, "s") &&
 		!strings.HasSuffix(last, "ss") &&
 		!strings.HasSuffix(last, "us") &&

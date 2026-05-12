@@ -178,3 +178,7 @@ OpsDB is a skeleton implementation of a unified operations, automation, and audi
 
 - These have been rewritten again with an LLM to integrate them, so they should be able to be worked into functioning.
 
+## internals/*
+
+- These have been rewritten again with LLMs to integrate them.  Not ready for compilation, just moved closer.
+
