@@ -4,32 +4,117 @@ package operations
 
 import (
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/ghowland/opsdb/internal/pg"
+	"github.com/ghowland/opsdb/tools/opsdb-api/gate"
 )
+
+// ---------------------------------------------------------------------------
+// Data types
+// ---------------------------------------------------------------------------
 
 // ResolveResult holds the result of an authority pointer resolution.
 // Contains everything a caller needs to fetch the resource from the
 // authority directly — the API does not fetch from the authority itself.
 type ResolveResult struct {
-	AuthorityID      int
-	AuthorityName    string
-	AuthorityType    string
-	BaseURL          string
-	PointerID        int
-	PointerType      string
-	Locator          string
-	PointerDataJSON  map[string]interface{}
-	LastVerifiedTime *time.Time
+	AuthorityID      int                    `json:"authority_id"`
+	AuthorityName    string                 `json:"authority_name"`
+	AuthorityType    string                 `json:"authority_type"`
+	BaseURL          string                 `json:"base_url"`
+	PointerID        int                    `json:"pointer_id"`
+	PointerType      string                 `json:"pointer_type"`
+	Locator          string                 `json:"locator"`
+	PointerDataJSON  map[string]interface{} `json:"pointer_data_json,omitempty"`
+	LastVerifiedTime *time.Time             `json:"last_verified_time,omitempty"`
 }
 
-// ResolveAuthorityPointer performs a where-is-X lookup. Returns authority
-// connection details and the locator for the specific resource within
-// that authority. Does NOT fetch from the authority — the caller uses
-// the returned coordinates to query the authority directly.
-func ResolveAuthorityPointer(db *pg.DB, pointerID int) (*ResolveResult, error) {
-	// read the authority_pointer row
+// ---------------------------------------------------------------------------
+// HTTP handler
+// ---------------------------------------------------------------------------
+
+// ResolveAuthorityPointer handles POST /api/v1/authority/resolve
+func (h *Handlers) ResolveAuthorityPointer(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodPost) {
+		return
+	}
+
+	var body struct {
+		PointerID     int    `json:"pointer_id"`
+		AuthorityName string `json:"authority_name"`
+		Locator       string `json:"locator"`
+	}
+	if err := parseJSONBody(r, &body); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]interface{}{
+			"success": false, "error": err.Error(),
+		})
+		return
+	}
+
+	// determine target entity ID: pointer_id if given, otherwise we resolve
+	// by name+locator after the gate validates
+	targetID := body.PointerID
+
+	resp := h.gate.ProcessRequest(&gate.GateRequest{
+		Operation:      "resolve_authority_pointer",
+		OperationClass: "read",
+		TargetEntity:   "authority_pointer",
+		TargetEntityID: targetID,
+		Params: map[string]interface{}{
+			"pointer_id":     body.PointerID,
+			"authority_name": body.AuthorityName,
+			"locator":        body.Locator,
+		},
+		RawCredentials: parseCredentials(r),
+		ClientIP:       clientIP(r),
+		UserAgent:      r.UserAgent(),
+		RequestID:      newRequestID(),
+		ReceivedAt:     time.Now().UTC(),
+	})
+
+	if !resp.Success {
+		writeGateResponse(w, resp)
+		return
+	}
+
+	// gate validated auth/authz/audit — now perform the read
+	var result *ResolveResult
+	var err error
+
+	if body.PointerID > 0 {
+		result, err = resolveAuthorityPointer(h.db, body.PointerID)
+	} else if body.AuthorityName != "" && body.Locator != "" {
+		result, err = resolveAuthorityPointerByPath(h.db, body.AuthorityName, body.Locator)
+	} else {
+		writeJSON(w, http.StatusBadRequest, map[string]interface{}{
+			"success": false,
+			"error":   "either pointer_id or both authority_name and locator are required",
+		})
+		return
+	}
+
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, map[string]interface{}{
+			"success": false, "error": err.Error(), "audit_entry_id": resp.AuditEntryID,
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"success": true, "data": result, "audit_entry_id": resp.AuditEntryID,
+		"warnings": resp.Warnings,
+	})
+}
+
+// ---------------------------------------------------------------------------
+// Domain functions
+// ---------------------------------------------------------------------------
+
+// resolveAuthorityPointer performs a where-is-X lookup by pointer ID.
+// Returns authority connection details and the locator for the specific
+// resource within that authority.
+func resolveAuthorityPointer(db *pg.DB, pointerID int) (*ResolveResult, error) {
 	var authorityID int
 	var pointerType, locator string
 	var pointerDataJSON []byte
@@ -47,7 +132,6 @@ func ResolveAuthorityPointer(db *pg.DB, pointerID int) (*ResolveResult, error) {
 		return nil, fmt.Errorf("authority_pointer query failed: %w", err)
 	}
 
-	// read the parent authority row for connection details
 	var authorityName, authorityType string
 	var authorityDataJSON []byte
 
@@ -64,16 +148,14 @@ func ResolveAuthorityPointer(db *pg.DB, pointerID int) (*ResolveResult, error) {
 		return nil, fmt.Errorf("authority query failed: %w", err)
 	}
 
-	// extract base_url from authority_data_json
 	baseURL := extractBaseURL(authorityDataJSON, authorityType)
 
-	// parse pointer data
 	var pointerData map[string]interface{}
 	if len(pointerDataJSON) > 0 {
 		pg.UnmarshalJSON(pointerDataJSON, &pointerData)
 	}
 
-	result := &ResolveResult{
+	return &ResolveResult{
 		AuthorityID:      authorityID,
 		AuthorityName:    authorityName,
 		AuthorityType:    authorityType,
@@ -83,15 +165,12 @@ func ResolveAuthorityPointer(db *pg.DB, pointerID int) (*ResolveResult, error) {
 		Locator:          locator,
 		PointerDataJSON:  pointerData,
 		LastVerifiedTime: lastVerifiedTime,
-	}
-
-	return result, nil
+	}, nil
 }
 
-// ResolveAuthorityPointerByPath resolves an authority pointer by authority
-// name and locator path instead of by ID. Useful when the caller knows
-// the authority and resource path but not the pointer row ID.
-func ResolveAuthorityPointerByPath(db *pg.DB, authorityName string, locator string) (*ResolveResult, error) {
+// resolveAuthorityPointerByPath resolves an authority pointer by authority
+// name and locator path instead of by ID.
+func resolveAuthorityPointerByPath(db *pg.DB, authorityName string, locator string) (*ResolveResult, error) {
 	var pointerID int
 	err := db.QueryRow(
 		"SELECT ap.id FROM authority_pointer ap "+
@@ -109,8 +188,12 @@ func ResolveAuthorityPointerByPath(db *pg.DB, authorityName string, locator stri
 		return nil, fmt.Errorf("authority_pointer lookup failed: %w", err)
 	}
 
-	return ResolveAuthorityPointer(db, pointerID)
+	return resolveAuthorityPointer(db, pointerID)
 }
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 // extractBaseURL pulls the base_url or equivalent connection string from
 // the authority's typed data JSON. Different authority types store their
@@ -125,14 +208,12 @@ func extractBaseURL(authorityDataJSON []byte, authorityType string) string {
 		return ""
 	}
 
-	// try common field names in priority order
 	for _, field := range []string{"base_url", "url", "endpoint", "address", "server_url"} {
 		if val, ok := data[field].(string); ok && val != "" {
 			return val
 		}
 	}
 
-	// authority-type-specific fields
 	switch authorityType {
 	case "prometheus_server":
 		if val, ok := data["prometheus_url"].(string); ok {

@@ -4,40 +4,54 @@ package operations
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
 	"github.com/ghowland/opsdb/internal/pg"
+	"github.com/ghowland/opsdb/tools/opsdb-api/gate"
 	runtimeschema "github.com/ghowland/opsdb/tools/opsdb-api/schema"
 )
 
+// ---------------------------------------------------------------------------
+// Data types
+// ---------------------------------------------------------------------------
+
 // WatchParams holds watch subscription parameters.
 type WatchParams struct {
-	EntityType    string
-	Filters       []FilterPredicate
-	ResumeToken   string
-	PollInterval  time.Duration // default 5s
-	MaxIdleTime   time.Duration // disconnect after this long with no changes, default 30m
+	EntityType   string            `json:"entity_type"`
+	Filters      []FilterPredicate `json:"filters"`
+	ResumeToken  string            `json:"resume_token"`
+	PollInterval int               `json:"poll_interval_seconds"`
+	MaxIdleTime  int               `json:"max_idle_time_seconds"`
 }
 
 // WatchEvent represents one change event in a watch stream.
 type WatchEvent struct {
-	Type       string                 // SNAPSHOT, ADDED, MODIFIED, DELETED, SYNC, ERROR
-	EntityType string
-	EntityID   int
-	Data       map[string]interface{}
-	Version    int
-	Timestamp  time.Time
-	ResumeToken string
+	Type        string                 `json:"type"`
+	EntityType  string                 `json:"entity_type"`
+	EntityID    int                    `json:"entity_id"`
+	Data        map[string]interface{} `json:"data,omitempty"`
+	Version     int                    `json:"version,omitempty"`
+	Timestamp   time.Time              `json:"timestamp"`
+	ResumeToken string                 `json:"resume_token"`
 }
 
 // resumeState tracks the position in the change stream for reconnection.
 type resumeState struct {
-	EntityType       string
-	LastUpdatedTime  time.Time
-	LastSeenID       int
-	KnownEntityIDs   map[int]bool
+	EntityType      string
+	LastUpdatedTime time.Time
+	LastSeenID      int
+	KnownEntityIDs  map[int]bool
+}
+
+// decodedToken holds parsed resume token data.
+type decodedToken struct {
+	EntityType      string
+	LastUpdatedTime time.Time
+	LastSeenID      int
 }
 
 const (
@@ -46,17 +60,104 @@ const (
 	maxPollInterval     = 60 * time.Second
 )
 
-// Watch implements the streaming watch operation. Sends an initial snapshot
-// of matching entities, then streams changes as they occur. On reconnect
-// with a resume token, sends a SYNC event with current state to ensure
-// the client hasn't missed any changes (level-triggered backstop).
-func Watch(ctx context.Context, db *pg.DB, schema *runtimeschema.RuntimeSchema, params *WatchParams, callback func(event WatchEvent)) error {
+// ---------------------------------------------------------------------------
+// HTTP handler
+// ---------------------------------------------------------------------------
+
+// Watch handles POST /api/v1/watch
+// After gate validates auth/authz, sets SSE headers and streams change
+// events until the client disconnects or max idle time is exceeded.
+func (h *Handlers) Watch(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodPost) {
+		return
+	}
+
+	var params WatchParams
+	if err := parseJSONBody(r, &params); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]interface{}{
+			"success": false, "error": err.Error(),
+		})
+		return
+	}
+
+	resp := h.gate.ProcessRequest(&gate.GateRequest{
+		Operation:      "watch",
+		OperationClass: "stream",
+		TargetEntity:   params.EntityType,
+		Params: map[string]interface{}{
+			"entity_type":  params.EntityType,
+			"filters":      params.Filters,
+			"resume_token": params.ResumeToken,
+		},
+		RawCredentials: parseCredentials(r),
+		ClientIP:       clientIP(r),
+		UserAgent:      r.UserAgent(),
+		RequestID:      newRequestID(),
+		ReceivedAt:     time.Now().UTC(),
+	})
+
+	if !resp.Success {
+		writeGateResponse(w, resp)
+		return
+	}
+
+	// verify the response writer supports flushing for SSE
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		writeJSON(w, http.StatusInternalServerError, map[string]interface{}{
+			"success": false, "error": "streaming not supported",
+		})
+		return
+	}
+
+	// set SSE headers
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Audit-Entry-ID", fmt.Sprintf("%d", resp.AuditEntryID))
+	w.WriteHeader(http.StatusOK)
+	flusher.Flush()
+
+	// callback that writes each event as an SSE data line
+	callback := func(event WatchEvent) {
+		data, err := json.Marshal(event)
+		if err != nil {
+			return
+		}
+		fmt.Fprintf(w, "event: %s\ndata: %s\n\n", event.Type, data)
+		flusher.Flush()
+	}
+
+	// run the streaming loop — blocks until context cancels or idle timeout
+	err := watchStream(r.Context(), h.db, h.schema, &params, callback)
+	if err != nil {
+		// write a final error event before closing
+		errEvent, _ := json.Marshal(WatchEvent{
+			Type:       "ERROR",
+			EntityType: params.EntityType,
+			Data:       map[string]interface{}{"error": err.Error()},
+			Timestamp:  time.Now().UTC(),
+		})
+		fmt.Fprintf(w, "event: ERROR\ndata: %s\n\n", errEvent)
+		flusher.Flush()
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Domain functions
+// ---------------------------------------------------------------------------
+
+// watchStream implements the streaming watch operation. Sends an initial
+// snapshot of matching entities, then streams changes as they occur. On
+// reconnect with a resume token, sends SYNC events with current state to
+// ensure the client hasn't missed any changes (level-triggered backstop).
+func watchStream(ctx context.Context, db *pg.DB, schema *runtimeschema.RuntimeSchema, params *WatchParams, callback func(event WatchEvent)) error {
 	_, found := schema.GetEntityType(params.EntityType)
 	if !found {
 		return fmt.Errorf("unknown entity type: %s", params.EntityType)
 	}
 
-	pollInterval := params.PollInterval
+	pollInterval := time.Duration(params.PollInterval) * time.Second
 	if pollInterval <= 0 {
 		pollInterval = defaultPollInterval
 	}
@@ -64,18 +165,16 @@ func Watch(ctx context.Context, db *pg.DB, schema *runtimeschema.RuntimeSchema, 
 		pollInterval = maxPollInterval
 	}
 
-	maxIdle := params.MaxIdleTime
+	maxIdle := time.Duration(params.MaxIdleTime) * time.Second
 	if maxIdle <= 0 {
 		maxIdle = defaultMaxIdleTime
 	}
 
-	// initialize or restore resume state
-	state, err := initializeResumeState(db, params)
+	state, err := initializeResumeState(params)
 	if err != nil {
 		return fmt.Errorf("failed to initialize watch state: %w", err)
 	}
 
-	// send initial data: full snapshot or sync depending on resume token
 	if params.ResumeToken != "" {
 		err = sendSyncEvents(db, params, state, callback)
 	} else {
@@ -85,13 +184,12 @@ func Watch(ctx context.Context, db *pg.DB, schema *runtimeschema.RuntimeSchema, 
 		return fmt.Errorf("initial sync failed: %w", err)
 	}
 
-	// enter polling loop for changes
 	return pollForChanges(ctx, db, params, state, pollInterval, maxIdle, callback)
 }
 
 // initializeResumeState sets up tracking state either from scratch or
 // from a resume token.
-func initializeResumeState(db *pg.DB, params *WatchParams) (*resumeState, error) {
+func initializeResumeState(params *WatchParams) (*resumeState, error) {
 	state := &resumeState{
 		EntityType:     params.EntityType,
 		KnownEntityIDs: make(map[int]bool),
@@ -188,7 +286,6 @@ func sendSyncEvents(db *pg.DB, params *WatchParams, state *resumeState, callback
 			state.LastSeenID = entityID
 		}
 
-		// determine event type based on whether we knew about this entity
 		eventType := "SYNC"
 		if !state.KnownEntityIDs[entityID] {
 			eventType = "ADDED"
@@ -257,7 +354,6 @@ func pollForChanges(ctx context.Context, db *pg.DB, params *WatchParams, state *
 				}
 			}
 
-			// check idle timeout
 			if time.Since(lastEventTime) > maxIdle {
 				return nil
 			}
@@ -298,7 +394,6 @@ func detectChanges(db *pg.DB, params *WatchParams, state *resumeState) ([]WatchE
 		entityID := extractEntityID(fieldValues)
 		updatedTime := extractUpdatedTime(fieldValues)
 
-		// determine event type
 		eventType := "MODIFIED"
 		if !state.KnownEntityIDs[entityID] {
 			eventType = "ADDED"
@@ -330,6 +425,10 @@ func detectChanges(db *pg.DB, params *WatchParams, state *resumeState) ([]WatchE
 	return events, rows.Err()
 }
 
+// ---------------------------------------------------------------------------
+// Query helpers
+// ---------------------------------------------------------------------------
+
 // buildWatchWhereClause constructs the WHERE clause for change detection,
 // combining user filters with the resume position.
 func buildWatchWhereClause(params *WatchParams, state *resumeState) (string, []interface{}) {
@@ -338,7 +437,7 @@ func buildWatchWhereClause(params *WatchParams, state *resumeState) (string, []i
 	argIdx := 1
 
 	// resume position: find rows updated after our last known time,
-	// or updated at the same time with a higher ID (for deterministic ordering)
+	// or updated at the same time with a higher ID (deterministic ordering)
 	if !state.LastUpdatedTime.IsZero() {
 		conditions = append(conditions,
 			fmt.Sprintf("(updated_time > $%d OR (updated_time = $%d AND id > $%d))",
@@ -395,7 +494,9 @@ func queryMatchingEntities(db *pg.DB, params *WatchParams) (pg.Rows, error) {
 	return rows, nil
 }
 
-// --- resume token encoding ---
+// ---------------------------------------------------------------------------
+// Resume token encoding
+// ---------------------------------------------------------------------------
 
 // encodeResumeToken creates an opaque token encoding the current watch position.
 func encodeResumeToken(state *resumeState) string {
@@ -404,13 +505,6 @@ func encodeResumeToken(state *resumeState) string {
 		state.LastUpdatedTime.UnixMicro(),
 		state.LastSeenID,
 	)
-}
-
-// decodedToken holds parsed resume token data.
-type decodedToken struct {
-	EntityType      string
-	LastUpdatedTime time.Time
-	LastSeenID      int
 }
 
 // decodeResumeToken parses an opaque resume token back into position data.
@@ -434,7 +528,9 @@ func decodeResumeToken(token string) (*decodedToken, error) {
 	}, nil
 }
 
-// --- field extraction helpers ---
+// ---------------------------------------------------------------------------
+// Field extraction helpers
+// ---------------------------------------------------------------------------
 
 func extractEntityID(fields map[string]interface{}) int {
 	if id, ok := fields["id"]; ok {

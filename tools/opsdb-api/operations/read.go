@@ -3,77 +3,272 @@
 package operations
 
 import (
+	"encoding/json"
 	"fmt"
+	"net"
+	"net/http"
 	"strings"
 	"time"
 
 	"github.com/ghowland/opsdb/internal/pg"
+	"github.com/ghowland/opsdb/tools/opsdb-api/auth"
+	"github.com/ghowland/opsdb/tools/opsdb-api/gate"
 	runtimeschema "github.com/ghowland/opsdb/tools/opsdb-api/schema"
+
+	"github.com/google/uuid"
 )
+
+// ---------------------------------------------------------------------------
+// Handlers — the struct main.go creates, every handler method hangs off it
+// ---------------------------------------------------------------------------
+
+// Handlers owns HTTP request parsing and response writing for all 18 API
+// operations. Each method constructs a GateRequest and delegates to the
+// gate pipeline for processing. Read operations perform the actual DB
+// query after the gate validates; write operations let the gate execute.
+type Handlers struct {
+	db     *pg.DB
+	schema *runtimeschema.RuntimeSchema
+	gate   *gate.Gate
+}
+
+// NewHandlers creates the operation handlers that main.go registers as
+// HTTP routes. Matches the call site in cmd/main.go.
+func NewHandlers(db *pg.DB, schema *runtimeschema.RuntimeSchema, g *gate.Gate) *Handlers {
+	return &Handlers{
+		db:     db,
+		schema: schema,
+		gate:   g,
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Shared HTTP helpers — used by every handler across all 6 files
+// ---------------------------------------------------------------------------
+
+// parseCredentials extracts authentication material from the HTTP request.
+// Supports Basic auth and Bearer tokens from the Authorization header.
+func parseCredentials(r *http.Request) auth.Credentials {
+	var creds auth.Credentials
+
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		return creds
+	}
+
+	if strings.HasPrefix(authHeader, "Basic ") {
+		username, password, ok := r.BasicAuth()
+		if ok {
+			creds.BasicUser = username
+			creds.BasicPassword = password
+		}
+	} else if strings.HasPrefix(authHeader, "Bearer ") {
+		creds.BearerToken = strings.TrimPrefix(authHeader, "Bearer ")
+	}
+
+	return creds
+}
+
+// parseJSONBody decodes the request body as JSON into the target struct.
+func parseJSONBody(r *http.Request, v interface{}) error {
+	if r.Body == nil {
+		return fmt.Errorf("request body is empty")
+	}
+	defer r.Body.Close()
+
+	decoder := json.NewDecoder(r.Body)
+	err := decoder.Decode(v)
+	if err != nil {
+		return fmt.Errorf("invalid JSON: %w", err)
+	}
+	return nil
+}
+
+// writeJSON serializes data as JSON and writes it with the given HTTP
+// status code.
+func writeJSON(w http.ResponseWriter, status int, data interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(data)
+}
+
+// writeError writes a structured error response from a GateError.
+func writeError(w http.ResponseWriter, status int, gateErr *gate.GateError) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": false,
+		"error": map[string]interface{}{
+			"step":    gateErr.StepName,
+			"code":    gateErr.Code,
+			"message": gateErr.Message,
+			"detail":  gateErr.Detail,
+		},
+	})
+}
+
+// writeGateResponse serializes a GateResponse as the HTTP response.
+// Routes to writeError on failure, writeJSON on success.
+func writeGateResponse(w http.ResponseWriter, resp *gate.GateResponse) {
+	if !resp.Success {
+		status := mapGateCodeToHTTPStatus(resp.Error.Code)
+		writeError(w, status, resp.Error)
+		return
+	}
+
+	result := map[string]interface{}{
+		"success":        true,
+		"data":           resp.Data,
+		"audit_entry_id": resp.AuditEntryID,
+	}
+	if len(resp.Warnings) > 0 {
+		result["warnings"] = resp.Warnings
+	}
+	if len(resp.Metadata) > 0 {
+		result["metadata"] = resp.Metadata
+	}
+
+	writeJSON(w, http.StatusOK, result)
+}
+
+// newRequestID generates a UUID v4 for request correlation.
+func newRequestID() string {
+	return uuid.New().String()
+}
+
+// clientIP extracts the client IP from X-Forwarded-For or RemoteAddr.
+func clientIP(r *http.Request) string {
+	forwarded := r.Header.Get("X-Forwarded-For")
+	if forwarded != "" {
+		// X-Forwarded-For can contain a comma-separated list; first is the client
+		parts := strings.SplitN(forwarded, ",", 2)
+		return strings.TrimSpace(parts[0])
+	}
+
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
+}
+
+// requireMethod checks the HTTP method and writes 405 if it doesn't match.
+// Returns true if the method matches and the handler should continue.
+func requireMethod(w http.ResponseWriter, r *http.Request, method string) bool {
+	if r.Method != method {
+		w.Header().Set("Allow", method)
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]interface{}{
+			"success": false,
+			"error":   fmt.Sprintf("method %s not allowed, use %s", r.Method, method),
+		})
+		return false
+	}
+	return true
+}
+
+// mapGateCodeToHTTPStatus maps gate error codes to HTTP status codes.
+func mapGateCodeToHTTPStatus(code string) int {
+	switch code {
+	case "auth_failed", "no_credentials", "invalid_credentials":
+		return http.StatusUnauthorized
+	case "forbidden", "denied", "authorization_denied":
+		return http.StatusForbidden
+	case "not_found", "entity_not_found":
+		return http.StatusNotFound
+	case "validation_failed", "schema_invalid", "bound_exceeded",
+		"policy_violation", "stale_version":
+		return http.StatusBadRequest
+	case "conflict":
+		return http.StatusConflict
+	case "too_many_requests":
+		return http.StatusTooManyRequests
+	default:
+		return http.StatusInternalServerError
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Read data types
+// ---------------------------------------------------------------------------
 
 // SearchParams holds search operation parameters.
 type SearchParams struct {
-	EntityType   string
-	Filters      []FilterPredicate
-	Joins        []string
-	Projection   string // standard, summary, full_with_history, or comma-separated field list
-	Ordering     []OrderSpec
-	Cursor       string
-	Offset       int
-	Limit        int
-	MaxStaleness int    // seconds, for observation cache
-	ViewMode     string // standard, with_history, at_time
+	EntityType   string            `json:"entity_type"`
+	Filters      []FilterPredicate `json:"filters"`
+	Joins        []string          `json:"joins"`
+	Projection   string            `json:"projection"`
+	Ordering     []OrderSpec       `json:"ordering"`
+	Cursor       string            `json:"cursor"`
+	Offset       int               `json:"offset"`
+	Limit        int               `json:"limit"`
+	MaxStaleness int               `json:"max_staleness"`
+	ViewMode     string            `json:"view_mode"`
 }
 
 // FilterPredicate represents one filter condition.
 type FilterPredicate struct {
-	Field    string
-	Operator string // eq, ne, gt, gte, lt, lte, in, like, is_null, is_not_null, between, json_contains
-	Value    interface{}
+	Field    string      `json:"field"`
+	Operator string      `json:"operator"`
+	Value    interface{} `json:"value"`
 }
 
 // OrderSpec represents one ordering directive.
 type OrderSpec struct {
-	Field     string
-	Direction string // asc, desc
+	Field     string `json:"field"`
+	Direction string `json:"direction"`
 }
 
 // SearchResult holds search results.
 type SearchResult struct {
-	Rows              []map[string]interface{}
-	Cursor            string
-	TotalCount        int
-	FreshnessSummary  map[string]interface{}
-	FilterDisclosures []string
+	Rows             []map[string]interface{} `json:"rows"`
+	Cursor           string                   `json:"cursor,omitempty"`
+	TotalCount       int                      `json:"total_count"`
+	FreshnessSummary map[string]interface{}   `json:"freshness_summary,omitempty"`
 }
 
 // EntityRow holds one entity row with field values and metadata.
 type EntityRow struct {
-	EntityType    string
-	EntityID      int
-	Fields        map[string]interface{}
-	VersionSerial *int
-	CreatedTime   *time.Time
-	UpdatedTime   *time.Time
+	EntityType    string                 `json:"entity_type"`
+	EntityID      int                    `json:"entity_id"`
+	Fields        map[string]interface{} `json:"fields"`
+	VersionSerial *int                   `json:"version_serial,omitempty"`
+	CreatedTime   *time.Time             `json:"created_time,omitempty"`
+	UpdatedTime   *time.Time             `json:"updated_time,omitempty"`
 }
 
 // VersionRow holds one version sibling row.
 type VersionRow struct {
-	VersionID                int
-	VersionSerial            int
-	ParentVersionID          *int
-	ChangeSetID              *int
-	IsActiveVersion          bool
-	ApprovedForProductionTime *time.Time
-	Fields                   map[string]interface{}
+	VersionID                 int                    `json:"version_id"`
+	VersionSerial             int                    `json:"version_serial"`
+	ParentVersionID           *int                   `json:"parent_version_id,omitempty"`
+	ChangeSetID               *int                   `json:"change_set_id,omitempty"`
+	IsActiveVersion           bool                   `json:"is_active_version"`
+	ApprovedForProductionTime *time.Time             `json:"approved_for_production_time,omitempty"`
+	Fields                    map[string]interface{} `json:"fields"`
 }
 
 // DependencyNode holds one node in a dependency walk.
 type DependencyNode struct {
-	EntityType string
-	EntityID   int
-	Depth      int
-	Metadata   map[string]interface{}
+	EntityType string                 `json:"entity_type"`
+	EntityID   int                    `json:"entity_id"`
+	Depth      int                    `json:"depth"`
+	Metadata   map[string]interface{} `json:"metadata,omitempty"`
+}
+
+// ChangeSetViewResult holds the result of a change set view query.
+type ChangeSetViewResult struct {
+	ChangeSetID   int                      `json:"change_set_id"`
+	Status        string                   `json:"status"`
+	Name          string                   `json:"name"`
+	Reason        string                   `json:"reason"`
+	IsEmergency   bool                     `json:"is_emergency"`
+	IsBulk        bool                     `json:"is_bulk"`
+	SubmittedBy   *int                     `json:"submitted_by,omitempty"`
+	SubmittedTime *time.Time               `json:"submitted_time,omitempty"`
+	FieldChanges  []map[string]interface{} `json:"field_changes"`
+	Approvals     []map[string]interface{} `json:"approvals"`
+	Rejections    []map[string]interface{} `json:"rejections"`
+	Requirements  []map[string]interface{} `json:"requirements"`
 }
 
 // query bounds — enforced on every search
@@ -85,9 +280,373 @@ const (
 	maxQueryTimeoutMillis = 30000
 )
 
-// GetEntity fetches one entity row by primary key. Returns current state
+// ---------------------------------------------------------------------------
+// HTTP handler methods — read operations
+// ---------------------------------------------------------------------------
+
+// GetEntity handles GET /api/v1/entity/get
+func (h *Handlers) GetEntity(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodPost) {
+		return
+	}
+
+	var body struct {
+		EntityType string `json:"entity_type"`
+		EntityID   int    `json:"entity_id"`
+	}
+	if err := parseJSONBody(r, &body); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]interface{}{
+			"success": false, "error": err.Error(),
+		})
+		return
+	}
+
+	resp := h.gate.ProcessRequest(&gate.GateRequest{
+		Operation:      "get_entity",
+		OperationClass: "read",
+		TargetEntity:   body.EntityType,
+		TargetEntityID: body.EntityID,
+		Params:         map[string]interface{}{"entity_type": body.EntityType, "entity_id": body.EntityID},
+		RawCredentials: parseCredentials(r),
+		ClientIP:       clientIP(r),
+		UserAgent:      r.UserAgent(),
+		RequestID:      newRequestID(),
+		ReceivedAt:     time.Now().UTC(),
+	})
+
+	if !resp.Success {
+		writeGateResponse(w, resp)
+		return
+	}
+
+	// gate validated auth/authz/audit — now perform the read
+	var omittedFields []string
+	if resp.Metadata != nil {
+		if of, ok := resp.Metadata["omitted_fields"].([]string); ok {
+			omittedFields = of
+		}
+	}
+
+	result, err := getEntity(h.db, h.schema, body.EntityType, body.EntityID, omittedFields)
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, map[string]interface{}{
+			"success": false, "error": err.Error(), "audit_entry_id": resp.AuditEntryID,
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"success": true, "data": result, "audit_entry_id": resp.AuditEntryID,
+		"warnings": resp.Warnings,
+	})
+}
+
+// GetEntityHistory handles POST /api/v1/entity/history
+func (h *Handlers) GetEntityHistory(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodPost) {
+		return
+	}
+
+	var body struct {
+		EntityType string  `json:"entity_type"`
+		EntityID   int     `json:"entity_id"`
+		StartTime  *string `json:"start_time"`
+		EndTime    *string `json:"end_time"`
+	}
+	if err := parseJSONBody(r, &body); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]interface{}{
+			"success": false, "error": err.Error(),
+		})
+		return
+	}
+
+	resp := h.gate.ProcessRequest(&gate.GateRequest{
+		Operation:      "get_entity_history",
+		OperationClass: "read",
+		TargetEntity:   body.EntityType,
+		TargetEntityID: body.EntityID,
+		Params:         map[string]interface{}{"entity_type": body.EntityType, "entity_id": body.EntityID},
+		RawCredentials: parseCredentials(r),
+		ClientIP:       clientIP(r),
+		UserAgent:      r.UserAgent(),
+		RequestID:      newRequestID(),
+		ReceivedAt:     time.Now().UTC(),
+	})
+
+	if !resp.Success {
+		writeGateResponse(w, resp)
+		return
+	}
+
+	var startTime, endTime *time.Time
+	if body.StartTime != nil {
+		t, err := time.Parse(time.RFC3339, *body.StartTime)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]interface{}{
+				"success": false, "error": fmt.Sprintf("invalid start_time: %v", err),
+			})
+			return
+		}
+		startTime = &t
+	}
+	if body.EndTime != nil {
+		t, err := time.Parse(time.RFC3339, *body.EndTime)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]interface{}{
+				"success": false, "error": fmt.Sprintf("invalid end_time: %v", err),
+			})
+			return
+		}
+		endTime = &t
+	}
+
+	versions, err := getEntityHistory(h.db, h.schema, body.EntityType, body.EntityID, startTime, endTime)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]interface{}{
+			"success": false, "error": err.Error(), "audit_entry_id": resp.AuditEntryID,
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"success": true, "data": versions, "audit_entry_id": resp.AuditEntryID,
+		"warnings": resp.Warnings,
+	})
+}
+
+// GetEntityAtTime handles POST /api/v1/entity/at-time
+func (h *Handlers) GetEntityAtTime(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodPost) {
+		return
+	}
+
+	var body struct {
+		EntityType string `json:"entity_type"`
+		EntityID   int    `json:"entity_id"`
+		Timestamp  string `json:"timestamp"`
+	}
+	if err := parseJSONBody(r, &body); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]interface{}{
+			"success": false, "error": err.Error(),
+		})
+		return
+	}
+
+	timestamp, err := time.Parse(time.RFC3339, body.Timestamp)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]interface{}{
+			"success": false, "error": fmt.Sprintf("invalid timestamp: %v", err),
+		})
+		return
+	}
+
+	resp := h.gate.ProcessRequest(&gate.GateRequest{
+		Operation:      "get_entity_at_time",
+		OperationClass: "read",
+		TargetEntity:   body.EntityType,
+		TargetEntityID: body.EntityID,
+		Params:         map[string]interface{}{"entity_type": body.EntityType, "entity_id": body.EntityID, "timestamp": body.Timestamp},
+		RawCredentials: parseCredentials(r),
+		ClientIP:       clientIP(r),
+		UserAgent:      r.UserAgent(),
+		RequestID:      newRequestID(),
+		ReceivedAt:     time.Now().UTC(),
+	})
+
+	if !resp.Success {
+		writeGateResponse(w, resp)
+		return
+	}
+
+	version, err := getEntityAtTime(h.db, h.schema, body.EntityType, body.EntityID, timestamp)
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, map[string]interface{}{
+			"success": false, "error": err.Error(), "audit_entry_id": resp.AuditEntryID,
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"success": true, "data": version, "audit_entry_id": resp.AuditEntryID,
+		"warnings": resp.Warnings,
+	})
+}
+
+// Search handles POST /api/v1/search
+func (h *Handlers) Search(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodPost) {
+		return
+	}
+
+	var params SearchParams
+	if err := parseJSONBody(r, &params); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]interface{}{
+			"success": false, "error": err.Error(),
+		})
+		return
+	}
+
+	resp := h.gate.ProcessRequest(&gate.GateRequest{
+		Operation:      "search",
+		OperationClass: "read",
+		TargetEntity:   params.EntityType,
+		Params: map[string]interface{}{
+			"entity_type":   params.EntityType,
+			"filters":       params.Filters,
+			"joins":         params.Joins,
+			"projection":    params.Projection,
+			"ordering":      params.Ordering,
+			"cursor":        params.Cursor,
+			"offset":        params.Offset,
+			"limit":         params.Limit,
+			"max_staleness": params.MaxStaleness,
+			"view_mode":     params.ViewMode,
+		},
+		RawCredentials: parseCredentials(r),
+		ClientIP:       clientIP(r),
+		UserAgent:      r.UserAgent(),
+		RequestID:      newRequestID(),
+		ReceivedAt:     time.Now().UTC(),
+	})
+
+	if !resp.Success {
+		writeGateResponse(w, resp)
+		return
+	}
+
+	var omittedFields []string
+	if resp.Metadata != nil {
+		if of, ok := resp.Metadata["omitted_fields"].([]string); ok {
+			omittedFields = of
+		}
+	}
+
+	result, err := search(h.db, h.schema, &params, omittedFields)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]interface{}{
+			"success": false, "error": err.Error(), "audit_entry_id": resp.AuditEntryID,
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"success": true, "data": result, "audit_entry_id": resp.AuditEntryID,
+		"warnings": resp.Warnings,
+	})
+}
+
+// GetDependencies handles POST /api/v1/dependencies
+func (h *Handlers) GetDependencies(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodPost) {
+		return
+	}
+
+	var body struct {
+		EntityType string `json:"entity_type"`
+		EntityID   int    `json:"entity_id"`
+		Pattern    string `json:"pattern"`
+		MaxDepth   int    `json:"max_depth"`
+	}
+	if err := parseJSONBody(r, &body); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]interface{}{
+			"success": false, "error": err.Error(),
+		})
+		return
+	}
+
+	resp := h.gate.ProcessRequest(&gate.GateRequest{
+		Operation:      "get_dependencies",
+		OperationClass: "read",
+		TargetEntity:   body.EntityType,
+		TargetEntityID: body.EntityID,
+		Params: map[string]interface{}{
+			"entity_type": body.EntityType,
+			"entity_id":   body.EntityID,
+			"pattern":     body.Pattern,
+			"max_depth":   body.MaxDepth,
+		},
+		RawCredentials: parseCredentials(r),
+		ClientIP:       clientIP(r),
+		UserAgent:      r.UserAgent(),
+		RequestID:      newRequestID(),
+		ReceivedAt:     time.Now().UTC(),
+	})
+
+	if !resp.Success {
+		writeGateResponse(w, resp)
+		return
+	}
+
+	nodes, err := getDependencies(h.db, body.EntityType, body.EntityID, body.Pattern, body.MaxDepth)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]interface{}{
+			"success": false, "error": err.Error(), "audit_entry_id": resp.AuditEntryID,
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"success": true, "data": nodes, "audit_entry_id": resp.AuditEntryID,
+		"warnings": resp.Warnings,
+	})
+}
+
+// ChangeSetView handles POST /api/v1/changeset/view
+func (h *Handlers) ChangeSetView(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodPost) {
+		return
+	}
+
+	var body struct {
+		ChangeSetID int    `json:"change_set_id"`
+		ViewMode    string `json:"view_mode"`
+	}
+	if err := parseJSONBody(r, &body); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]interface{}{
+			"success": false, "error": err.Error(),
+		})
+		return
+	}
+
+	resp := h.gate.ProcessRequest(&gate.GateRequest{
+		Operation:      "changeset_view",
+		OperationClass: "read",
+		TargetEntity:   "change_set",
+		TargetEntityID: body.ChangeSetID,
+		Params:         map[string]interface{}{"change_set_id": body.ChangeSetID, "view_mode": body.ViewMode},
+		RawCredentials: parseCredentials(r),
+		ClientIP:       clientIP(r),
+		UserAgent:      r.UserAgent(),
+		RequestID:      newRequestID(),
+		ReceivedAt:     time.Now().UTC(),
+	})
+
+	if !resp.Success {
+		writeGateResponse(w, resp)
+		return
+	}
+
+	result, err := queryChangeSetView(h.db, body.ChangeSetID)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]interface{}{
+			"success": false, "error": err.Error(), "audit_entry_id": resp.AuditEntryID,
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"success": true, "data": result, "audit_entry_id": resp.AuditEntryID,
+		"warnings": resp.Warnings,
+	})
+}
+
+// ---------------------------------------------------------------------------
+// Domain functions — read queries (called by handlers after gate validates)
+// ---------------------------------------------------------------------------
+
+// getEntity fetches one entity row by primary key. Returns current state
 // with all fields the caller is authorized to see.
-func GetEntity(db *pg.DB, schema *runtimeschema.RuntimeSchema, entityType string, entityID int, omittedFields []string) (*EntityRow, error) {
+func getEntity(db *pg.DB, schema *runtimeschema.RuntimeSchema, entityType string, entityID int, omittedFields []string) (*EntityRow, error) {
 	_, found := schema.GetEntityType(entityType)
 	if !found {
 		return nil, fmt.Errorf("unknown entity type: %s", entityType)
@@ -116,7 +675,6 @@ func GetEntity(db *pg.DB, schema *runtimeschema.RuntimeSchema, entityType string
 		return nil, fmt.Errorf("row scan failed: %w", err)
 	}
 
-	// apply field omissions from authorization
 	for _, omitted := range omittedFields {
 		delete(fieldValues, omitted)
 	}
@@ -127,7 +685,6 @@ func GetEntity(db *pg.DB, schema *runtimeschema.RuntimeSchema, entityType string
 		Fields:     fieldValues,
 	}
 
-	// extract version stamp if the entity is versioned
 	if schema.IsVersioned(entityType) {
 		versionSerial, err := readCurrentVersionSerial(db, entityType, entityID)
 		if err == nil && versionSerial > 0 {
@@ -138,9 +695,9 @@ func GetEntity(db *pg.DB, schema *runtimeschema.RuntimeSchema, entityType string
 	return result, nil
 }
 
-// GetEntityHistory fetches the version chain for one entity. Returns all
+// getEntityHistory fetches the version chain for one entity. Returns all
 // versions ordered by version_serial descending (newest first).
-func GetEntityHistory(db *pg.DB, schema *runtimeschema.RuntimeSchema, entityType string, entityID int, startTime *time.Time, endTime *time.Time) ([]VersionRow, error) {
+func getEntityHistory(db *pg.DB, schema *runtimeschema.RuntimeSchema, entityType string, entityID int, startTime *time.Time, endTime *time.Time) ([]VersionRow, error) {
 	if !schema.IsVersioned(entityType) {
 		return nil, fmt.Errorf("entity type %s is not versioned", entityType)
 	}
@@ -224,9 +781,8 @@ func GetEntityHistory(db *pg.DB, schema *runtimeschema.RuntimeSchema, entityType
 	return versions, rows.Err()
 }
 
-// GetEntityAtTime reconstructs field values active at a specific timestamp.
-// Finds the version that was active at that point in time.
-func GetEntityAtTime(db *pg.DB, schema *runtimeschema.RuntimeSchema, entityType string, entityID int, timestamp time.Time) (*VersionRow, error) {
+// getEntityAtTime reconstructs field values active at a specific timestamp.
+func getEntityAtTime(db *pg.DB, schema *runtimeschema.RuntimeSchema, entityType string, entityID int, timestamp time.Time) (*VersionRow, error) {
 	if !schema.IsVersioned(entityType) {
 		return nil, fmt.Errorf("entity type %s is not versioned", entityType)
 	}
@@ -282,16 +838,15 @@ func GetEntityAtTime(db *pg.DB, schema *runtimeschema.RuntimeSchema, entityType 
 	return vr, nil
 }
 
-// Search is the discovery surface across entity types. Builds a SQL query
+// search is the discovery surface across entity types. Builds a SQL query
 // from structured parameters with enforced bounds on result size, join
 // depth, predicate count, and query time.
-func Search(db *pg.DB, schema *runtimeschema.RuntimeSchema, params *SearchParams, omittedFields []string) (*SearchResult, error) {
+func search(db *pg.DB, schema *runtimeschema.RuntimeSchema, params *SearchParams, omittedFields []string) (*SearchResult, error) {
 	_, found := schema.GetEntityType(params.EntityType)
 	if !found {
 		return nil, fmt.Errorf("unknown entity type: %s", params.EntityType)
 	}
 
-	// enforce bounds
 	if params.Limit <= 0 {
 		params.Limit = defaultSearchLimit
 	}
@@ -307,14 +862,12 @@ func Search(db *pg.DB, schema *runtimeschema.RuntimeSchema, params *SearchParams
 			len(params.Joins), maxJoinDepth)
 	}
 
-	// build query
 	selectClause := buildSelectClause(params.EntityType, params.Projection, schema, omittedFields)
 	fromClause := pg.QuoteIdentifier(params.EntityType)
 	joinClause := buildJoinClause(params.EntityType, params.Joins, schema)
 	whereClause, whereArgs := buildWhereClause(params.EntityType, params.Filters, params.MaxStaleness)
 	orderClause := buildOrderClause(params.Ordering)
 
-	// count query for total
 	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM %s %s %s",
 		fromClause, joinClause, whereClause)
 
@@ -324,7 +877,6 @@ func Search(db *pg.DB, schema *runtimeschema.RuntimeSchema, params *SearchParams
 		return nil, fmt.Errorf("count query failed: %w", err)
 	}
 
-	// data query with pagination
 	dataQuery := fmt.Sprintf("SELECT %s FROM %s %s %s %s LIMIT %d OFFSET %d",
 		selectClause, fromClause, joinClause, whereClause, orderClause,
 		params.Limit, params.Offset)
@@ -347,7 +899,6 @@ func Search(db *pg.DB, schema *runtimeschema.RuntimeSchema, params *SearchParams
 			return nil, fmt.Errorf("row scan failed: %w", err)
 		}
 
-		// apply field omissions
 		for _, omitted := range omittedFields {
 			delete(fieldValues, omitted)
 		}
@@ -364,12 +915,10 @@ func Search(db *pg.DB, schema *runtimeschema.RuntimeSchema, params *SearchParams
 		TotalCount: totalCount,
 	}
 
-	// build freshness summary for observation cache queries
 	if isObservationCacheTable(params.EntityType) {
 		result.FreshnessSummary = buildFreshnessSummary(resultRows)
 	}
 
-	// compute cursor for pagination
 	if len(resultRows) > 0 && len(resultRows) == params.Limit {
 		result.Cursor = computeCursor(params.Offset + params.Limit)
 	}
@@ -377,9 +926,8 @@ func Search(db *pg.DB, schema *runtimeschema.RuntimeSchema, params *SearchParams
 	return result, nil
 }
 
-// GetDependencies walks the substrate hierarchy or service connection graph.
-// Supports multiple walk patterns with cycle detection and depth bounds.
-func GetDependencies(db *pg.DB, startEntity string, startID int, pattern string, maxDepth int) ([]DependencyNode, error) {
+// getDependencies walks the substrate hierarchy or service connection graph.
+func getDependencies(db *pg.DB, startEntity string, startID int, pattern string, maxDepth int) ([]DependencyNode, error) {
 	if maxDepth <= 0 {
 		maxDepth = 10
 	}
@@ -391,44 +939,203 @@ func GetDependencies(db *pg.DB, startEntity string, startID int, pattern string,
 	case "substrate_parent_chain":
 		return walkParentChain(db, "megavisor_instance", "parent_megavisor_instance_id",
 			startID, maxDepth)
-
 	case "service_connections":
 		return walkServiceConnections(db, startID, maxDepth)
-
 	case "location_ancestry":
 		return walkParentChain(db, "location", "parent_location_id",
 			startID, maxDepth)
-
 	case "host_group_machines":
 		return walkHostGroupMachines(db, startID)
-
 	case "service_package_chain":
 		return walkServicePackages(db, startID)
-
 	default:
 		return nil, fmt.Errorf("unknown dependency pattern: %s", pattern)
 	}
 }
 
-// --- query building helpers ---
+// queryChangeSetView fetches a complete change set view including field
+// changes, approvals, rejections, and requirements.
+func queryChangeSetView(db *pg.DB, changeSetID int) (*ChangeSetViewResult, error) {
+	// read the change set row
+	var status, name, reason string
+	var isEmergency, isBulk bool
+	var submittedBy *int
+	var submittedTime *time.Time
+
+	err := db.QueryRow(
+		"SELECT status, name, reason, is_emergency, is_bulk, "+
+			"submitted_by_ops_user_id, submitted_time "+
+			"FROM change_set WHERE id = $1",
+		changeSetID,
+	).Scan(&status, &name, &reason, &isEmergency, &isBulk, &submittedBy, &submittedTime)
+	if err != nil {
+		if pg.IsNoRows(err) {
+			return nil, fmt.Errorf("change_set with id=%d not found", changeSetID)
+		}
+		return nil, fmt.Errorf("change_set query failed: %w", err)
+	}
+
+	result := &ChangeSetViewResult{
+		ChangeSetID:   changeSetID,
+		Status:        status,
+		Name:          name,
+		Reason:        reason,
+		IsEmergency:   isEmergency,
+		IsBulk:        isBulk,
+		SubmittedBy:   submittedBy,
+		SubmittedTime: submittedTime,
+	}
+
+	// read field changes
+	fcRows, err := db.Query(
+		"SELECT id, target_entity_type, target_entity_id, field_name, "+
+			"before_value, after_value, change_type, applied_status, apply_order "+
+			"FROM change_set_field_change WHERE change_set_id = $1 ORDER BY apply_order",
+		changeSetID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("field change query failed: %w", err)
+	}
+	defer fcRows.Close()
+
+	for fcRows.Next() {
+		var fcID, entityID, applyOrder int
+		var entityType, fieldName, changeType, appliedStatus string
+		var beforeValue, afterValue interface{}
+		if err := fcRows.Scan(&fcID, &entityType, &entityID, &fieldName,
+			&beforeValue, &afterValue, &changeType, &appliedStatus, &applyOrder); err != nil {
+			return nil, fmt.Errorf("field change scan failed: %w", err)
+		}
+		result.FieldChanges = append(result.FieldChanges, map[string]interface{}{
+			"id":                 fcID,
+			"target_entity_type": entityType,
+			"target_entity_id":   entityID,
+			"field_name":         fieldName,
+			"before_value":       beforeValue,
+			"after_value":        afterValue,
+			"change_type":        changeType,
+			"applied_status":     appliedStatus,
+			"apply_order":        applyOrder,
+		})
+	}
+	if err := fcRows.Err(); err != nil {
+		return nil, fmt.Errorf("field change iteration failed: %w", err)
+	}
+
+	// read approvals
+	approvalRows, err := db.Query(
+		"SELECT id, approved_by_ops_user_id, comment, created_time "+
+			"FROM change_set_approval WHERE change_set_id = $1 ORDER BY created_time",
+		changeSetID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("approval query failed: %w", err)
+	}
+	defer approvalRows.Close()
+
+	for approvalRows.Next() {
+		var aID, approverID int
+		var comment string
+		var createdTime time.Time
+		if err := approvalRows.Scan(&aID, &approverID, &comment, &createdTime); err != nil {
+			return nil, fmt.Errorf("approval scan failed: %w", err)
+		}
+		result.Approvals = append(result.Approvals, map[string]interface{}{
+			"id":           aID,
+			"approver_id":  approverID,
+			"comment":      comment,
+			"created_time": createdTime,
+		})
+	}
+	if err := approvalRows.Err(); err != nil {
+		return nil, fmt.Errorf("approval iteration failed: %w", err)
+	}
+
+	// read rejections
+	rejectionRows, err := db.Query(
+		"SELECT id, rejected_by_ops_user_id, reason, created_time "+
+			"FROM change_set_rejection WHERE change_set_id = $1 ORDER BY created_time",
+		changeSetID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("rejection query failed: %w", err)
+	}
+	defer rejectionRows.Close()
+
+	for rejectionRows.Next() {
+		var rID, rejectorID int
+		var rejReason string
+		var createdTime time.Time
+		if err := rejectionRows.Scan(&rID, &rejectorID, &rejReason, &createdTime); err != nil {
+			return nil, fmt.Errorf("rejection scan failed: %w", err)
+		}
+		result.Rejections = append(result.Rejections, map[string]interface{}{
+			"id":           rID,
+			"rejector_id":  rejectorID,
+			"reason":       rejReason,
+			"created_time": createdTime,
+		})
+	}
+	if err := rejectionRows.Err(); err != nil {
+		return nil, fmt.Errorf("rejection iteration failed: %w", err)
+	}
+
+	// read approval requirements
+	reqRows, err := db.Query(
+		"SELECT car.id, car.approval_rule_id, car.required_group_id, "+
+			"car.required_count, car.fulfilled_count, car.is_fulfilled, "+
+			"COALESCE(g.name, '') AS group_name "+
+			"FROM change_set_approval_required car "+
+			"LEFT JOIN ops_group g ON g.id = car.required_group_id "+
+			"WHERE car.change_set_id = $1",
+		changeSetID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("requirements query failed: %w", err)
+	}
+	defer reqRows.Close()
+
+	for reqRows.Next() {
+		var reqID, ruleID, groupID, requiredCount, fulfilledCount int
+		var isFulfilled bool
+		var groupName string
+		if err := reqRows.Scan(&reqID, &ruleID, &groupID, &requiredCount,
+			&fulfilledCount, &isFulfilled, &groupName); err != nil {
+			return nil, fmt.Errorf("requirement scan failed: %w", err)
+		}
+		result.Requirements = append(result.Requirements, map[string]interface{}{
+			"id":              reqID,
+			"rule_id":         ruleID,
+			"group_id":        groupID,
+			"group_name":      groupName,
+			"required_count":  requiredCount,
+			"fulfilled_count": fulfilledCount,
+			"is_fulfilled":    isFulfilled,
+		})
+	}
+	if err := reqRows.Err(); err != nil {
+		return nil, fmt.Errorf("requirement iteration failed: %w", err)
+	}
+
+	return result, nil
+}
+
+// ---------------------------------------------------------------------------
+// Query building helpers
+// ---------------------------------------------------------------------------
 
 func buildSelectClause(entityType string, projection string, schema *runtimeschema.RuntimeSchema, omittedFields []string) string {
 	tableName := pg.QuoteIdentifier(entityType)
 
 	switch projection {
 	case "summary":
-		// summary mode returns id, name/label, status, and timestamps
 		return fmt.Sprintf("%s.id, %s.created_time, %s.updated_time",
 			tableName, tableName, tableName)
-
 	case "full_with_history":
 		return tableName + ".*"
-
 	case "":
 		return tableName + ".*"
-
 	default:
-		// explicit field list
 		if strings.Contains(projection, ",") {
 			fields := strings.Split(projection, ",")
 			qualified := make([]string, 0, len(fields))
@@ -454,7 +1161,6 @@ func buildJoinClause(entityType string, joins []string, schema *runtimeschema.Ru
 
 	var clauses []string
 	for _, joinTarget := range joins {
-		// look up relationship from schema
 		rels := schema.GetRelationships(entityType)
 		for _, rel := range rels {
 			if rel.TargetEntity == joinTarget {
@@ -490,7 +1196,6 @@ func buildWhereClause(entityType string, filters []FilterPredicate, maxStaleness
 		}
 	}
 
-	// freshness filter for observation cache tables
 	if maxStaleness > 0 && isObservationCacheTable(entityType) {
 		conditions = append(conditions,
 			fmt.Sprintf("%s._observed_time >= NOW() - INTERVAL '%d seconds'",
@@ -555,7 +1260,6 @@ func buildFilterCondition(entityType string, f FilterPredicate, argIdx *int) (st
 		return fmt.Sprintf("%s IN (%s)", qualifiedField, strings.Join(placeholders, ", ")), args
 
 	case "like":
-		// anchored pattern only — prefix% or %suffix — no regex
 		strVal, ok := f.Value.(string)
 		if !ok {
 			return "", nil
@@ -606,15 +1310,15 @@ func buildOrderClause(ordering []OrderSpec) string {
 		parts = append(parts, fmt.Sprintf("%s %s", pg.QuoteIdentifier(o.Field), dir))
 	}
 
-	// always tie-break by id for deterministic pagination
 	parts = append(parts, "id ASC")
 
 	return "ORDER BY " + strings.Join(parts, ", ")
 }
 
-// --- dependency walk implementations ---
+// ---------------------------------------------------------------------------
+// Dependency walk implementations
+// ---------------------------------------------------------------------------
 
-// walkParentChain walks a self-referential parent_id chain up to the root.
 func walkParentChain(db *pg.DB, entityType string, parentColumn string, startID int, maxDepth int) ([]DependencyNode, error) {
 	query := fmt.Sprintf(
 		"WITH RECURSIVE chain AS ("+
@@ -659,18 +1363,16 @@ func walkParentChain(db *pg.DB, entityType string, parentColumn string, startID 
 	return nodes, rows.Err()
 }
 
-// walkServiceConnections walks service_connection rows from a source service.
 func walkServiceConnections(db *pg.DB, serviceID int, maxDepth int) ([]DependencyNode, error) {
-	query := fmt.Sprintf(
-		"WITH RECURSIVE deps AS (" +
-			"SELECT destination_service_id AS id, 1 AS depth " +
-			"FROM service_connection WHERE source_service_id = $1 AND is_active = true " +
-			"UNION ALL " +
-			"SELECT sc.destination_service_id, d.depth + 1 " +
-			"FROM service_connection sc " +
-			"JOIN deps d ON sc.source_service_id = d.id " +
-			"WHERE d.depth < $2 AND sc.is_active = true" +
-			") SELECT DISTINCT id, depth FROM deps ORDER BY depth ASC, id ASC")
+	query := "WITH RECURSIVE deps AS (" +
+		"SELECT destination_service_id AS id, 1 AS depth " +
+		"FROM service_connection WHERE source_service_id = $1 AND is_active = true " +
+		"UNION ALL " +
+		"SELECT sc.destination_service_id, d.depth + 1 " +
+		"FROM service_connection sc " +
+		"JOIN deps d ON sc.source_service_id = d.id " +
+		"WHERE d.depth < $2 AND sc.is_active = true" +
+		") SELECT DISTINCT id, depth FROM deps ORDER BY depth ASC, id ASC"
 
 	rows, err := db.Query(query, serviceID, maxDepth)
 	if err != nil {
@@ -678,7 +1380,6 @@ func walkServiceConnections(db *pg.DB, serviceID int, maxDepth int) ([]Dependenc
 	}
 	defer rows.Close()
 
-	// include the starting service as depth 0
 	nodes := []DependencyNode{{
 		EntityType: "service",
 		EntityID:   serviceID,
@@ -702,7 +1403,6 @@ func walkServiceConnections(db *pg.DB, serviceID int, maxDepth int) ([]Dependenc
 	return nodes, rows.Err()
 }
 
-// walkHostGroupMachines returns all machines in a host group.
 func walkHostGroupMachines(db *pg.DB, hostGroupID int) ([]DependencyNode, error) {
 	rows, err := db.Query(
 		"SELECT hgm.machine_id FROM host_group_machine hgm "+
@@ -738,7 +1438,6 @@ func walkHostGroupMachines(db *pg.DB, hostGroupID int) ([]DependencyNode, error)
 	return nodes, rows.Err()
 }
 
-// walkServicePackages returns all packages installed on a service.
 func walkServicePackages(db *pg.DB, serviceID int) ([]DependencyNode, error) {
 	rows, err := db.Query(
 		"SELECT sp.package_id, sp.install_order FROM service_package sp "+
@@ -777,9 +1476,11 @@ func walkServicePackages(db *pg.DB, serviceID int) ([]DependencyNode, error) {
 	return nodes, rows.Err()
 }
 
-// --- utility helpers ---
+// ---------------------------------------------------------------------------
+// Utility helpers
+// ---------------------------------------------------------------------------
 
-// scanRowToMap scans a database row into a map of column name → value.
+// scanRowToMap scans a database row into a map of column name to value.
 func scanRowToMap(rows pg.Rows, columns []string) (map[string]interface{}, error) {
 	values := make([]interface{}, len(columns))
 	valuePtrs := make([]interface{}, len(columns))
@@ -860,12 +1561,12 @@ func buildFreshnessSummary(rows []map[string]interface{}) map[string]interface{}
 	}
 
 	return map[string]interface{}{
-		"row_count":                count,
-		"oldest_observation":       oldestObservation.Format(time.RFC3339),
-		"newest_observation":       newestObservation.Format(time.RFC3339),
-		"max_staleness_seconds":    int(now.Sub(oldestObservation).Seconds()),
-		"min_staleness_seconds":    int(now.Sub(newestObservation).Seconds()),
-		"avg_staleness_seconds":    int(totalStaleness / float64(count)),
+		"row_count":             count,
+		"oldest_observation":    oldestObservation.Format(time.RFC3339),
+		"newest_observation":    newestObservation.Format(time.RFC3339),
+		"max_staleness_seconds": int(now.Sub(oldestObservation).Seconds()),
+		"min_staleness_seconds": int(now.Sub(newestObservation).Seconds()),
+		"avg_staleness_seconds": int(totalStaleness / float64(count)),
 	}
 }
 
