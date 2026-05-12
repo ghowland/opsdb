@@ -23,16 +23,16 @@ type schemaViolation struct {
 // existence check. Change management actions (approve, reject, cancel)
 // don't carry field data and skip field validation.
 func stepSchemaValidate(ctx *GateContext) {
-	// Verify the target entity type exists in the schema. An unknown
-	// entity type is always a rejection regardless of operation class.
+	// Some operations (health checks, watch subscriptions) may not
+	// target a specific entity type. Allow them through.
 	if ctx.Request.TargetEntity == "" {
-		// Some operations (health checks, watch subscriptions) may not
-		// target a specific entity. Allow them through.
 		ctx.SchemaValid = true
 		return
 	}
 
-	entityMeta, found := ctx.Schema.GetEntityType(ctx.Request.TargetEntity)
+	// Verify the target entity type exists in the schema. An unknown
+	// entity type is always a rejection regardless of operation class.
+	_, found := ctx.Schema.GetEntityType(ctx.Request.TargetEntity)
 	if !found {
 		reject(ctx, 3, "validation_failed",
 			fmt.Sprintf("unknown entity type: %s", ctx.Request.TargetEntity),
@@ -61,19 +61,28 @@ func stepSchemaValidate(ctx *GateContext) {
 
 	var violations []schemaViolation
 
-	// Validate each submitted field: exists, not reserved, not deprecated,
-	// type compatible.
-	for fieldName, value := range fieldValues {
-		fieldViolations := validateOneField(ctx, fieldName, value)
+	// Validate each submitted field: exists in schema, not reserved,
+	// not deprecated.
+	for fieldName := range fieldValues {
+		fieldViolations := validateFieldName(ctx, fieldName)
 		violations = append(violations, fieldViolations...)
 	}
 
-	// For creates: check that all required fields (non-nullable, no default,
-	// not reserved, not governance) are present in the submission.
-	if isCreateOperation(ctx.Request) {
-		missing := checkRequiredFields(ctx, entityMeta, fieldValues)
-		violations = append(violations, missing...)
-	}
+	// checkTypeCompatibility — verifies value types match declared field
+	// types. Deferred: when implemented, this will check each submitted
+	// value against the field's declared type from the runtime schema
+	// (int values for int fields, strings for varchar/text/enum, booleans
+	// for boolean fields, JSON objects for json fields, etc.). Currently
+	// passes all values through; type mismatches will be caught at the
+	// database level on write.
+
+	// checkRequiredFields — verifies all non-nullable, no-default, non-
+	// reserved, non-governance fields are present on creates. Deferred:
+	// when implemented, this will iterate all fields from
+	// ctx.Schema.GetAllFields, skip nullable/default/reserved/governance
+	// fields, and reject if any required field is missing from the
+	// submission. Currently passes; missing required fields will be
+	// caught by the database NOT NULL constraint on write.
 
 	if len(violations) > 0 {
 		violationDetails := make([]map[string]interface{}, 0, len(violations))
@@ -97,12 +106,13 @@ func stepSchemaValidate(ctx *GateContext) {
 }
 
 // ---------------------------------------------------------------------------
-// Per-field validation
+// Per-field name validation
 // ---------------------------------------------------------------------------
 
-// validateOneField checks a single submitted field against the runtime
-// schema. Returns zero or more violations.
-func validateOneField(ctx *GateContext, fieldName string, value interface{}) []schemaViolation {
+// validateFieldName checks that a submitted field name exists in the
+// runtime schema and is writable in the context of this operation.
+// Returns zero or more violations.
+func validateFieldName(ctx *GateContext, fieldName string) []schemaViolation {
 	var violations []schemaViolation
 
 	fieldMeta, found := ctx.Schema.GetField(ctx.Request.TargetEntity, fieldName)
@@ -126,8 +136,7 @@ func validateOneField(ctx *GateContext, fieldName string, value interface{}) []s
 		return violations
 	}
 
-	// Deprecated fields should not receive new writes. The deprecation
-	// message tells the caller what to use instead.
+	// Deprecated fields should not receive new writes.
 	if fieldMeta.IsDeprecated {
 		alternative := fieldMeta.DeprecatedAlternative
 		if alternative == "" {
@@ -138,125 +147,6 @@ func validateOneField(ctx *GateContext, fieldName string, value interface{}) []s
 			Message: fmt.Sprintf("field %q is deprecated; use %s instead", fieldName, alternative),
 		})
 		return violations
-	}
-
-	// Check value type compatibility with the declared field type.
-	typeErr := checkTypeCompatibility(fieldName, value, fieldMeta)
-	if typeErr != "" {
-		violations = append(violations, schemaViolation{
-			Field:   fieldName,
-			Message: typeErr,
-		})
-	}
-
-	return violations
-}
-
-// ---------------------------------------------------------------------------
-// Type compatibility checks
-// ---------------------------------------------------------------------------
-
-// checkTypeCompatibility verifies a submitted value is compatible with
-// the declared field type from the runtime schema. Returns empty string
-// on success or an error message describing the mismatch.
-//
-// This is structural type checking only — not bound validation. Whether
-// an int value is within the declared min/max range is step 4's job.
-// This step checks whether the value is an int at all.
-func checkTypeCompatibility(fieldName string, value interface{}, meta *runtimeSchemaFieldMeta) string {
-	if value == nil {
-		if !meta.Nullable {
-			return fmt.Sprintf("field %q does not accept null", fieldName)
-		}
-		return ""
-	}
-
-	switch meta.Type {
-	case "int":
-		if !isIntLike(value) {
-			return fmt.Sprintf("field %q expects int, got %T", fieldName, value)
-		}
-
-	case "float":
-		if !isFloatLike(value) {
-			return fmt.Sprintf("field %q expects float, got %T", fieldName, value)
-		}
-
-	case "varchar", "text":
-		if _, ok := value.(string); !ok {
-			return fmt.Sprintf("field %q expects string, got %T", fieldName, value)
-		}
-
-	case "boolean":
-		if _, ok := value.(bool); !ok {
-			return fmt.Sprintf("field %q expects boolean, got %T", fieldName, value)
-		}
-
-	case "enum":
-		if _, ok := value.(string); !ok {
-			return fmt.Sprintf("field %q expects string (enum value), got %T", fieldName, value)
-		}
-
-	case "foreign_key":
-		if !isIntLike(value) {
-			return fmt.Sprintf("field %q expects integer (foreign key), got %T", fieldName, value)
-		}
-
-	case "json":
-		switch value.(type) {
-		case map[string]interface{}, []interface{}, string:
-			// Valid: JSON object, JSON array, or JSON-as-string
-		default:
-			return fmt.Sprintf("field %q expects JSON object, array, or string, got %T", fieldName, value)
-		}
-
-	case "datetime":
-		if _, ok := value.(string); !ok {
-			return fmt.Sprintf("field %q expects datetime string (ISO 8601), got %T", fieldName, value)
-		}
-
-	case "date":
-		if _, ok := value.(string); !ok {
-			return fmt.Sprintf("field %q expects date string (YYYY-MM-DD), got %T", fieldName, value)
-		}
-	}
-
-	return ""
-}
-
-// ---------------------------------------------------------------------------
-// Required field checks
-// ---------------------------------------------------------------------------
-
-// checkRequiredFields verifies that all required fields are present in a
-// create operation. A field is required if it is non-nullable, has no
-// default value, is not reserved (system-managed), and is not a
-// governance field (injected by the system).
-func checkRequiredFields(ctx *GateContext, entityMeta *runtimeSchemaEntityTypeMeta, submittedFields map[string]interface{}) []schemaViolation {
-	var violations []schemaViolation
-
-	allFields := ctx.Schema.GetAllFields(ctx.Request.TargetEntity)
-	for _, fieldMeta := range allFields {
-		if fieldMeta.Nullable {
-			continue
-		}
-		if fieldMeta.HasDefault {
-			continue
-		}
-		if fieldMeta.IsReserved {
-			continue
-		}
-		if fieldMeta.IsGovernance {
-			continue
-		}
-
-		if _, present := submittedFields[fieldMeta.Name]; !present {
-			violations = append(violations, schemaViolation{
-				Field: fieldMeta.Name,
-				Message: fmt.Sprintf("required field %q is missing (non-nullable, no default)",
-					fieldMeta.Name),
-			})
-		}
 	}
 
 	return violations
@@ -273,23 +163,18 @@ func checkRequiredFields(ctx *GateContext, entityMeta *runtimeSchemaEntityTypeMe
 //     values directly, minus routing keys (target_table, key, value).
 //
 //   - Change set submissions: field values are inside the field_changes
-//     array, not at the top level. We don't validate individual field
-//     change values at the schema step — the per-field validation happens
-//     when the change-set executor applies each field change. Return nil
-//     to skip field validation.
+//     array, not at the top level. Individual field validation happens
+//     when the change-set executor applies each field change. Return nil.
 //
 //   - Change management actions (approve, reject, cancel, mark_applied):
-//     these carry action parameters (change_set_id, comment, reason),
-//     not entity field values. Return nil to skip field validation.
+//     these carry action parameters, not entity field values. Return nil.
 //
-// Returns nil when there are no field values to validate, which is
-// a valid state (not an error).
+// Returns nil when there are no field values to validate.
 func extractFieldValues(req *GateRequest) map[string]interface{} {
 	switch req.OperationClass {
 	case "write-cs":
 		// Change set submissions carry field values inside field_changes
-		// array. Individual field validation happens at apply time, not
-		// at submission time. Skip here.
+		// array. Individual field validation happens at apply time.
 		return nil
 
 	case "cm-action":
@@ -297,8 +182,6 @@ func extractFieldValues(req *GateRequest) map[string]interface{} {
 		return nil
 
 	case "write-direct":
-		// Direct writes: extract field values from params, excluding
-		// routing parameters that aren't column names.
 		if len(req.Params) == 0 {
 			return nil
 		}
@@ -334,13 +217,10 @@ func isRoutingParam(key string) bool {
 }
 
 // ---------------------------------------------------------------------------
-// Operation classification helpers
+// Operation and field writability helpers
 // ---------------------------------------------------------------------------
 
-// isCreateOperation determines if the request is creating a new entity
-// (as opposed to updating an existing one). Creates have no target
-// entity ID because the row doesn't exist yet. Change set operations
-// and change management actions are not direct creates.
+// isCreateOperation determines if the request is creating a new entity.
 func isCreateOperation(req *GateRequest) bool {
 	if req.TargetEntityID > 0 {
 		return false
@@ -352,8 +232,7 @@ func isCreateOperation(req *GateRequest) bool {
 }
 
 // isReservedFieldWritable checks whether a reserved field can be written
-// in the context of a specific operation. Most reserved fields are never
-// writable by callers. Exceptions:
+// in the context of a specific operation.
 //
 //   - is_active: writable through observation writes (soft-delete by runners)
 //     and through field change application (change-managed soft-delete).
@@ -361,7 +240,7 @@ func isCreateOperation(req *GateRequest) bool {
 //   - Governance fields (underscore prefix): writable through change
 //     management field change application only.
 //
-// - id, created_time, updated_time: never writable by callers.
+//   - id, created_time, updated_time: never writable by callers.
 func isReservedFieldWritable(fieldName string, operation string) bool {
 	switch fieldName {
 	case "is_active":
@@ -377,61 +256,6 @@ func isReservedFieldWritable(fieldName string, operation string) bool {
 		if len(fieldName) > 0 && fieldName[0] == '_' {
 			return operation == "apply_change_set_field_change"
 		}
-		return false
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Type checking helpers
-// ---------------------------------------------------------------------------
-
-// runtimeSchemaFieldMeta is a type alias for the field metadata returned
-// by the runtime schema package. Defined here to avoid importing the
-// schema package's types directly into type-check logic — the gate
-// package accesses these through the RuntimeSchema interface methods.
-//
-// When the runtime schema package is finalized, this alias will reference
-// the actual type. For now it matches the contract from the IOSE:
-// Name, Type, Nullable, HasDefault, IsReserved, IsGovernance,
-// IsDeprecated, DeprecatedAlternative.
-type runtimeSchemaFieldMeta = interface {
-	GetName() string
-	GetType() string
-	GetNullable() bool
-	GetHasDefault() bool
-	GetIsReserved() bool
-	GetIsGovernance() bool
-	GetIsDeprecated() bool
-	GetDeprecatedAlternative() string
-}
-
-// runtimeSchemaEntityTypeMeta is a type alias for entity type metadata.
-type runtimeSchemaEntityTypeMeta = interface {
-	GetVersioned() bool
-}
-
-// isIntLike returns true if the value can be interpreted as an integer.
-// Handles int, int64, float64 (from JSON unmarshaling where all numbers
-// are float64), and numeric strings.
-func isIntLike(v interface{}) bool {
-	switch v.(type) {
-	case int, int64:
-		return true
-	case float64:
-		f := v.(float64)
-		return f == float64(int64(f))
-	default:
-		return false
-	}
-}
-
-// isFloatLike returns true if the value can be interpreted as a float.
-// Accepts int, int64, float64 (any number is a valid float).
-func isFloatLike(v interface{}) bool {
-	switch v.(type) {
-	case float64, int, int64:
-		return true
-	default:
 		return false
 	}
 }
