@@ -31,14 +31,17 @@ func main() {
 		os.Exit(2)
 	}
 
-	// load configuration
+	// Load configuration from the DOS config.yaml for this substrate.
 	cfg, err := config.LoadConfig(*configPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: failed to load config: %v\n", err)
 		os.Exit(2)
 	}
+	fmt.Fprintf(os.Stdout, "config loaded: substrate=%s site=%s\n", cfg.SubstrateName, cfg.SiteName)
 
-	// connect to database
+	// Connect to Postgres. The DSN was resolved from an environment variable
+	// by config.LoadConfig — the config file names the env var, not the DSN
+	// itself, because the DSN is a secret.
 	db, err := pg.Connect(cfg.DSN)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: failed to connect to database: %v\n", err)
@@ -53,7 +56,10 @@ func main() {
 	}
 	fmt.Fprintf(os.Stdout, "database connection established\n")
 
-	// load runtime schema from _schema_* tables
+	// Load the runtime schema from _schema_entity_type, _schema_field, and
+	// _schema_relationship tables. This is the API's cached view of what
+	// entities and fields exist — used by the gate for schema validation,
+	// bound validation, and column filtering on writes.
 	rtSchema, err := runtimeschema.LoadRuntimeSchema(db)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: failed to load runtime schema: %v\n", err)
@@ -61,7 +67,9 @@ func main() {
 	}
 	fmt.Fprintf(os.Stdout, "runtime schema loaded: %d entity types\n", rtSchema.EntityCount())
 
-	// initialize auth provider
+	// Initialize the auth provider. For now only the YAML backend is
+	// implemented. OIDC and service account providers will be added later;
+	// their cases return clear errors so the failure is obvious.
 	authProvider, err := newAuthProvider(cfg)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: failed to initialize auth provider: %v\n", err)
@@ -69,20 +77,28 @@ func main() {
 	}
 	fmt.Fprintf(os.Stdout, "auth provider initialized: %s\n", authProvider.Type())
 
-	// initialize report key enforcer
+	// Initialize the runner report key enforcer. This is consulted by the
+	// gate during write_observation calls to verify the runner is authorized
+	// to write the submitted key to the target observation table.
 	reportKeyEnforcer := reportkeys.NewEnforcer(db)
 
-	// initialize gate pipeline
+	// Create the gate pipeline with all its dependencies. The gate is the
+	// single entry point for every API operation — it runs the 10-step
+	// sequence (auth, authz, schema validate, bound validate, policy,
+	// versioning, change mgmt, audit, execute, response) uniformly on
+	// every request.
 	gatePipeline := gate.NewGate(db, rtSchema, authProvider, reportKeyEnforcer)
 
-	// initialize operation handlers
+	// Create the operation handlers. These own HTTP request parsing and
+	// response writing. Each handler constructs a GateRequest and delegates
+	// to gatePipeline.ProcessRequest for the actual processing.
 	ops := operations.NewHandlers(db, rtSchema, gatePipeline)
 
-	// register HTTP routes
+	// Register all HTTP routes.
 	mux := http.NewServeMux()
 	registerRoutes(mux, ops, gatePipeline)
 
-	// build HTTP server
+	// Build the HTTP server with conservative timeouts.
 	server := &http.Server{
 		Addr:              cfg.ListenAddress,
 		Handler:           mux,
@@ -93,7 +109,8 @@ func main() {
 		MaxHeaderBytes:    1 << 20, // 1 MB
 	}
 
-	// configure TLS if cert and key paths are provided
+	// Configure TLS if both cert and key paths are provided. Config
+	// validation already ensures both-or-neither.
 	if cfg.TLSCertPath != "" && cfg.TLSKeyPath != "" {
 		server.TLSConfig = &tls.Config{
 			MinVersion: tls.VersionTLS12,
@@ -112,14 +129,16 @@ func main() {
 		}
 	}
 
-	// start schema refresh goroutine — reloads runtime schema when
-	// _schema_version changes, so the API picks up schema applies
-	// without restart
+	// Start a background goroutine that polls _schema_version every 30
+	// seconds and reloads the runtime schema when a new version is detected.
+	// This lets the API pick up schema-executor applies without a full
+	// restart.
 	schemaRefreshCtx, schemaRefreshCancel := context.WithCancel(context.Background())
 	defer schemaRefreshCancel()
 	go refreshSchemaLoop(schemaRefreshCtx, db, rtSchema)
 
-	// start server in goroutine so we can handle shutdown signals
+	// Start the HTTP server in a goroutine so we can block on shutdown
+	// signals in the main goroutine.
 	serverErr := make(chan error, 1)
 	go func() {
 		if cfg.TLSCertPath != "" && cfg.TLSKeyPath != "" {
@@ -131,7 +150,7 @@ func main() {
 		}
 	}()
 
-	// block on shutdown signal or server error
+	// Block until we receive a shutdown signal or the server errors out.
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
@@ -144,7 +163,8 @@ func main() {
 		}
 	}
 
-	// graceful shutdown: stop accepting new connections, drain in-flight
+	// Graceful shutdown: stop the schema refresh loop, then drain
+	// in-flight HTTP requests with a 30-second timeout.
 	schemaRefreshCancel()
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer shutdownCancel()
@@ -156,28 +176,29 @@ func main() {
 	}
 
 	fmt.Fprintf(os.Stdout, "opsdb-api stopped\n")
-	os.Exit(0)
 }
 
-// newAuthProvider creates the appropriate auth provider based on config.
+// newAuthProvider creates the appropriate auth provider based on the
+// configured auth backend. Only YAML is implemented now; OIDC and
+// service account return clear errors.
 func newAuthProvider(cfg *config.Config) (auth.Provider, error) {
 	switch cfg.AuthBackend {
 	case "yaml":
 		return auth.NewYAMLProvider(cfg.AuthConfigPath)
 	case "oidc":
-		return auth.NewOIDCProvider(cfg.OIDCIssuer, cfg.OIDCClientID, cfg.OIDCAudience)
-	case "serviceaccount":
-		return auth.NewServiceAccountProvider(cfg.AuthConfigPath)
+		return nil, fmt.Errorf("oidc auth backend is not yet implemented")
+	case "serviceaccount", "service_account":
+		return nil, fmt.Errorf("service_account auth backend is not yet implemented")
 	default:
 		return nil, fmt.Errorf("unknown auth backend: %s", cfg.AuthBackend)
 	}
 }
 
-// registerRoutes maps HTTP paths to the 16 API operations.
-// All routes go through the gate pipeline which enforces the 10-step
-// sequence uniformly on every request.
+// registerRoutes maps HTTP paths to the 16 API operations plus health
+// and readiness probes. All API routes go through the gate pipeline
+// which enforces the 10-step sequence uniformly on every request.
 func registerRoutes(mux *http.ServeMux, ops *operations.Handlers, gatePipeline *gate.Gate) {
-	// read operations
+	// Read operations
 	mux.HandleFunc("/api/v1/entity/get", ops.GetEntity)
 	mux.HandleFunc("/api/v1/entity/history", ops.GetEntityHistory)
 	mux.HandleFunc("/api/v1/entity/at-time", ops.GetEntityAtTime)
@@ -186,42 +207,44 @@ func registerRoutes(mux *http.ServeMux, ops *operations.Handlers, gatePipeline *
 	mux.HandleFunc("/api/v1/authority/resolve", ops.ResolveAuthorityPointer)
 	mux.HandleFunc("/api/v1/changeset/view", ops.ChangeSetView)
 
-	// write operations — observation (direct write path)
+	// Write operations — observation (direct write path, no change management)
 	mux.HandleFunc("/api/v1/observation/write", ops.WriteObservation)
 
-	// write operations — change set path
+	// Write operations — change set path
 	mux.HandleFunc("/api/v1/changeset/submit", ops.SubmitChangeSet)
 	mux.HandleFunc("/api/v1/changeset/bulk-submit", ops.BulkSubmitChangeSet)
 	mux.HandleFunc("/api/v1/changeset/emergency-apply", ops.EmergencyApply)
 
-	// change management actions
+	// Change management actions
 	mux.HandleFunc("/api/v1/changeset/approve", ops.ApproveChangeSet)
 	mux.HandleFunc("/api/v1/changeset/reject", ops.RejectChangeSet)
 	mux.HandleFunc("/api/v1/changeset/cancel", ops.CancelChangeSet)
 
-	// executor operations (called by change-set-executor runner)
+	// Executor operations (called by the change-set-executor runner)
 	mux.HandleFunc("/api/v1/changeset/apply-field-change", ops.ApplyFieldChange)
 	mux.HandleFunc("/api/v1/changeset/mark-applied", ops.MarkApplied)
 
-	// streaming
+	// Streaming
 	mux.HandleFunc("/api/v1/watch", ops.Watch)
 
-	// health and readiness
+	// Health and readiness probes
 	mux.HandleFunc("/healthz", handleHealthz)
 	mux.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) {
 		handleReadyz(w, r, gatePipeline)
 	})
 }
 
-// handleHealthz is the liveness probe. Returns 200 if the process is running.
+// handleHealthz is the liveness probe. Returns 200 if the process is
+// running. No dependency checks — if the process can serve HTTP, it's live.
 func handleHealthz(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(`{"status":"ok"}`))
 }
 
-// handleReadyz is the readiness probe. Returns 200 if the API can serve
-// requests: database reachable, runtime schema loaded, auth provider ready.
+// handleReadyz is the readiness probe. Returns 200 only if the API can
+// actually serve requests: database is reachable, runtime schema is
+// loaded with at least one entity type, and auth provider is configured.
 func handleReadyz(w http.ResponseWriter, r *http.Request, g *gate.Gate) {
 	w.Header().Set("Content-Type", "application/json")
 	if !g.IsReady() {
@@ -233,9 +256,10 @@ func handleReadyz(w http.ResponseWriter, r *http.Request, g *gate.Gate) {
 	w.Write([]byte(`{"status":"ready"}`))
 }
 
-// refreshSchemaLoop periodically checks for schema version changes and
-// reloads the runtime schema when a new version is detected. This lets
-// the API pick up schema-executor applies without a full restart.
+// refreshSchemaLoop polls for schema version changes every 30 seconds
+// and reloads the runtime schema when a new version is detected. This
+// lets the API pick up schema applies from the schema-executor runner
+// without requiring a full restart.
 func refreshSchemaLoop(ctx context.Context, db *pg.DB, rtSchema *runtimeschema.RuntimeSchema) {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
@@ -247,6 +271,8 @@ func refreshSchemaLoop(ctx context.Context, db *pg.DB, rtSchema *runtimeschema.R
 		case <-ticker.C:
 			err := rtSchema.Refresh(db)
 			if err != nil {
+				// Log the error but don't crash — the API continues serving
+				// with the previously loaded schema. The next tick will retry.
 				fmt.Fprintf(os.Stderr, "schema refresh failed: %v\n", err)
 			}
 		}

@@ -2,7 +2,9 @@ package pg
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -150,6 +152,11 @@ func QueryRowInTx(tx *Tx, query string, args ...interface{}) pgx.Row {
 	return tx.tx.QueryRow(tx.ctx, query, args...)
 }
 
+// QueryRowInDB executes a query that returns at most one row, on the database directly.
+func QueryRowInDB(db *DB, query string, args ...interface{}) *sql.Row {
+	return db.pool.QueryRow(query, args...)
+}
+
 // Context returns the transaction's context. Used by callers that need
 // to pass context to sub-operations within the transaction scope.
 func (tx *Tx) Context() context.Context {
@@ -160,4 +167,11 @@ func (tx *Tx) Context() context.Context {
 // Prefer ExecInTx/QueryInTx/QueryRowInTx for normal operations.
 func (tx *Tx) Underlying() pgx.Tx {
 	return tx.tx
+}
+
+// QuoteIdentifier wraps a SQL identifier in double quotes with proper
+// escaping. Prevents SQL injection when table or column names are
+// constructed dynamically from schema metadata.
+func QuoteIdentifier(name string) string {
+	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
 }

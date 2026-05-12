@@ -9,17 +9,24 @@ import (
 )
 
 // stepAuthenticate is gate step 1: Authentication.
-// Validates caller credentials via the configured auth provider.
-// Resolves to ops_user (human), runner_machine (runner), or both (web-mediated).
+// Validates caller credentials via the configured auth provider and
+// resolves to an Identity. The identity carries ops_user_id (human),
+// runner_machine_id (runner), or both (web-application-mediated write
+// where a runner acts on behalf of a human).
+//
+// Rejects if: no auth provider configured, no credentials provided,
+// authentication fails, identity is nil, or identity has no resolved
+// principal (neither ops_user_id nor runner_machine_id).
 func stepAuthenticate(ctx *GateContext) {
 	if ctx.AuthProvider == nil {
-		reject(ctx, 1, "authentication_failed",
-			"no auth provider configured", nil)
+		reject(ctx, 1, "auth_not_configured",
+			"no authentication provider is configured", nil)
 		return
 	}
 
 	creds := ctx.Request.RawCredentials
-	if isEmpty(creds) {
+
+	if isCredentialsEmpty(creds) {
 		reject(ctx, 1, "authentication_failed",
 			"no credentials provided", map[string]interface{}{
 				"client_ip":  ctx.Request.ClientIP,
@@ -46,7 +53,12 @@ func stepAuthenticate(ctx *GateContext) {
 		return
 	}
 
-	// verify identity has at least one resolved principal
+	// The identity must have at least one resolved principal. A human
+	// has OpsUserID set. A runner has RunnerMachineID set. A web-mediated
+	// write has both. An identity with neither means the auth provider
+	// matched credentials but couldn't map them to an operational identity
+	// in the OpsDB — the user or service account exists in the IdP but
+	// has no corresponding ops_user or runner_machine row.
 	if !identity.IsHuman() && !identity.IsRunner() {
 		reject(ctx, 1, "authentication_failed",
 			"identity resolved but has no ops_user_id or runner_machine_id",
@@ -60,10 +72,14 @@ func stepAuthenticate(ctx *GateContext) {
 	ctx.Identity = identity
 }
 
-// isEmpty checks whether credentials contain any authentication data.
-func isEmpty(creds auth.Credentials) bool {
-	return !creds.HasBasicAuth() &&
-		!creds.HasBearerToken() &&
-		!creds.HasOIDCToken() &&
-		!creds.HasSAMLAssertion()
+// isCredentialsEmpty returns true if the credentials struct contains no
+// authentication material at all — no basic auth, no bearer token. This
+// is checked before calling the auth provider so we can give a clear
+// "no credentials provided" error rather than a provider-specific error
+// about missing fields.
+//
+// When OIDC and service account providers are added, this function
+// extends to check their credential fields as well.
+func isCredentialsEmpty(creds auth.Credentials) bool {
+	return !creds.HasBasicAuth() && !creds.HasBearerToken()
 }

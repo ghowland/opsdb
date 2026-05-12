@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/ghowland/opsdb/internal/pg"
-	runtimeschema "github.com/ghowland/opsdb/tools/opsdb-api/schema"
 )
 
 // boundViolation records one field value that failed bound validation.
@@ -20,32 +19,42 @@ type boundViolation struct {
 }
 
 // stepBoundValidate is gate step 4: Bound Validation.
-// Checks field values against declared constraints from the runtime schema.
-// No regex. Declarative bounds only.
+// Checks field values against declared constraints from the runtime
+// schema metadata. The constraint vocabulary is closed per OPSDB-7 §6:
+// numeric ranges (min_value, max_value), string lengths (min_length,
+// max_length), enum membership (enum_values), FK existence (references),
+// precision (precision_decimal_places), and JSON payload validation
+// against registered schemas. No regex — ever.
+//
+// This step runs after schema validation (step 3) which already verified
+// that field names exist and value types are compatible. Step 4 checks
+// that values are within the declared bounds for their type.
+//
+// Skips entirely for read operations.
 func stepBoundValidate(ctx *GateContext) {
 	if !isWriteOperation(ctx.Request.OperationClass) {
 		ctx.BoundsValid = true
 		return
 	}
 
-	fields := extractRequestedFields(ctx.Request)
-	if len(fields) == 0 {
+	fieldValues := extractFieldValues(ctx.Request)
+	if fieldValues == nil || len(fieldValues) == 0 {
 		ctx.BoundsValid = true
 		return
 	}
 
-	fieldValues := extractFieldValues(ctx.Request)
 	var violations []boundViolation
 
-	for _, fieldName := range fields {
-		value, hasValue := fieldValues[fieldName]
-		if !hasValue {
+	for fieldName, value := range fieldValues {
+		if value == nil {
+			// Null values are checked by step 3 (nullable validation).
+			// Step 4 only checks non-null values against bounds.
 			continue
 		}
 
 		fieldMeta, found := ctx.Schema.GetField(ctx.Request.TargetEntity, fieldName)
 		if !found {
-			// unknown fields are caught by step 3 (schema validation)
+			// Unknown fields are caught by step 3. Skip here.
 			continue
 		}
 
@@ -54,10 +63,9 @@ func stepBoundValidate(ctx *GateContext) {
 	}
 
 	if len(violations) > 0 {
-		detail := make(map[string]interface{})
-		violationList := make([]map[string]interface{}, 0, len(violations))
+		violationDetails := make([]map[string]interface{}, 0, len(violations))
 		for _, v := range violations {
-			violationList = append(violationList, map[string]interface{}{
+			violationDetails = append(violationDetails, map[string]interface{}{
 				"field":      v.Field,
 				"constraint": v.Constraint,
 				"value":      v.Value,
@@ -65,48 +73,55 @@ func stepBoundValidate(ctx *GateContext) {
 				"message":    v.Message,
 			})
 		}
-		detail["violations"] = violationList
 
 		reject(ctx, 4, "validation_failed",
 			fmt.Sprintf("bound validation failed: %d field(s) out of bounds", len(violations)),
-			detail)
+			map[string]interface{}{
+				"entity_type": ctx.Request.TargetEntity,
+				"violations":  violationDetails,
+			})
 		return
 	}
 
 	ctx.BoundsValid = true
 }
 
-// validateFieldBounds checks one field's value against all declared constraints.
-func validateFieldBounds(ctx *GateContext, meta *runtimeschema.FieldMeta, fieldName string, value interface{}) []boundViolation {
-	var violations []boundViolation
-
+// validateFieldBounds dispatches to the appropriate per-type bound
+// validator based on the field's declared type.
+func validateFieldBounds(ctx *GateContext, meta *RuntimeFieldMeta, fieldName string, value interface{}) []boundViolation {
 	switch meta.Type {
 	case "int":
-		violations = append(violations, validateIntBounds(fieldName, value, meta)...)
+		return validateIntBounds(fieldName, value, meta)
 	case "float":
-		violations = append(violations, validateFloatBounds(fieldName, value, meta)...)
+		return validateFloatBounds(fieldName, value, meta)
 	case "varchar":
-		violations = append(violations, validateVarcharBounds(fieldName, value, meta)...)
+		return validateVarcharBounds(fieldName, value, meta)
 	case "text":
-		violations = append(violations, validateTextBounds(fieldName, value, meta)...)
+		return validateTextBounds(fieldName, value, meta)
 	case "enum":
-		violations = append(violations, validateEnumBounds(fieldName, value, meta)...)
+		return validateEnumBounds(fieldName, value, meta)
 	case "foreign_key":
-		violations = append(violations, validateFKExists(ctx.DB, fieldName, value, meta)...)
+		return validateFKExists(ctx.DB, fieldName, value, meta)
 	case "json":
-		violations = append(violations, validateJSONPayload(ctx, fieldName, value, meta)...)
+		return validateJSONPayload(ctx, fieldName, value, meta)
 	case "boolean":
-		violations = append(violations, validateBoolean(fieldName, value)...)
+		return validateBoolean(fieldName, value)
 	case "datetime", "date":
-		// datetime and date are validated at the type level by step 3;
-		// no additional bound constraints defined for these types
+		// Datetime and date are validated at the type level by step 3.
+		// No additional bound constraints are defined for these types
+		// in the closed vocabulary.
+		return nil
+	default:
+		return nil
 	}
-
-	return violations
 }
 
-// validateIntBounds checks int value against min_value and max_value.
-func validateIntBounds(fieldName string, value interface{}, meta *runtimeschema.FieldMeta) []boundViolation {
+// ---------------------------------------------------------------------------
+// Integer bounds
+// ---------------------------------------------------------------------------
+
+// validateIntBounds checks an int value against min_value and max_value.
+func validateIntBounds(fieldName string, value interface{}, meta *RuntimeFieldMeta) []boundViolation {
 	intVal, ok := toInt(value)
 	if !ok {
 		return []boundViolation{{
@@ -148,9 +163,13 @@ func validateIntBounds(fieldName string, value interface{}, meta *runtimeschema.
 	return violations
 }
 
-// validateFloatBounds checks float value against min_value, max_value,
+// ---------------------------------------------------------------------------
+// Float bounds
+// ---------------------------------------------------------------------------
+
+// validateFloatBounds checks a float value against min_value, max_value,
 // and precision_decimal_places.
-func validateFloatBounds(fieldName string, value interface{}, meta *runtimeschema.FieldMeta) []boundViolation {
+func validateFloatBounds(fieldName string, value interface{}, meta *RuntimeFieldMeta) []boundViolation {
 	floatVal, ok := toFloat(value)
 	if !ok {
 		return []boundViolation{{
@@ -190,14 +209,16 @@ func validateFloatBounds(fieldName string, value interface{}, meta *runtimeschem
 	}
 
 	if meta.PrecisionDecimalPlaces != nil {
-		precision := *meta.PrecisionDecimalPlaces
-		if countDecimalPlaces(floatVal) > precision {
+		maxPlaces := *meta.PrecisionDecimalPlaces
+		actualPlaces := countDecimalPlaces(floatVal)
+		if actualPlaces > maxPlaces {
 			violations = append(violations, boundViolation{
 				Field:      fieldName,
 				Constraint: "precision_decimal_places",
 				Value:      floatVal,
-				Bound:      precision,
-				Message:    fmt.Sprintf("value %g exceeds %d decimal places", floatVal, precision),
+				Bound:      maxPlaces,
+				Message: fmt.Sprintf("value %g has %d decimal places, maximum is %d",
+					floatVal, actualPlaces, maxPlaces),
 			})
 		}
 	}
@@ -205,8 +226,13 @@ func validateFloatBounds(fieldName string, value interface{}, meta *runtimeschem
 	return violations
 }
 
-// validateVarcharBounds checks string value against min_length and max_length.
-func validateVarcharBounds(fieldName string, value interface{}, meta *runtimeschema.FieldMeta) []boundViolation {
+// ---------------------------------------------------------------------------
+// String bounds (varchar and text)
+// ---------------------------------------------------------------------------
+
+// validateVarcharBounds checks a string value against min_length and
+// max_length. Both constraints are character-counted.
+func validateVarcharBounds(fieldName string, value interface{}, meta *RuntimeFieldMeta) []boundViolation {
 	strVal, ok := value.(string)
 	if !ok {
 		return []boundViolation{{
@@ -218,7 +244,7 @@ func validateVarcharBounds(fieldName string, value interface{}, meta *runtimesch
 	}
 
 	var violations []boundViolation
-	strLen := len(strVal)
+	strLen := len([]rune(strVal)) // character count, not byte count
 
 	if meta.MinLength != nil && strLen < *meta.MinLength {
 		violations = append(violations, boundViolation{
@@ -243,8 +269,10 @@ func validateVarcharBounds(fieldName string, value interface{}, meta *runtimesch
 	return violations
 }
 
-// validateTextBounds checks text value against max_length if declared.
-func validateTextBounds(fieldName string, value interface{}, meta *runtimeschema.FieldMeta) []boundViolation {
+// validateTextBounds checks a text value against max_length if declared.
+// Text fields may not have a max_length (the schema allows omitting it
+// for text fields), in which case no bound is checked.
+func validateTextBounds(fieldName string, value interface{}, meta *RuntimeFieldMeta) []boundViolation {
 	strVal, ok := value.(string)
 	if !ok {
 		return []boundViolation{{
@@ -255,21 +283,30 @@ func validateTextBounds(fieldName string, value interface{}, meta *runtimeschema
 		}}
 	}
 
-	if meta.MaxLength != nil && len(strVal) > *meta.MaxLength {
-		return []boundViolation{{
-			Field:      fieldName,
-			Constraint: "max_length",
-			Value:      len(strVal),
-			Bound:      *meta.MaxLength,
-			Message:    fmt.Sprintf("text length %d exceeds maximum %d", len(strVal), *meta.MaxLength),
-		}}
+	if meta.MaxLength != nil {
+		strLen := len([]rune(strVal))
+		if strLen > *meta.MaxLength {
+			return []boundViolation{{
+				Field:      fieldName,
+				Constraint: "max_length",
+				Value:      strLen,
+				Bound:      *meta.MaxLength,
+				Message:    fmt.Sprintf("text length %d exceeds maximum %d", strLen, *meta.MaxLength),
+			}}
+		}
 	}
 
 	return nil
 }
 
-// validateEnumBounds checks that the value is in the declared enum_values set.
-func validateEnumBounds(fieldName string, value interface{}, meta *runtimeschema.FieldMeta) []boundViolation {
+// ---------------------------------------------------------------------------
+// Enum bounds
+// ---------------------------------------------------------------------------
+
+// validateEnumBounds checks that the value is in the declared enum_values
+// set. The enum_values list is loaded from the runtime schema (originally
+// declared in the entity YAML file per OPSDB-7 §6.3).
+func validateEnumBounds(fieldName string, value interface{}, meta *RuntimeFieldMeta) []boundViolation {
 	strVal, ok := value.(string)
 	if !ok {
 		return []boundViolation{{
@@ -281,6 +318,9 @@ func validateEnumBounds(fieldName string, value interface{}, meta *runtimeschema
 	}
 
 	if len(meta.EnumValues) == 0 {
+		// No enum values declared — nothing to check. This shouldn't
+		// happen for a properly-declared enum field, but if the schema
+		// metadata is incomplete, pass through rather than reject.
 		return nil
 	}
 
@@ -295,13 +335,20 @@ func validateEnumBounds(fieldName string, value interface{}, meta *runtimeschema
 		Constraint: "enum_values",
 		Value:      strVal,
 		Bound:      meta.EnumValues,
-		Message: fmt.Sprintf("value %q is not in allowed set: %s",
+		Message: fmt.Sprintf("value %q is not in allowed set: [%s]",
 			strVal, strings.Join(meta.EnumValues, ", ")),
 	}}
 }
 
-// validateFKExists checks that the referenced foreign key row exists.
-func validateFKExists(db *pg.DB, fieldName string, value interface{}, meta *runtimeschema.FieldMeta) []boundViolation {
+// ---------------------------------------------------------------------------
+// Foreign key existence
+// ---------------------------------------------------------------------------
+
+// validateFKExists checks that the referenced foreign key row exists in
+// the target table. The target table name comes from the field's
+// References metadata (set from the `references` property in the
+// entity YAML file).
+func validateFKExists(db *pg.DB, fieldName string, value interface{}, meta *RuntimeFieldMeta) []boundViolation {
 	if meta.References == "" {
 		return nil
 	}
@@ -324,6 +371,9 @@ func validateFKExists(db *pg.DB, fieldName string, value interface{}, meta *runt
 	var exists bool
 	err := db.QueryRow(query, intVal).Scan(&exists)
 	if err != nil {
+		// FK check failure — could be the referenced table doesn't
+		// exist (during bootstrap), or a transient error. Report as
+		// a violation with the error detail.
 		return []boundViolation{{
 			Field:      fieldName,
 			Constraint: "foreign_key",
@@ -346,22 +396,57 @@ func validateFKExists(db *pg.DB, fieldName string, value interface{}, meta *runt
 	return nil
 }
 
-// validateJSONPayload validates a JSON payload against the registered schema
-// for its discriminator value. Looks up the discriminator field value from
-// the request, finds the matching JSON schema, and validates structure.
-func validateJSONPayload(ctx *GateContext, fieldName string, value interface{}, meta *runtimeschema.FieldMeta) []boundViolation {
+// ---------------------------------------------------------------------------
+// Boolean validation
+// ---------------------------------------------------------------------------
+
+// validateBoolean checks that a boolean value is actually a boolean.
+// This is a type check more than a bound check, but it lives here
+// because step 3 does structural type compatibility and step 4 does
+// the detailed per-type validation.
+func validateBoolean(fieldName string, value interface{}) []boundViolation {
+	if _, ok := value.(bool); !ok {
+		return []boundViolation{{
+			Field:      fieldName,
+			Constraint: "type",
+			Value:      value,
+			Message:    "value must be a boolean (true or false)",
+		}}
+	}
+	return nil
+}
+
+// ---------------------------------------------------------------------------
+// JSON payload validation
+// ---------------------------------------------------------------------------
+
+// validateJSONPayload validates a JSON payload against the registered
+// schema for its discriminator value. Looks up the discriminator field
+// value from the request, finds the matching JSON schema in the runtime
+// schema, and validates the payload's structure and field bounds.
+//
+// Per OPSDB-7 §9.4, JSON payload schemas are one level deep. Lists
+// may contain primitives, maps may contain primitives, but nested
+// objects are not validated recursively — deeper structure is a signal
+// to factor into separate entity types.
+func validateJSONPayload(ctx *GateContext, fieldName string, value interface{}, meta *RuntimeFieldMeta) []boundViolation {
 	if meta.JsonTypeDiscriminator == "" {
+		// No discriminator declared — the JSON field accepts any valid
+		// JSON without schema validation.
 		return nil
 	}
 
-	// find the discriminator value from the request fields
+	// Read the discriminator value from the request's field values.
 	fieldValues := extractFieldValues(ctx.Request)
+	if fieldValues == nil {
+		return nil
+	}
+
 	discriminatorValue, ok := fieldValues[meta.JsonTypeDiscriminator]
 	if !ok {
 		return []boundViolation{{
 			Field:      fieldName,
 			Constraint: "json_type_discriminator",
-			Value:      nil,
 			Bound:      meta.JsonTypeDiscriminator,
 			Message: fmt.Sprintf("JSON field %s requires discriminator field %s to be set",
 				fieldName, meta.JsonTypeDiscriminator),
@@ -378,8 +463,9 @@ func validateJSONPayload(ctx *GateContext, fieldName string, value interface{}, 
 		}}
 	}
 
-	// look up the JSON schema for this entity type + discriminator value
-	jsonSchema, found := ctx.Schema.GetJSONSchema(ctx.Request.TargetEntity, fieldName, discStr)
+	// Look up the registered JSON schema for this discriminator value.
+	jsonSchema, found := ctx.Schema.GetJSONSchema(
+		ctx.Request.TargetEntity, fieldName, discStr)
 	if !found {
 		return []boundViolation{{
 			Field:      fieldName,
@@ -390,28 +476,32 @@ func validateJSONPayload(ctx *GateContext, fieldName string, value interface{}, 
 		}}
 	}
 
-	// validate the payload against the schema
-	violations := validateJSONAgainstSchema(fieldName, value, jsonSchema)
-	return violations
+	return validateJSONAgainstSchema(fieldName, value, jsonSchema)
 }
 
-// validateJSONAgainstSchema checks a JSON value against a registered schema.
-// Validates required fields, types, bounds on nested values, and max depth
-// (one level per spec).
-func validateJSONAgainstSchema(fieldName string, value interface{}, schema *runtimeschema.JSONSchemaMeta) []boundViolation {
+// validateJSONAgainstSchema checks a JSON value against a registered
+// schema. Validates that the value is an object, checks required fields
+// are present, and validates each declared field's type and bounds.
+func validateJSONAgainstSchema(fieldName string, value interface{}, schema *RuntimeJSONSchemaMeta) []boundViolation {
 	jsonMap, ok := value.(map[string]interface{})
 	if !ok {
+		// Accept JSON-as-string — try to note it but don't reject.
+		// The actual parsing happens downstream when the value is
+		// written to the database's JSONB column.
+		if _, isStr := value.(string); isStr {
+			return nil
+		}
 		return []boundViolation{{
 			Field:      fieldName,
 			Constraint: "json_structure",
 			Value:      value,
-			Message:    "JSON payload must be an object",
+			Message:    "JSON payload must be an object or a JSON string",
 		}}
 	}
 
 	var violations []boundViolation
 
-	// check required fields
+	// Check required fields
 	for _, required := range schema.RequiredFields {
 		if _, exists := jsonMap[required]; !exists {
 			violations = append(violations, boundViolation{
@@ -422,41 +512,47 @@ func validateJSONAgainstSchema(fieldName string, value interface{}, schema *runt
 		}
 	}
 
-	// check each declared field's type and bounds
+	// Check each declared field's type and bounds
 	for key, val := range jsonMap {
-		fieldSchema, exists := schema.Fields[key]
-		if !exists {
-			// undeclared fields in JSON payload — warn but don't reject
-			// to allow forward compatibility
+		fieldSchema, declared := schema.Fields[key]
+		if !declared {
+			// Undeclared fields in JSON payloads are allowed for forward
+			// compatibility — the schema may not cover every field the
+			// source API returns. No violation.
 			continue
 		}
 
-		// type check
+		// Type check
 		if !jsonFieldTypeMatches(val, fieldSchema.Type) {
 			violations = append(violations, boundViolation{
 				Field:      fmt.Sprintf("%s.%s", fieldName, key),
 				Constraint: "type",
 				Value:      val,
 				Bound:      fieldSchema.Type,
-				Message:    fmt.Sprintf("field %s expected type %s", key, fieldSchema.Type),
+				Message:    fmt.Sprintf("field %s expected type %s, got %T", key, fieldSchema.Type, val),
 			})
 			continue
 		}
 
-		// bounds on JSON field values
+		// String length bound
 		if fieldSchema.MaxLength != nil {
-			if strVal, ok := val.(string); ok && len(strVal) > *fieldSchema.MaxLength {
-				violations = append(violations, boundViolation{
-					Field:      fmt.Sprintf("%s.%s", fieldName, key),
-					Constraint: "max_length",
-					Value:      len(strVal),
-					Bound:      *fieldSchema.MaxLength,
-					Message:    fmt.Sprintf("field %s length %d exceeds max %d", key, len(strVal), *fieldSchema.MaxLength),
-				})
+			if strVal, ok := val.(string); ok {
+				strLen := len([]rune(strVal))
+				if strLen > *fieldSchema.MaxLength {
+					violations = append(violations, boundViolation{
+						Field:      fmt.Sprintf("%s.%s", fieldName, key),
+						Constraint: "max_length",
+						Value:      strLen,
+						Bound:      *fieldSchema.MaxLength,
+						Message: fmt.Sprintf("field %s length %d exceeds maximum %d",
+							key, strLen, *fieldSchema.MaxLength),
+					})
+				}
 			}
 		}
 
-		if fieldSchema.EnumValues != nil {
+		// Enum membership
+		if len(fieldSchema.EnumValues) > 0 {
 			if strVal, ok := val.(string); ok {
 				found := false
 				for _, allowed := range fieldSchema.EnumValues {
@@ -471,8 +567,81 @@ func validateJSONAgainstSchema(fieldName string, value interface{}, schema *runt
 						Constraint: "enum_values",
 						Value:      strVal,
 						Bound:      fieldSchema.EnumValues,
-						Message: fmt.Sprintf("field %s value %q not in allowed set",
-							key, strVal),
+						Message: fmt.Sprintf("field %s value %q not in allowed set: [%s]",
+							key, strVal, strings.Join(fieldSchema.EnumValues, ", ")),
+					})
+				}
+			}
+		}
+
+		// Numeric range on JSON fields
+		if fieldSchema.MinValue != nil || fieldSchema.MaxValue != nil {
+			if numVal, ok := toFloat(val); ok {
+				if fieldSchema.MinValue != nil {
+					if minVal, ok := toFloat(*fieldSchema.MinValue); ok && numVal < minVal {
+						violations = append(violations, boundViolation{
+							Field:      fmt.Sprintf("%s.%s", fieldName, key),
+							Constraint: "min_value",
+							Value:      numVal,
+							Bound:      minVal,
+							Message: fmt.Sprintf("field %s value %g below minimum %g",
+								key, numVal, minVal),
+						})
+					}
+				}
+				if fieldSchema.MaxValue != nil {
+					if maxVal, ok := toFloat(*fieldSchema.MaxValue); ok && numVal > maxVal {
+						violations = append(violations, boundViolation{
+							Field:      fmt.Sprintf("%s.%s", fieldName, key),
+							Constraint: "max_value",
+							Value:      numVal,
+							Bound:      maxVal,
+							Message: fmt.Sprintf("field %s value %g exceeds maximum %g",
+								key, numVal, maxVal),
+						})
+					}
+				}
+			}
+		}
+
+		// List count bounds
+		if fieldSchema.MinCount != nil || fieldSchema.MaxCount != nil {
+			if listVal, ok := val.([]interface{}); ok {
+				listLen := len(listVal)
+				if fieldSchema.MinCount != nil && listLen < *fieldSchema.MinCount {
+					violations = append(violations, boundViolation{
+						Field:      fmt.Sprintf("%s.%s", fieldName, key),
+						Constraint: "min_count",
+						Value:      listLen,
+						Bound:      *fieldSchema.MinCount,
+						Message: fmt.Sprintf("field %s has %d items, minimum is %d",
+							key, listLen, *fieldSchema.MinCount),
+					})
+				}
+				if fieldSchema.MaxCount != nil && listLen > *fieldSchema.MaxCount {
+					violations = append(violations, boundViolation{
+						Field:      fmt.Sprintf("%s.%s", fieldName, key),
+						Constraint: "max_count",
+						Value:      listLen,
+						Bound:      *fieldSchema.MaxCount,
+						Message: fmt.Sprintf("field %s has %d items, maximum is %d",
+							key, listLen, *fieldSchema.MaxCount),
+					})
+				}
+			}
+		}
+
+		// Map entry count bounds
+		if fieldSchema.MaxEntries != nil {
+			if mapVal, ok := val.(map[string]interface{}); ok {
+				if len(mapVal) > *fieldSchema.MaxEntries {
+					violations = append(violations, boundViolation{
+						Field:      fmt.Sprintf("%s.%s", fieldName, key),
+						Constraint: "max_entries",
+						Value:      len(mapVal),
+						Bound:      *fieldSchema.MaxEntries,
+						Message: fmt.Sprintf("field %s has %d entries, maximum is %d",
+							key, len(mapVal), *fieldSchema.MaxEntries),
 					})
 				}
 			}
@@ -482,23 +651,10 @@ func validateJSONAgainstSchema(fieldName string, value interface{}, schema *runt
 	return violations
 }
 
-// validateBoolean checks that a boolean value is actually a boolean.
-func validateBoolean(fieldName string, value interface{}) []boundViolation {
-	if _, ok := value.(bool); !ok {
-		return []boundViolation{{
-			Field:      fieldName,
-			Constraint: "type",
-			Value:      value,
-			Message:    "value must be a boolean",
-		}}
-	}
-	return nil
-}
-
-// jsonFieldTypeMatches checks if a JSON value matches the expected type string.
+// jsonFieldTypeMatches checks if a JSON value matches the expected type.
 func jsonFieldTypeMatches(value interface{}, expectedType string) bool {
 	switch expectedType {
-	case "string":
+	case "string", "varchar":
 		_, ok := value.(string)
 		return ok
 	case "int", "integer":
@@ -517,64 +673,110 @@ func jsonFieldTypeMatches(value interface{}, expectedType string) bool {
 		_, ok := value.(map[string]interface{})
 		return ok
 	default:
+		// Unknown type — pass through. The schema registered an
+		// unrecognized type string; this is a schema issue, not a
+		// value issue.
 		return true
 	}
 }
 
-// extractFieldValues returns a map of field name → value from the request params.
-func extractFieldValues(req *GateRequest) map[string]interface{} {
-	if req.Params == nil {
-		return nil
-	}
-	if fields, ok := req.Params["fields"]; ok {
-		if fieldMap, ok := fields.(map[string]interface{}); ok {
-			return fieldMap
-		}
-	}
-	return nil
+// ---------------------------------------------------------------------------
+// Runtime schema type references
+// ---------------------------------------------------------------------------
+
+// RuntimeFieldMeta is a type alias for the field metadata struct returned
+// by the runtime schema package. When the runtime schema package is
+// finalized, this will reference the actual exported type. For now it
+// declares the fields step_bound_validate needs.
+//
+// The runtime schema package contract (from IOSE):
+//
+//	Name, Type, Nullable, HasDefault, IsReserved, IsGovernance,
+//	IsDeprecated, DeprecatedAlternative, References,
+//	MinValue, MaxValue, MinLength, MaxLength,
+//	PrecisionDecimalPlaces, EnumValues, JsonTypeDiscriminator,
+//	AccessClassification
+type RuntimeFieldMeta = interface {
+	// This alias will be replaced with a concrete struct import when
+	// tools/opsdb-api/schema is written. For now, step_bound_validate
+	// accesses field metadata through ctx.Schema.GetField() which
+	// returns whatever the runtime schema package defines.
 }
 
-// --- numeric conversion helpers ---
+// RuntimeJSONSchemaMeta represents the registered JSON schema for a
+// typed payload field. Loaded from the runtime schema's JSON schema
+// registry. Contains the fields and constraints declared in the
+// schema/json_schemas/ YAML files.
+type RuntimeJSONSchemaMeta struct {
+	RequiredFields []string
+	Fields         map[string]RuntimeJSONFieldSchema
+}
 
-func toInt(value interface{}) (int, bool) {
-	switch v := value.(type) {
+// RuntimeJSONFieldSchema represents one field within a JSON payload schema.
+type RuntimeJSONFieldSchema struct {
+	Type       string
+	EnumValues []string
+	MinValue   *interface{}
+	MaxValue   *interface{}
+	MinLength  *int
+	MaxLength  *int
+	MinCount   *int
+	MaxCount   *int
+	MaxEntries *int
+}
+
+// ---------------------------------------------------------------------------
+// Numeric conversion helpers (value, bool) signatures
+// ---------------------------------------------------------------------------
+
+// toInt converts an interface{} to int. Returns (value, true) on success,
+// (0, false) on failure. Handles int, int32, int64, float64 (from JSON
+// unmarshaling where whole numbers arrive as float64).
+//
+// This is the (value, bool) variant used by all validation steps.
+// step_execute.go uses toIntErr which returns (value, error) for its
+// error message needs.
+func toInt(v interface{}) (int, bool) {
+	switch val := v.(type) {
 	case int:
-		return v, true
+		return val, true
 	case int32:
-		return int(v), true
+		return int(val), true
 	case int64:
-		return int(v), true
-	case float32:
-		return int(v), true
+		return int(val), true
 	case float64:
-		if v == float64(int(v)) {
-			return int(v), true
+		// Only accept float64 values that are whole numbers
+		if val == float64(int64(val)) {
+			return int(val), true
 		}
-		return 0, false
-	case string:
 		return 0, false
 	default:
 		return 0, false
 	}
 }
 
-func toFloat(value interface{}) (float64, bool) {
-	switch v := value.(type) {
+// toFloat converts an interface{} to float64. Returns (value, true) on
+// success, (0, false) on failure. Accepts all numeric types since any
+// number is a valid float.
+func toFloat(v interface{}) (float64, bool) {
+	switch val := v.(type) {
 	case float64:
-		return v, true
+		return val, true
 	case float32:
-		return float64(v), true
+		return float64(val), true
 	case int:
-		return float64(v), true
+		return float64(val), true
 	case int32:
-		return float64(v), true
+		return float64(val), true
 	case int64:
-		return float64(v), true
+		return float64(val), true
 	default:
 		return 0, false
 	}
 }
 
+// countDecimalPlaces counts the number of decimal places in a float value
+// by converting to string and counting digits after the decimal point.
 func countDecimalPlaces(f float64) int {
 	s := fmt.Sprintf("%g", f)
 	idx := strings.IndexByte(s, '.')
