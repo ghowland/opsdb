@@ -1,12 +1,18 @@
+//# internal/pg/conn.go
+
 package pg
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -14,6 +20,52 @@ import (
 type DB struct {
 	Pool *pgxpool.Pool
 	dsn  string
+}
+
+// Row wraps a pgx.Row so callers outside this package don't import pgx directly.
+type Row struct {
+	row pgx.Row
+}
+
+// Scan reads columns from the row into dest values.
+func (r *Row) Scan(dest ...interface{}) error {
+	return r.row.Scan(dest...)
+}
+
+// Rows wraps pgx.Rows with a Columns() method that returns []string,
+// which scanRowToMap and other generic row-reading code needs.
+type Rows struct {
+	rows pgx.Rows
+}
+
+// Next advances to the next row. Returns false when no more rows.
+func (r *Rows) Next() bool {
+	return r.rows.Next()
+}
+
+// Scan reads columns from the current row into dest values.
+func (r *Rows) Scan(dest ...interface{}) error {
+	return r.rows.Scan(dest...)
+}
+
+// Close releases the rows back to the pool.
+func (r *Rows) Close() {
+	r.rows.Close()
+}
+
+// Err returns any error encountered during iteration.
+func (r *Rows) Err() error {
+	return r.rows.Err()
+}
+
+// Columns returns the column names for the result set.
+func (r *Rows) Columns() ([]string, error) {
+	descs := r.rows.FieldDescriptions()
+	names := make([]string, len(descs))
+	for i, d := range descs {
+		names[i] = d.Name
+	}
+	return names, nil
 }
 
 // DefaultMaxConns is the default maximum number of connections in the pool.
@@ -64,7 +116,6 @@ func Connect(dsn string) (*DB, error) {
 }
 
 // ConnectWithPoolSize opens a connection pool with a specific max connection count.
-// Used when the DOS config specifies pool sizing.
 func ConnectWithPoolSize(dsn string, maxConns int, minConns int, maxLifetime time.Duration) (*DB, error) {
 	if dsn == "" {
 		return nil, fmt.Errorf("empty DSN provided")
@@ -108,7 +159,7 @@ func ConnectWithPoolSize(dsn string, maxConns int, minConns int, maxLifetime tim
 	return &DB{Pool: pool, dsn: dsn}, nil
 }
 
-// Close closes the connection pool. All acquired connections are released.
+// Close closes the connection pool.
 func (db *DB) Close() {
 	if db.Pool != nil {
 		db.Pool.Close()
@@ -122,8 +173,32 @@ func (db *DB) Ping() error {
 	return db.Pool.Ping(ctx)
 }
 
-// DSN returns the connection string this pool was created with.
-// Used for logging and diagnostics — never log the password portion.
+// Query executes a query that returns rows.
+func (db *DB) Query(query string, args ...interface{}) (*Rows, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	rows, err := db.Pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	return &Rows{rows: rows}, nil
+}
+
+// QueryRow executes a query expected to return at most one row.
+func (db *DB) QueryRow(query string, args ...interface{}) *Row {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	return &Row{row: db.Pool.QueryRow(ctx, query, args...)}
+}
+
+// QueryRows is an alias for Query. Some call sites use this name.
+func (db *DB) QueryRows(query string, args ...interface{}) (*Rows, error) {
+	return db.Query(query, args...)
+}
+
+// DSN returns the connection string this pool was created with, redacted.
 func (db *DB) DSN() string {
 	return redactDSN(db.dsn)
 }
@@ -147,12 +222,58 @@ func DSNFromEnv(envVar string) (string, error) {
 	return dsn, nil
 }
 
-// validateDSNFormat performs basic format validation on a DSN string.
-// Accepts both URI format (postgres://...) and keyword/value format (host=... dbname=...).
+// ---------------------------------------------------------------------------
+// Error classification helpers
+// ---------------------------------------------------------------------------
+
+// IsNoRows returns true if the error indicates no rows were returned.
+func IsNoRows(err error) bool {
+	return errors.Is(err, pgx.ErrNoRows)
+}
+
+// IsUndefinedTable returns true if the error is Postgres code 42P01
+// (undefined_table).
+func IsUndefinedTable(err error) bool {
+	return isPgErrorCode(err, "42P01")
+}
+
+// IsUndefinedColumn returns true if the error is Postgres code 42703
+// (undefined_column).
+func IsUndefinedColumn(err error) bool {
+	return isPgErrorCode(err, "42703")
+}
+
+// isPgErrorCode checks whether the error chain contains a pgconn.PgError
+// with the given SQLSTATE code.
+func isPgErrorCode(err error, code string) bool {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		return pgErr.Code == code
+	}
+	return false
+}
+
+// ---------------------------------------------------------------------------
+// JSON helpers — thin wrappers so callers don't import encoding/json
+// ---------------------------------------------------------------------------
+
+// MarshalJSON serializes a value to JSON bytes.
+func MarshalJSON(v interface{}) ([]byte, error) {
+	return json.Marshal(v)
+}
+
+// UnmarshalJSON deserializes JSON bytes into a value.
+func UnmarshalJSON(data []byte, v interface{}) error {
+	return json.Unmarshal(data, v)
+}
+
+// ---------------------------------------------------------------------------
+// DSN format helpers
+// ---------------------------------------------------------------------------
+
 func validateDSNFormat(dsn string) error {
 	dsn = strings.TrimSpace(dsn)
 
-	// URI format: postgres:// or postgresql://
 	if strings.HasPrefix(dsn, "postgres://") || strings.HasPrefix(dsn, "postgresql://") {
 		if len(dsn) < 15 {
 			return fmt.Errorf("DSN too short to be valid")
@@ -160,7 +281,6 @@ func validateDSNFormat(dsn string) error {
 		return nil
 	}
 
-	// Keyword/value format: must contain at least host= or dbname=
 	lower := strings.ToLower(dsn)
 	if strings.Contains(lower, "host=") || strings.Contains(lower, "dbname=") {
 		return nil
@@ -169,9 +289,7 @@ func validateDSNFormat(dsn string) error {
 	return fmt.Errorf("DSN does not start with postgres:// and does not contain host= or dbname= keywords")
 }
 
-// redactDSN removes the password from a DSN for safe logging.
 func redactDSN(dsn string) string {
-	// URI format: mask between second : and @
 	if strings.HasPrefix(dsn, "postgres://") || strings.HasPrefix(dsn, "postgresql://") {
 		atIdx := strings.Index(dsn, "@")
 		if atIdx == -1 {
@@ -186,7 +304,6 @@ func redactDSN(dsn string) string {
 		return dsn[:schemeEnd] + userInfo[:colonIdx] + ":***@" + dsn[atIdx+1:]
 	}
 
-	// Keyword/value format: mask password= value
 	lower := strings.ToLower(dsn)
 	pwIdx := strings.Index(lower, "password=")
 	if pwIdx == -1 {

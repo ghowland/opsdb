@@ -1,3 +1,5 @@
+//# internal/pg/advisory_lock.go
+
 package pg
 
 import (
@@ -8,7 +10,6 @@ import (
 
 // SchemaApplyLockID returns the fixed advisory lock ID used for schema apply.
 // All schema apply operations use this same ID to prevent concurrent applies.
-// Chosen to avoid collision with application-level advisory locks.
 func SchemaApplyLockID() int64 {
 	return 7283946501
 }
@@ -29,8 +30,7 @@ func AcquireAdvisoryLock(db *DB, lockID int64) (bool, error) {
 }
 
 // WaitForAdvisoryLock blocks until the lock is acquired or timeout expires.
-// Polls with a short sleep interval. Returns nil on acquisition, error on timeout
-// or database failure.
+// Polls with a short sleep interval.
 func WaitForAdvisoryLock(db *DB, lockID int64, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	pollInterval := 250 * time.Millisecond
@@ -58,8 +58,6 @@ func WaitForAdvisoryLock(db *DB, lockID int64, timeout time.Duration) error {
 }
 
 // ReleaseAdvisoryLock releases a session-level advisory lock.
-// Returns error if the lock was not held by this session (should not happen
-// in normal operation — indicates a programming error).
 func ReleaseAdvisoryLock(db *DB, lockID int64) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

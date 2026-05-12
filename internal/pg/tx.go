@@ -1,8 +1,9 @@
+//# internal/pg/tx.go
+
 package pg
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"strings"
 	"time"
@@ -21,8 +22,7 @@ type Tx struct {
 const DefaultTxTimeout = 60 * time.Second
 
 // WithTransaction begins a transaction, calls fn, commits on success,
-// rolls back on error or panic. The transaction uses serializable isolation
-// for schema DDL operations and read-committed for normal operations.
+// rolls back on error or panic.
 func WithTransaction(db *DB, fn func(tx *Tx) error) error {
 	return WithTransactionContext(context.Background(), db, fn)
 }
@@ -97,8 +97,7 @@ func WithSerializableTransaction(db *DB, fn func(tx *Tx) error) error {
 }
 
 // RollbackOnly begins a transaction, calls fn, then always rolls back.
-// Used for dry-run validation of DDL — executes everything to test
-// correctness then discards all changes.
+// Used for dry-run validation of DDL.
 func RollbackOnly(db *DB, fn func(tx *Tx) error) error {
 	ctx, cancel := context.WithTimeout(context.Background(), DefaultTxTimeout)
 	defer cancel()
@@ -121,13 +120,11 @@ func RollbackOnly(db *DB, fn func(tx *Tx) error) error {
 		return err
 	}
 
-	// Always rollback — this is the dry-run contract.
 	_ = pgxTx.Rollback(ctx)
 	return nil
 }
 
 // ExecInTx executes a statement within a transaction.
-// Returns the command tag (rows affected, etc.) or error.
 func ExecInTx(tx *Tx, query string, args ...interface{}) (pgconn.CommandTag, error) {
 	tag, err := tx.tx.Exec(tx.ctx, query, args...)
 	if err != nil {
@@ -136,35 +133,32 @@ func ExecInTx(tx *Tx, query string, args ...interface{}) (pgconn.CommandTag, err
 	return tag, nil
 }
 
-// QueryInTx executes a query within a transaction and returns rows.
-// Caller is responsible for closing the returned Rows.
-func QueryInTx(tx *Tx, query string, args ...interface{}) (pgx.Rows, error) {
+// QueryInTx executes a query within a transaction and returns wrapped Rows.
+func QueryInTx(tx *Tx, query string, args ...interface{}) (*Rows, error) {
 	rows, err := tx.tx.Query(tx.ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("query in tx: %w", err)
 	}
-	return rows, nil
+	return &Rows{rows: rows}, nil
 }
 
-// QueryRowInTx executes a query expected to return at most one row.
-// Use .Scan() on the returned Row to read values.
-func QueryRowInTx(tx *Tx, query string, args ...interface{}) pgx.Row {
-	return tx.tx.QueryRow(tx.ctx, query, args...)
+// QueryRowInTx executes a query expected to return at most one row
+// within a transaction.
+func QueryRowInTx(tx *Tx, query string, args ...interface{}) *Row {
+	return &Row{row: tx.tx.QueryRow(tx.ctx, query, args...)}
 }
 
-// QueryRowInDB executes a query that returns at most one row, on the database directly.
-func QueryRowInDB(db *DB, query string, args ...interface{}) *sql.Row {
-	return db.pool.QueryRow(query, args...)
+// QueryRowsInTx is an alias for QueryInTx. Some call sites use this name.
+func QueryRowsInTx(tx *Tx, query string, args ...interface{}) (*Rows, error) {
+	return QueryInTx(tx, query, args...)
 }
 
-// Context returns the transaction's context. Used by callers that need
-// to pass context to sub-operations within the transaction scope.
+// Context returns the transaction's context.
 func (tx *Tx) Context() context.Context {
 	return tx.ctx
 }
 
 // Underlying returns the raw pgx.Tx for cases where direct access is needed.
-// Prefer ExecInTx/QueryInTx/QueryRowInTx for normal operations.
 func (tx *Tx) Underlying() pgx.Tx {
 	return tx.tx
 }
