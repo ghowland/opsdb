@@ -1,11 +1,9 @@
 package loader
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/ghowland/opsdb/internal/model"
 	"github.com/ghowland/opsdb/internal/pg"
@@ -111,12 +109,6 @@ func Diff(desired *model.Schema, current *SchemaState) (*SchemaDiff, error) {
 			continue // new entity, already recorded above
 		}
 
-		// Build lookup of current fields.
-		currentFieldSet := make(map[string]bool)
-		for fieldName := range currentEntity.Fields {
-			currentFieldSet[fieldName] = true
-		}
-
 		// Check each desired field.
 		for _, desiredField := range desiredEntity.Fields {
 			currentField, fieldExists := currentEntity.Fields[desiredField.Name]
@@ -150,13 +142,9 @@ func Diff(desired *model.Schema, current *SchemaState) (*SchemaDiff, error) {
 			// Compare constraints.
 			constraintDiffs := compareFieldConstraints(name, desiredField, currentField)
 			diff.ChangedConstraints = append(diff.ChangedConstraints, constraintDiffs...)
-
-			// Remove from current set to track removals.
-			delete(currentFieldSet, desiredField.Name)
 		}
 
-		// Fields in current but not in desired (after removing matched ones).
-		// We need to re-check since we deleted matched fields above.
+		// Fields in current but not in desired — removals.
 		for fieldName := range currentEntity.Fields {
 			found := false
 			for _, df := range desiredEntity.Fields {
@@ -185,10 +173,10 @@ func Diff(desired *model.Schema, current *SchemaState) (*SchemaDiff, error) {
 			idxName := buildIndexName(name, desiredIdx)
 			if !currentIndexSet[idxName] {
 				diff.NewIndexes = append(diff.NewIndexes, DiffItem{
-					Entity:      name,
-					ChangeType:  "new_index",
+					Entity:       name,
+					ChangeType:   "new_index",
 					DesiredValue: desiredIdx,
-					Description: fmt.Sprintf("index %s on (%s)", idxName, strings.Join(indexFieldNames(desiredIdx), ", ")),
+					Description:  fmt.Sprintf("index %s on (%s)", idxName, strings.Join(desiredIdx.Fields, ", ")),
 				})
 			}
 		}
@@ -200,12 +188,9 @@ func Diff(desired *model.Schema, current *SchemaState) (*SchemaDiff, error) {
 // ReadCurrentState reads the current database schema from _schema_* tables.
 // Falls back to information_schema if _schema_* tables don't exist yet.
 func ReadCurrentState(db *pg.DB) (*SchemaState, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
 	// Check if _schema_entity_type table exists.
 	var exists bool
-	err := db.Pool.QueryRow(ctx,
+	err := db.QueryRow(
 		`SELECT EXISTS (
 			SELECT 1 FROM information_schema.tables
 			WHERE table_schema = 'public' AND table_name = '_schema_entity_type'
@@ -222,15 +207,12 @@ func ReadCurrentState(db *pg.DB) (*SchemaState, error) {
 
 // readFromSchemaMetaTables reads schema from _schema_entity_type, _schema_field, _schema_relationship.
 func readFromSchemaMetaTables(db *pg.DB) (*SchemaState, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
 	state := &SchemaState{
 		Entities: make(map[string]*EntityState),
 	}
 
 	// Read current schema version.
-	err := db.Pool.QueryRow(ctx,
+	err := db.QueryRow(
 		`SELECT COALESCE(
 			(SELECT version_serial FROM _schema_version WHERE is_current = true LIMIT 1),
 			0
@@ -240,7 +222,7 @@ func readFromSchemaMetaTables(db *pg.DB) (*SchemaState, error) {
 	}
 
 	// Read entity types.
-	entityRows, err := db.Pool.Query(ctx,
+	entityRows, err := db.Query(
 		`SELECT id, table_name FROM _schema_entity_type WHERE _schema_version_deprecated_id IS NULL`)
 	if err != nil {
 		return nil, fmt.Errorf("reading _schema_entity_type: %w", err)
@@ -265,7 +247,7 @@ func readFromSchemaMetaTables(db *pg.DB) (*SchemaState, error) {
 	}
 
 	// Read fields.
-	fieldRows, err := db.Pool.Query(ctx,
+	fieldRows, err := db.Query(
 		`SELECT schema_entity_type_id, field_name, field_type, is_nullable, default_value, constraint_data_json
 		 FROM _schema_field WHERE _schema_version_deprecated_id IS NULL`)
 	if err != nil {
@@ -323,7 +305,7 @@ func readFromSchemaMetaTables(db *pg.DB) (*SchemaState, error) {
 	}
 
 	// Read relationships.
-	relRows, err := db.Pool.Query(ctx,
+	relRows, err := db.Query(
 		`SELECT source_entity_name, source_field_name, target_entity_name
 		 FROM _schema_relationship`)
 	if err != nil {
@@ -349,16 +331,13 @@ func readFromSchemaMetaTables(db *pg.DB) (*SchemaState, error) {
 // ReadFromInformationSchema reads current schema from Postgres information_schema.
 // Used during bootstrap when _schema_* tables don't exist yet.
 func ReadFromInformationSchema(db *pg.DB) (*SchemaState, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
 	state := &SchemaState{
 		Entities: make(map[string]*EntityState),
 		Version:  0,
 	}
 
 	// Read all user tables in public schema.
-	tableRows, err := db.Pool.Query(ctx,
+	tableRows, err := db.Query(
 		`SELECT table_name FROM information_schema.tables
 		 WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
 		 ORDER BY table_name`)
@@ -385,7 +364,7 @@ func ReadFromInformationSchema(db *pg.DB) (*SchemaState, error) {
 
 	// Read columns for each table.
 	for _, tableName := range tableNames {
-		colRows, err := db.Pool.Query(ctx,
+		colRows, err := db.Query(
 			`SELECT column_name, data_type, is_nullable, column_default,
 			        character_maximum_length, numeric_scale
 			 FROM information_schema.columns
@@ -422,7 +401,7 @@ func ReadFromInformationSchema(db *pg.DB) (*SchemaState, error) {
 
 	// Read indexes.
 	for _, tableName := range tableNames {
-		idxRows, err := db.Pool.Query(ctx,
+		idxRows, err := db.Query(
 			`SELECT indexname, indexdef FROM pg_indexes
 			 WHERE schemaname = 'public' AND tablename = $1`, tableName)
 		if err != nil {
@@ -450,7 +429,7 @@ func ReadFromInformationSchema(db *pg.DB) (*SchemaState, error) {
 
 	// Read constraints.
 	for _, tableName := range tableNames {
-		conRows, err := db.Pool.Query(ctx,
+		conRows, err := db.Query(
 			`SELECT tc.constraint_name, tc.constraint_type,
 			        kcu.column_name,
 			        ccu.table_name AS references_table,
@@ -506,37 +485,6 @@ func ReadFromInformationSchema(db *pg.DB) (*SchemaState, error) {
 
 // --- helpers ---
 
-// buildConstraintMap builds a constraint map from a model.Field for use
-// with vocabulary.GetPostgresType.
-func buildConstraintMap(f model.Field) map[string]interface{} {
-	m := make(map[string]interface{})
-	if f.MaxLength != nil {
-		m["max_length"] = *f.MaxLength
-	}
-	if f.MinLength != nil {
-		m["min_length"] = *f.MinLength
-	}
-	if f.MaxValue != nil {
-		m["max_value"] = f.MaxValue
-	}
-	if f.MinValue != nil {
-		m["min_value"] = f.MinValue
-	}
-	if f.PrecisionDecimalPlaces != nil {
-		m["precision_decimal_places"] = *f.PrecisionDecimalPlaces
-	}
-	if len(f.EnumValues) > 0 {
-		m["enum_values"] = f.EnumValues
-	}
-	if f.References != "" {
-		m["references"] = f.References
-	}
-	if f.JsonTypeDiscriminator != "" {
-		m["json_type_discriminator"] = f.JsonTypeDiscriminator
-	}
-	return m
-}
-
 // pgTypesMatch compares a desired Postgres type with the type reported by
 // information_schema or _schema_field. Handles common aliases.
 func pgTypesMatch(desired string, current string) bool {
@@ -549,18 +497,18 @@ func pgTypesMatch(desired string, current string) bool {
 
 	// Normalize common Postgres type aliases.
 	aliases := map[string]string{
-		"integer":                       "integer",
-		"int":                           "integer",
-		"int4":                          "integer",
-		"double precision":              "double precision",
-		"float8":                        "double precision",
-		"boolean":                       "boolean",
-		"bool":                          "boolean",
-		"timestamp without time zone":   "timestamp without time zone",
-		"timestamp":                     "timestamp without time zone",
-		"text":                          "text",
-		"jsonb":                         "jsonb",
-		"date":                          "date",
+		"integer":                     "integer",
+		"int":                         "integer",
+		"int4":                        "integer",
+		"double precision":            "double precision",
+		"float8":                      "double precision",
+		"boolean":                     "boolean",
+		"bool":                        "boolean",
+		"timestamp without time zone": "timestamp without time zone",
+		"timestamp":                   "timestamp without time zone",
+		"text":                        "text",
+		"jsonb":                       "jsonb",
+		"date":                        "date",
 	}
 
 	normalizedDesired := desired
@@ -598,16 +546,16 @@ func pgTypesMatch(desired string, current string) bool {
 func compareFieldConstraints(entityName string, desired model.Field, current *FieldState) []DiffItem {
 	var diffs []DiffItem
 
-	// Compare max_length for varchar/text.
-	if desired.MaxLength != nil && current.MaxLength != nil {
-		if *desired.MaxLength != *current.MaxLength {
+	// Compare max_length for varchar/text. MaxLength is plain int, 0 = unset.
+	if desired.MaxLength > 0 && current.MaxLength != nil {
+		if desired.MaxLength != *current.MaxLength {
 			diffs = append(diffs, DiffItem{
 				Entity:       entityName,
 				Field:        desired.Name,
 				ChangeType:   "changed_constraint",
-				DesiredValue: *desired.MaxLength,
+				DesiredValue: desired.MaxLength,
 				CurrentValue: *current.MaxLength,
-				Description:  fmt.Sprintf("max_length: %d -> %d", *current.MaxLength, *desired.MaxLength),
+				Description:  fmt.Sprintf("max_length: %d -> %d", *current.MaxLength, desired.MaxLength),
 			})
 		}
 	}
@@ -628,21 +576,17 @@ func compareFieldConstraints(entityName string, desired model.Field, current *Fi
 }
 
 // buildIndexName constructs the expected index name from entity and index definition.
+// model.Index has no Name field — an optional user-provided name is stored
+// in Description. If Description is empty, the name is computed from fields.
 func buildIndexName(entityName string, idx model.Index) string {
-	if idx.Name != "" {
-		return idx.Name
+	if idx.Description != "" {
+		return idx.Description
 	}
-	fields := indexFieldNames(idx)
 	prefix := "idx"
 	if idx.Unique {
 		prefix = "uq"
 	}
-	return fmt.Sprintf("%s_%s_%s", prefix, entityName, strings.Join(fields, "_"))
-}
-
-// indexFieldNames extracts field names from an index definition.
-func indexFieldNames(idx model.Index) []string {
-	return idx.Fields
+	return fmt.Sprintf("%s_%s_%s", prefix, entityName, strings.Join(idx.Fields, "_"))
 }
 
 // parseIndexFields extracts column names from a CREATE INDEX definition string.

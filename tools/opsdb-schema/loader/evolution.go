@@ -47,19 +47,12 @@ func CheckEvolution(diff *SchemaDiff) (*EvolutionResult, error) {
 		})
 	}
 
-	// New fields — allowed if nullable or has default.
+	// New fields — allowed. The validator already enforced that new fields
+	// must be nullable (evolution rule A1). If a non-nullable non-default
+	// field slipped through, the database ALTER will fail at apply time,
+	// which is the correct enforcement point.
 	for _, item := range diff.NewFields {
 		desiredType, _ := item.DesiredValue.(string)
-
-		// Determine if the new field is nullable. We check the description
-		// and the diff item metadata. New fields added by the schema are
-		// expected to be nullable for safe evolution.
-		// The differ sets DesiredValue to the field type string.
-		// We treat all new fields as allowed here because the validator
-		// already enforced that new fields must be nullable (evolution
-		// rule A1). If a non-nullable non-default field slipped through,
-		// the database ALTER will fail at apply time, which is the
-		// correct enforcement point.
 		result.Allowed = append(result.Allowed, AllowedChange{
 			Entity:      item.Entity,
 			Field:       item.Field,
@@ -254,8 +247,8 @@ func isFieldRename(removed DiffItem, diff *SchemaDiff) bool {
 }
 
 // isRangeWidening determines if a numeric constraint change is widening.
-// For min_value: widening means desired < current (lower minimum).
-// For max_value: widening means desired > current (higher maximum).
+// For min_value: widening means desired <= current (lower minimum).
+// For max_value: widening means desired >= current (higher maximum).
 func isRangeWidening(desc string, desired float64, current float64) bool {
 	if strings.Contains(desc, "min") {
 		return desired <= current

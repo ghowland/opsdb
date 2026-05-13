@@ -182,6 +182,10 @@ OpsDB is a skeleton implementation of a unified operations, automation, and audi
 
 - These have been rewritten again with LLMs to integrate them.  Not ready for compilation, just moved closer.
 
+## tools/opsdb-schema/*
+
+- Second LLM pass complete
+
 ## tools/*
 
 - Besides opsdb-api, these are still just skeleton examples of what the logic in-total needs to do, and need a 2nd pass to integrate them together, before human troubleshooting to get them to compile and run.

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/ghowland/opsdb/internal/conventions"
 	"github.com/ghowland/opsdb/internal/model"
 )
 
@@ -39,9 +38,10 @@ func Load(repoPath string) (*model.Schema, error) {
 		return nil, fmt.Errorf("failed to parse directory.yaml at %s: %w", directoryPath, err)
 	}
 
-	// Step 4: initialize empty schema.
+	// Step 4: initialize empty schema with parsed config references.
 	schema := &model.Schema{
 		Entities: make(map[string]*model.Entity),
+		Reserved: reserved,
 	}
 
 	// Step 5: process each entity file in directory order.
@@ -52,7 +52,7 @@ func Load(repoPath string) (*model.Schema, error) {
 
 		entity, rawYAML, parseErr := ParseEntityFile(fullPath)
 		if parseErr != nil {
-			schema.Errors = append(schema.Errors, SchemaError{
+			schema.Errors = append(schema.Errors, model.SchemaError{
 				Entity:   relPath,
 				Message:  fmt.Sprintf("parse error: %v", parseErr),
 				Severity: "error",
@@ -70,7 +70,7 @@ func Load(repoPath string) (*model.Schema, error) {
 
 		// Check for duplicate entity names.
 		if _, exists := schema.Entities[entity.Name]; exists {
-			schema.Errors = append(schema.Errors, SchemaError{
+			schema.Errors = append(schema.Errors, model.SchemaError{
 				Entity:   entity.Name,
 				Message:  fmt.Sprintf("duplicate entity name %q (first defined earlier in directory.yaml)", entity.Name),
 				Severity: "error",
@@ -133,7 +133,7 @@ func LoadAndValidateOnly(repoPath string) (*model.Schema, error) {
 
 		entity, rawYAML, parseErr := ParseEntityFile(fullPath)
 		if parseErr != nil {
-			schema.Errors = append(schema.Errors, SchemaError{
+			schema.Errors = append(schema.Errors, model.SchemaError{
 				Entity:   relPath,
 				Message:  fmt.Sprintf("parse error: %v", parseErr),
 				Severity: "error",
@@ -147,7 +147,7 @@ func LoadAndValidateOnly(repoPath string) (*model.Schema, error) {
 		}
 
 		if _, exists := schema.Entities[entity.Name]; exists {
-			schema.Errors = append(schema.Errors, SchemaError{
+			schema.Errors = append(schema.Errors, model.SchemaError{
 				Entity:   entity.Name,
 				Message:  fmt.Sprintf("duplicate entity name %q", entity.Name),
 				Severity: "error",
@@ -165,6 +165,3 @@ func LoadAndValidateOnly(repoPath string) (*model.Schema, error) {
 
 	return schema, nil
 }
-
-// Ensure imports are used.
-var _ = conventions.ValidateEntityName

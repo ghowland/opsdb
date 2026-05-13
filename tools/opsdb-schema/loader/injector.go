@@ -8,7 +8,7 @@ import (
 // Inject adds reserved fields, governance fields, and versioning sibling
 // entity definitions to the schema based on entity flags. Runs after
 // validation and resolution — entities are known-good at this point.
-func Inject(schema *model.Schema, reserved *ReservedConfig) error {
+func Inject(schema *model.Schema, reserved *model.ReservedConfig) error {
 	// Snapshot entity names to avoid mutation during iteration.
 	entityNames := make([]string, 0, len(schema.Entities))
 	for name := range schema.Entities {
@@ -98,7 +98,7 @@ func Inject(schema *model.Schema, reserved *ReservedConfig) error {
 			}
 		}
 
-		// Append any siblings whose parents weren't in LoadOrder (shouldn't happen, safety).
+		// Append any siblings whose parents weren't in LoadOrder (safety).
 		inOrder := make(map[string]bool)
 		for _, name := range newLoadOrder {
 			inOrder[name] = true
@@ -137,28 +137,49 @@ func injectHierarchical(entity *model.Entity) {
 }
 
 // injectGovernanceFields appends enabled governance fields with underscore prefix.
-func injectGovernanceFields(entity *model.Entity, enabled map[string]bool, reserved *ReservedConfig) {
+// Searches across all three governance-style field lists in ReservedConfig:
+// Governance, Observation, and SchemaMetadata. Each has EnabledBy keys that
+// match against the entity's governance map.
+func injectGovernanceFields(entity *model.Entity, enabled map[string]bool, reserved *model.ReservedConfig) {
 	for flagName, isEnabled := range enabled {
 		if !isEnabled {
 			continue
 		}
 
-		// Look up the field definition from the reserved config.
-		fieldDef, ok := reserved.GovernanceFields[flagName]
-		if !ok {
-			// Fall back to conventions package hardcoded defaults.
-			govFields := conventions.GetGovernanceFields(map[string]bool{flagName: true})
-			for _, gf := range govFields {
-				entity.Fields = append(entity.Fields, gf)
-			}
+		// Search across all governance-style field definition slices.
+		if found := findAndInjectGovernanceField(entity, flagName, reserved.Governance); found {
+			continue
+		}
+		if found := findAndInjectGovernanceField(entity, flagName, reserved.Observation); found {
+			continue
+		}
+		if found := findAndInjectGovernanceField(entity, flagName, reserved.SchemaMetadata); found {
 			continue
 		}
 
-		// Ensure reserved and governance flags are set.
-		fieldDef.IsReserved = true
-		fieldDef.IsGovernance = true
-		entity.Fields = append(entity.Fields, fieldDef)
+		// Fall back to conventions package hardcoded defaults if not found
+		// in any of the reserved config slices.
+		govFields := conventions.GetGovernanceFields(map[string]bool{flagName: true})
+		for _, gf := range govFields {
+			entity.Fields = append(entity.Fields, gf)
+		}
 	}
+}
+
+// findAndInjectGovernanceField searches a GovernanceFieldDef slice for a
+// matching EnabledBy key. If found, appends the field to the entity and
+// returns true. Returns false if no match found.
+func findAndInjectGovernanceField(entity *model.Entity, flagName string, defs []model.GovernanceFieldDef) bool {
+	for _, gfd := range defs {
+		if gfd.EnabledBy == flagName {
+			fieldDef := gfd.Field
+			fieldDef.IsReserved = true
+			fieldDef.IsGovernance = true
+			entity.Fields = append(entity.Fields, fieldDef)
+			return true
+		}
+	}
+	return false
 }
 
 // generateVersioningSibling creates the {entity_name}_version entity
@@ -168,19 +189,20 @@ func generateVersioningSibling(entity *model.Entity) *model.Entity {
 	siblingName := entity.Name + "_version"
 
 	sibling := &model.Entity{
-		Name:        siblingName,
-		Description: "Version history for " + entity.Name,
-		Category:    entity.Category,
-		Versioned:   false,  // no recursive versioning
-		SoftDelete:  false,  // versions are permanent
+		Name:         siblingName,
+		Description:  "Version history for " + entity.Name,
+		Category:     entity.Category,
+		Versioned:    false, // no recursive versioning
+		SoftDelete:   false, // versions are permanent
 		Hierarchical: false,
-		AppendOnly:  false,
-		Governance:  nil,
+		AppendOnly:   false,
+		Governance:   nil,
+		IsSibling:    true,
+		ParentEntity: entity.Name,
 	}
 
-	// Versioning structural fields (after universal fields which will be
-	// injected by the caller in the first pass — but siblings are created
-	// in the second pass, so we inject universals here directly).
+	// Inject universal fields directly — siblings are created in the second
+	// pass after universal injection, so they need their own.
 	sibling.Fields = append(sibling.Fields, conventions.GetUniversalFields()...)
 
 	// FK to parent entity.
@@ -194,7 +216,7 @@ func generateVersioningSibling(entity *model.Entity) *model.Entity {
 	})
 
 	// Version serial.
-	minOne := 1
+	minOne := float64(1)
 	sibling.Fields = append(sibling.Fields, model.Field{
 		Name:        "version_serial",
 		Type:        "int",
@@ -252,17 +274,21 @@ func generateVersioningSibling(entity *model.Entity) *model.Entity {
 		"created_time": true,
 		"updated_time": true,
 	}
+	// Also skip fields that are already on the sibling (versioning structural fields).
+	siblingStructuralNames := map[string]bool{
+		entity.Name + "_id":             true,
+		"version_serial":                true,
+		"parent_" + siblingName + "_id": true,
+		"change_set_id":                 true,
+		"is_active_version":             true,
+		"approved_for_production_time":  true,
+	}
+
 	for _, parentField := range entity.Fields {
 		if universalNames[parentField.Name] {
 			continue
 		}
-		// Skip fields that are already on the sibling (versioning structural fields).
-		if parentField.Name == entity.Name+"_id" ||
-			parentField.Name == "version_serial" ||
-			parentField.Name == "parent_"+siblingName+"_id" ||
-			parentField.Name == "change_set_id" ||
-			parentField.Name == "is_active_version" ||
-			parentField.Name == "approved_for_production_time" {
+		if siblingStructuralNames[parentField.Name] {
 			continue
 		}
 
@@ -278,22 +304,23 @@ func generateVersioningSibling(entity *model.Entity) *model.Entity {
 		sibling.Fields = append(sibling.Fields, snapshotField)
 	}
 
-	// Indexes for the sibling.
+	// Indexes for the sibling. model.Index has no Name field — optional
+	// user-provided name stored in Description.
 	sibling.Indexes = []model.Index{
 		{
-			Name:   "uq_" + siblingName + "_entity_serial",
-			Fields: []string{entity.Name + "_id", "version_serial"},
-			Unique: true,
+			Description: "uq_" + siblingName + "_entity_serial",
+			Fields:      []string{entity.Name + "_id", "version_serial"},
+			Unique:      true,
 		},
 		{
-			Name:   "idx_" + siblingName + "_change_set_id",
-			Fields: []string{"change_set_id"},
-			Unique: false,
+			Description: "idx_" + siblingName + "_change_set_id",
+			Fields:      []string{"change_set_id"},
+			Unique:      false,
 		},
 		{
-			Name:   "idx_" + siblingName + "_is_active_version",
-			Fields: []string{"is_active_version"},
-			Unique: false,
+			Description: "idx_" + siblingName + "_is_active_version",
+			Fields:      []string{"is_active_version"},
+			Unique:      false,
 		},
 	}
 

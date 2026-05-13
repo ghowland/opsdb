@@ -281,18 +281,22 @@ func markDeprecated(tx *pg.Tx, fieldName string, entityName string, versionID in
 func buildFieldConstraintJSON(field model.Field) (string, error) {
 	constraints := make(map[string]interface{})
 
-	if field.MaxLength != nil {
-		constraints["max_length"] = *field.MaxLength
+	// MaxLength and MinLength are plain int; 0 means unset.
+	if field.MaxLength > 0 {
+		constraints["max_length"] = field.MaxLength
 	}
-	if field.MinLength != nil {
-		constraints["min_length"] = *field.MinLength
+	if field.MinLength > 0 {
+		constraints["min_length"] = field.MinLength
 	}
+
+	// MaxValue and MinValue are *float64.
 	if field.MaxValue != nil {
-		constraints["max_value"] = field.MaxValue
+		constraints["max_value"] = *field.MaxValue
 	}
 	if field.MinValue != nil {
-		constraints["min_value"] = field.MinValue
+		constraints["min_value"] = *field.MinValue
 	}
+
 	if field.PrecisionDecimalPlaces != nil {
 		constraints["precision_decimal_places"] = *field.PrecisionDecimalPlaces
 	}

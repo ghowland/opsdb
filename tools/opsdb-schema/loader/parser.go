@@ -10,7 +10,8 @@ import (
 )
 
 // MetaSchema holds the parsed meta-schema that validates entity YAML files.
-// Loaded from schema/meta/_schema_meta.yaml.
+// This is a simplified parse target for the loader — not the full
+// model.MetaSchema which carries richer structure for runtime use.
 type MetaSchema struct {
 	AllowedTopLevelKeys   []string
 	AllowedFieldKeys      []string
@@ -20,7 +21,7 @@ type MetaSchema struct {
 	Version               string
 }
 
-// allowedTopLevelKeySet is built from MetaSchema for fast lookup.
+// allowedTopLevelKeySet for fast lookup during entity parsing.
 var defaultAllowedTopLevelKeys = map[string]bool{
 	"name": true, "description": true, "category": true,
 	"versioned": true, "soft_delete": true, "hierarchical": true,
@@ -169,24 +170,26 @@ func parseField(fieldMap map[string]interface{}, index int, filePath string) (*m
 		field.References = ref
 	}
 
+	// MaxLength and MinLength are plain int on model.Field (0 = unset).
 	if ml, ok := fieldMap["max_length"]; ok {
 		if v, err := yamlInt(ml); err == nil {
-			field.MaxLength = &v
+			field.MaxLength = v
 		}
 	}
 
 	if ml, ok := fieldMap["min_length"]; ok {
 		if v, err := yamlInt(ml); err == nil {
-			field.MinLength = &v
+			field.MinLength = v
 		}
 	}
 
+	// MaxValue and MinValue are *float64 on model.Field.
 	if mv, ok := fieldMap["max_value"]; ok {
-		field.MaxValue = mv
+		field.MaxValue = yamlFloat64Ptr(mv)
 	}
 
 	if mv, ok := fieldMap["min_value"]; ok {
-		field.MinValue = mv
+		field.MinValue = yamlFloat64Ptr(mv)
 	}
 
 	if pdp, ok := fieldMap["precision_decimal_places"]; ok {
@@ -219,11 +222,15 @@ func parseField(fieldMap map[string]interface{}, index int, filePath string) (*m
 }
 
 // parseIndex extracts a model.Index from a parsed YAML index map.
+// The model.Index has no Name field — an optional user-provided name
+// is stored in Description. Index names for DDL are computed from
+// entity name and field list by the generator.
 func parseIndex(idxMap map[string]interface{}, index int, filePath string) (*model.Index, error) {
 	idx := &model.Index{}
 
+	// Optional name stored in Description (model.Index has no Name field).
 	if name, ok := idxMap["name"].(string); ok {
-		idx.Name = name
+		idx.Description = name
 	}
 
 	if fieldsRaw, ok := idxMap["fields"]; ok {
@@ -332,19 +339,8 @@ func ParseMetaSchema(path string) (*MetaSchema, error) {
 }
 
 // ParseReserved reads and parses the reserved field conventions file.
-// Delegates to the conventions package LoadReserved for the actual parsing,
-// then wraps the result into the loader's ReservedConfig type.
-func ParseReserved(path string) (*ReservedConfig, error) {
-	// Read and parse via the conventions package.
-	modelConfig, err := loadReservedFromFile(path)
-	if err != nil {
-		return nil, err
-	}
-	return modelConfig, nil
-}
-
-// loadReservedFromFile reads reserved.yaml and returns a ReservedConfig.
-func loadReservedFromFile(path string) (*ReservedConfig, error) {
+// Returns *model.ReservedConfig aligned to the model's structure.
+func ParseReserved(path string) (*model.ReservedConfig, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("reading reserved conventions: %w", err)
@@ -355,43 +351,65 @@ func loadReservedFromFile(path string) (*ReservedConfig, error) {
 		return nil, fmt.Errorf("parsing reserved conventions: %w", err)
 	}
 
-	config := &ReservedConfig{
-		GovernanceFields: make(map[string]model.Field),
-	}
+	config := &model.ReservedConfig{}
 
+	// Universal fields (id, created_time, updated_time).
 	for _, fd := range raw.Universal.Fields {
-		config.UniversalFields = append(config.UniversalFields, yamlFieldToModel(fd, true, false))
+		config.Universal = append(config.Universal, yamlFieldToModel(fd, true, false))
 	}
 
+	// Soft delete fields (is_active).
 	for _, fd := range raw.SoftDelete.Fields {
-		config.SoftDeleteFields = append(config.SoftDeleteFields, yamlFieldToModel(fd, true, false))
+		config.SoftDelete = append(config.SoftDelete, yamlFieldToModel(fd, true, false))
 	}
 
+	// Hierarchical fields (parent_{entity}_id placeholders).
+	for _, fd := range raw.Hierarchical.Fields {
+		config.Hierarchical = append(config.Hierarchical, yamlFieldToModel(fd, true, false))
+	}
+
+	// Versioning sibling fields.
 	for _, fd := range raw.VersioningSibling.Fields {
-		config.VersionSiblingFields = append(config.VersionSiblingFields, yamlFieldToModel(fd, true, false))
+		config.VersioningSibling = append(config.VersioningSibling, yamlFieldToModel(fd, true, false))
 	}
 
+	// Governance fields — stored as []GovernanceFieldDef with EnabledBy.
 	for _, fd := range raw.Governance.Fields {
-		config.GovernanceFields[fd.Name] = yamlFieldToModel(fd, true, true)
-	}
-	for _, fd := range raw.Observation.Fields {
-		config.GovernanceFields[fd.Name] = yamlFieldToModel(fd, true, true)
-	}
-	for _, fd := range raw.SchemaMetadata.Fields {
-		config.GovernanceFields[fd.Name] = yamlFieldToModel(fd, true, true)
-	}
-
-	for _, rd := range raw.DatabaseRoles {
-		config.DatabaseRoles = append(config.DatabaseRoles, RoleDefinition{
-			Name:        rd.Name,
-			Permissions: rd.Permissions,
-			AppliesTo:   rd.AppliesTo,
-			Description: rd.Description,
+		config.Governance = append(config.Governance, model.GovernanceFieldDef{
+			Field:     yamlFieldToModel(fd, true, true),
+			EnabledBy: fd.EnabledBy,
 		})
 	}
 
-	config.AppendOnlyRevokeOps = raw.AppendOnly.RevokeOperations
-	config.AppendOnlyRevokeRoles = raw.AppendOnly.RevokeFromRoles
+	// Observation fields — also governance-style with EnabledBy.
+	for _, fd := range raw.Observation.Fields {
+		config.Observation = append(config.Observation, model.GovernanceFieldDef{
+			Field:     yamlFieldToModel(fd, true, true),
+			EnabledBy: fd.EnabledBy,
+		})
+	}
+
+	// Schema metadata fields — also governance-style with EnabledBy.
+	for _, fd := range raw.SchemaMetadata.Fields {
+		config.SchemaMetadata = append(config.SchemaMetadata, model.GovernanceFieldDef{
+			Field:     yamlFieldToModel(fd, true, true),
+			EnabledBy: fd.EnabledBy,
+		})
+	}
+
+	// Append-only config.
+	config.AppendOnly = model.AppendOnlyConfig{
+		PostgresRevokeRoles: raw.AppendOnly.RevokeFromRoles,
+	}
+
+	// Database roles — model uses Grants, not Permissions.
+	for _, rd := range raw.DatabaseRoles {
+		config.DatabaseRoles = append(config.DatabaseRoles, model.RoleDefinition{
+			Name:        rd.Name,
+			Description: rd.Description,
+			Grants:      rd.Grants,
+		})
+	}
 
 	return config, nil
 }
@@ -436,13 +454,14 @@ type reservedFieldYAML struct {
 	Unique      bool        `yaml:"unique"`
 	EnumValues  []string    `yaml:"enum_values"`
 	MaxLength   int         `yaml:"max_length"`
+	EnabledBy   string      `yaml:"enabled_by"`
 }
 
+// reservedRoleYAML matches model.RoleDefinition: uses Grants, no AppliesTo.
 type reservedRoleYAML struct {
 	Name        string   `yaml:"name"`
-	Permissions []string `yaml:"permissions"`
-	AppliesTo   string   `yaml:"applies_to"`
 	Description string   `yaml:"description"`
+	Grants      []string `yaml:"grants"`
 }
 
 // yamlFieldToModel converts a parsed YAML field definition to a model.Field.
@@ -459,9 +478,9 @@ func yamlFieldToModel(fd reservedFieldYAML, isReserved bool, isGovernance bool) 
 		IsReserved:   isReserved,
 		IsGovernance: isGovernance,
 	}
+	// MaxLength is plain int on model.Field (0 = unset).
 	if fd.MaxLength > 0 {
-		ml := fd.MaxLength
-		f.MaxLength = &ml
+		f.MaxLength = fd.MaxLength
 	}
 	return f
 }
@@ -597,6 +616,29 @@ func yamlInt(val interface{}) (int, error) {
 		return int(v), nil
 	default:
 		return 0, fmt.Errorf("cannot convert %T to int", val)
+	}
+}
+
+// yamlFloat64Ptr converts a YAML numeric value to *float64.
+// Returns nil if the value cannot be converted.
+func yamlFloat64Ptr(val interface{}) *float64 {
+	switch v := val.(type) {
+	case float64:
+		return &v
+	case float32:
+		f := float64(v)
+		return &f
+	case int:
+		f := float64(v)
+		return &f
+	case int64:
+		f := float64(v)
+		return &f
+	case int32:
+		f := float64(v)
+		return &f
+	default:
+		return nil
 	}
 }
 

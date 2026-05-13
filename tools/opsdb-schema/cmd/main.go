@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/ghowland/opsdb/internal/model"
 	"github.com/ghowland/opsdb/internal/pg"
 	"github.com/ghowland/opsdb/tools/opsdb-schema/loader"
 )
@@ -95,7 +96,6 @@ func cmdValidate(repoPath string, scope string) int {
 
 	schema, err := loader.Load(repoPath)
 	if err != nil {
-		// Load returns the schema even with errors so we can report them.
 		if schema != nil && len(schema.Errors) > 0 {
 			printSchemaErrors(schema.Errors)
 			fmt.Fprintf(os.Stderr, "\n%d validation error(s) found\n", len(schema.Errors))
@@ -160,7 +160,6 @@ func cmdPlan(repoPath string, dsn string, scope string, verbose bool) int {
 		return 2
 	}
 
-	// Print forbidden changes as errors.
 	if len(evolution.Forbidden) > 0 {
 		fmt.Println("\n=== Forbidden Changes ===")
 		for _, fc := range evolution.Forbidden {
@@ -181,7 +180,6 @@ func cmdPlan(repoPath string, dsn string, scope string, verbose bool) int {
 		return 0
 	}
 
-	// Generate DDL.
 	statements, err := loader.GenerateDDL(schema, evolution.Allowed)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error generating DDL: %v\n", err)
@@ -196,7 +194,6 @@ func cmdPlan(repoPath string, dsn string, scope string, verbose bool) int {
 		}
 	}
 
-	// Summary.
 	tables, columns, constraints, indexes := countChanges(evolution.Allowed)
 	fmt.Printf("\nplan: %d tables to create, %d columns to add, %d constraints to modify, %d indexes to create\n",
 		tables, columns, constraints, indexes)
@@ -434,7 +431,9 @@ func cmdExport(dsn string) int {
 	return 0
 }
 
-// cmdInit creates a new empty schema repository.
+// cmdInit creates a new empty schema repository directory structure.
+// The user populates it with the actual YAML files from the schema/
+// directory or copies from an existing deployment.
 func cmdInit(repoPath string) int {
 	schemaDir := filepath.Join(repoPath, "schema")
 
@@ -452,210 +451,17 @@ func cmdInit(repoPath string) int {
 		}
 	}
 
-	// Write minimal directory.yaml.
-	directoryContent := "# OpsDB Schema Directory\n# List entity files in dependency order.\nimports: []\n"
-	directoryPath := filepath.Join(schemaDir, "directory.yaml")
-	if err := os.WriteFile(directoryPath, []byte(directoryContent), 0644); err != nil {
-		fmt.Fprintf(os.Stderr, "error writing directory.yaml: %v\n", err)
-		return 2
-	}
-
-	// Write minimal meta-schema.
-	metaContent := `version: "1.0"
-
-allowed_top_level_keys:
-  - name
-  - description
-  - category
-  - versioned
-  - soft_delete
-  - hierarchical
-  - append_only
-  - fields
-  - indexes
-  - governance
-
-allowed_field_keys:
-  - name
-  - type
-  - nullable
-  - description
-  - default
-  - unique
-  - references
-  - max_length
-  - min_length
-  - max_value
-  - min_value
-  - precision_decimal_places
-  - enum_values
-  - json_type_discriminator
-  - must_be_unique_within
-
-allowed_index_keys:
-  - fields
-  - unique
-  - name
-
-allowed_governance_keys:
-  - _requires_group
-  - _access_classification
-  - _audit_chain_hash
-  - _retention_policy_id
-  - _schema_version_introduced_id
-  - _schema_version_deprecated_id
-  - _observed_time
-  - _authority_id
-  - _puller_runner_job_id
-
-allowed_categories:
-  - identity
-  - substrate
-  - service
-  - kubernetes
-  - authority
-  - schedule
-  - policy
-  - documentation
-  - runner
-  - monitoring
-  - observation
-  - config
-  - change_mgmt
-  - audit
-  - schema_meta
-`
-	metaPath := filepath.Join(schemaDir, "meta", "_schema_meta.yaml")
-	if err := os.WriteFile(metaPath, []byte(metaContent), 0644); err != nil {
-		fmt.Fprintf(os.Stderr, "error writing meta-schema: %v\n", err)
-		return 2
-	}
-
-	// Write minimal reserved.yaml.
-	reservedContent := `universal:
-  fields:
-    - name: id
-      type: int
-      nullable: false
-      description: "primary key auto-increment"
-    - name: created_time
-      type: datetime
-      nullable: false
-      description: "set on insert"
-    - name: updated_time
-      type: datetime
-      nullable: false
-      description: "set on insert and update"
-
-soft_delete:
-  fields:
-    - name: is_active
-      type: boolean
-      nullable: false
-      default: true
-      description: "soft delete state"
-
-hierarchical:
-  fields: []
-
-versioning_sibling:
-  fields:
-    - name: version_serial
-      type: int
-      nullable: false
-      description: "monotonic version number"
-    - name: is_active_version
-      type: boolean
-      nullable: false
-      default: false
-      description: "true for current version"
-    - name: approved_for_production_time
-      type: datetime
-      nullable: true
-      description: "when version went live"
-
-governance:
-  fields:
-    - name: _requires_group
-      type: varchar
-      nullable: true
-      max_length: 255
-      description: "group required for access"
-    - name: _access_classification
-      type: enum
-      nullable: true
-      enum_values: [public, internal, confidential, restricted, regulated]
-      description: "data sensitivity level"
-
-observation:
-  fields:
-    - name: _observed_time
-      type: datetime
-      nullable: true
-      description: "when observation sampled"
-    - name: _authority_id
-      type: foreign_key
-      nullable: true
-      references: authority
-      description: "source authority"
-    - name: _puller_runner_job_id
-      type: foreign_key
-      nullable: true
-      references: runner_job
-      description: "runner job that wrote"
-
-schema_metadata:
-  fields:
-    - name: _schema_version_introduced_id
-      type: foreign_key
-      nullable: true
-      references: _schema_version
-      description: "schema version introduced"
-    - name: _schema_version_deprecated_id
-      type: foreign_key
-      nullable: true
-      references: _schema_version
-      description: "schema version deprecated"
-
-append_only:
-  revoke_operations: [UPDATE, DELETE]
-  revoke_from_roles: [opsdb_app_role, opsdb_runner_role, opsdb_readonly_role]
-
-database_roles:
-  - name: opsdb_app_role
-    permissions: [SELECT, INSERT, UPDATE, DELETE]
-    applies_to: all
-    description: "application role for API"
-  - name: opsdb_admin_role
-    permissions: [ALL]
-    applies_to: all
-    description: "admin role for substrate operators"
-  - name: opsdb_readonly_role
-    permissions: [SELECT]
-    applies_to: all
-    description: "read-only role for auditors"
-  - name: opsdb_runner_role
-    permissions: [SELECT, INSERT, UPDATE]
-    applies_to: all
-    description: "runner role"
-`
-	reservedPath := filepath.Join(schemaDir, "conventions", "reserved.yaml")
-	if err := os.WriteFile(reservedPath, []byte(reservedContent), 0644); err != nil {
-		fmt.Fprintf(os.Stderr, "error writing reserved.yaml: %v\n", err)
-		return 2
-	}
-
-	fmt.Printf("initialized schema repository at %s\n", repoPath)
-	fmt.Println("  schema/meta/_schema_meta.yaml")
-	fmt.Println("  schema/conventions/reserved.yaml")
-	fmt.Println("  schema/directory.yaml")
-	fmt.Println("  schema/domains/")
-	fmt.Println("  schema/json_schemas/")
+	fmt.Printf("initialized schema repository at %s\n", schemaDir)
+	fmt.Println("  schema/meta/          — place _schema_meta.yaml here")
+	fmt.Println("  schema/conventions/   — place reserved.yaml here")
+	fmt.Println("  schema/domains/       — place entity YAML files here")
+	fmt.Println("  schema/json_schemas/  — place JSON payload schemas here")
+	fmt.Println("  schema/directory.yaml — create with ordered imports list")
 	return 0
 }
 
 // printSchemaErrors prints validation errors in a human-readable format.
-func printSchemaErrors(errors []loader.SchemaError) {
+func printSchemaErrors(errors []model.SchemaError) {
 	for _, e := range errors {
 		severity := strings.ToUpper(e.Severity)
 		if e.Field != "" {

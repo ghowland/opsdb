@@ -62,7 +62,7 @@ func GenerateDDL(schema *model.Schema, changes []AllowedChange) ([]DDLStatement,
 				allFields := append([]string{field.Name}, field.MustBeUniqueWithin...)
 				statements = append(statements, generateCompositeUnique(entity.Name, allFields))
 			}
-			// CHECK constraints for numeric ranges (not inlined in CREATE TABLE for existing fields).
+			// CHECK constraints for numeric ranges.
 			if (field.Type == "int" || field.Type == "float") && (field.MinValue != nil || field.MaxValue != nil) {
 				stmt := generateCheckConstraint(entity.Name, field)
 				if stmt.SQL != "" {
@@ -267,10 +267,10 @@ func generateCheckConstraint(entityName string, field *model.Field) DDLStatement
 	var conditions []string
 
 	if field.MinValue != nil {
-		conditions = append(conditions, fmt.Sprintf("%s >= %v", field.Name, field.MinValue))
+		conditions = append(conditions, fmt.Sprintf("%s >= %v", field.Name, *field.MinValue))
 	}
 	if field.MaxValue != nil {
-		conditions = append(conditions, fmt.Sprintf("%s <= %v", field.Name, field.MaxValue))
+		conditions = append(conditions, fmt.Sprintf("%s <= %v", field.Name, *field.MaxValue))
 	}
 
 	if len(conditions) == 0 {
@@ -290,9 +290,11 @@ func generateCheckConstraint(entityName string, field *model.Field) DDLStatement
 }
 
 // generateIndex produces a CREATE INDEX statement.
+// model.Index has no Name field — an optional user-provided name is stored
+// in Description. If Description is empty, the name is computed from fields.
 func generateIndex(entityName string, index *model.Index) DDLStatement {
 	fieldList := strings.Join(index.Fields, ", ")
-	indexName := index.Name
+	indexName := index.Description
 	if indexName == "" {
 		prefix := "idx"
 		if index.Unique {
@@ -398,32 +400,4 @@ func formatDefault(fieldType string, value interface{}) string {
 // escapeSQLString escapes single quotes in a SQL string literal.
 func escapeSQLString(s string) string {
 	return strings.ReplaceAll(s, "'", "''")
-}
-
-// buildConstraintMap builds a constraint map from a model.Field for use
-// with vocabulary.GetPostgresType. (Duplicated from differ.go for package locality.)
-func buildConstraintMapFromField(f *model.Field) map[string]interface{} {
-	m := make(map[string]interface{})
-	if f.MaxLength != nil {
-		m["max_length"] = *f.MaxLength
-	}
-	if f.MinLength != nil {
-		m["min_length"] = *f.MinLength
-	}
-	if f.MaxValue != nil {
-		m["max_value"] = f.MaxValue
-	}
-	if f.MinValue != nil {
-		m["min_value"] = f.MinValue
-	}
-	if f.PrecisionDecimalPlaces != nil {
-		m["precision_decimal_places"] = *f.PrecisionDecimalPlaces
-	}
-	if len(f.EnumValues) > 0 {
-		m["enum_values"] = f.EnumValues
-	}
-	if f.References != "" {
-		m["references"] = f.References
-	}
-	return m
 }

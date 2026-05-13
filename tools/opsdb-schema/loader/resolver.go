@@ -112,24 +112,11 @@ func BuildDependencyGraph(entities map[string]*model.Entity) (map[string][]strin
 // then entities that depend only on already-listed entities.
 // Returns error if the graph contains cycles (not all nodes visited).
 func TopologicalSort(graph map[string][]string) ([]string, error) {
-	// In-degree: how many dependencies each entity has.
+	// inDegree[X] = number of entities X depends on.
+	// reverseAdj[Y] = list of entities that depend on Y.
 	inDegree := make(map[string]int, len(graph))
-	for name := range graph {
-		inDegree[name] = 0
-	}
-	for _, deps := range graph {
-		for _, dep := range deps {
-			// This entity depends on dep, but in-degree counts how many
-			// things depend on us. We need the reverse: in-degree = number
-			// of dependencies (edges pointing INTO this node in the "must come after" sense).
-			// Actually, for Kahn's: inDegree[entity] = len(graph[entity]) is the dependency count.
-		}
-		_ = dep
-	}
-
-	// Correct approach: inDegree[X] = number of entities X depends on.
-	// Reverse graph: reverseAdj[Y] = list of entities that depend on Y.
 	reverseAdj := make(map[string][]string, len(graph))
+
 	for name := range graph {
 		reverseAdj[name] = nil
 		inDegree[name] = len(graph[name])

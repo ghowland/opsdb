@@ -116,8 +116,8 @@ func classifyStatement(result *ApplyResult, stmt DDLStatement) {
 		result.ConstraintsModified++
 	case 3:
 		result.IndexesCreated++
-	// Phase 4 (REVOKE for append-only) counted as constraints for reporting.
 	case 4:
+		// REVOKE for append-only counted as constraints for reporting.
 		result.ConstraintsModified++
 	}
 }

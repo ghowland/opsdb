@@ -8,23 +8,15 @@ import (
 	"github.com/ghowland/opsdb/internal/vocabulary"
 )
 
-// SchemaError represents one validation error with location and context.
-type SchemaError struct {
-	Entity   string
-	Field    string
-	Message  string
-	Severity string // error, warning
-}
-
 // Validate runs all validation checks on one parsed entity.
 // Accumulates errors rather than failing on first — returns the full
 // picture of what is wrong. Called once per entity during the loading pipeline.
-func Validate(entity *model.Entity, rawYAML map[string]interface{}, metaSchema *MetaSchema, knownEntities map[string]bool) []SchemaError {
-	var errors []SchemaError
+func Validate(entity *model.Entity, rawYAML map[string]interface{}, metaSchema *MetaSchema, knownEntities map[string]bool) []model.SchemaError {
+	var errors []model.SchemaError
 
 	// Validate entity name.
 	if err := conventions.ValidateEntityName(entity.Name); err != nil {
-		errors = append(errors, SchemaError{
+		errors = append(errors, model.SchemaError{
 			Entity:   entity.Name,
 			Message:  fmt.Sprintf("invalid entity name: %v", err),
 			Severity: "error",
@@ -33,7 +25,7 @@ func Validate(entity *model.Entity, rawYAML map[string]interface{}, metaSchema *
 
 	// Validate category is in allowed set.
 	if !isInList(entity.Category, metaSchema.AllowedCategories) {
-		errors = append(errors, SchemaError{
+		errors = append(errors, model.SchemaError{
 			Entity:   entity.Name,
 			Message:  fmt.Sprintf("unknown category %q (allowed: %v)", entity.Category, metaSchema.AllowedCategories),
 			Severity: "error",
@@ -42,7 +34,7 @@ func Validate(entity *model.Entity, rawYAML map[string]interface{}, metaSchema *
 
 	// Validate versioned + append_only are mutually exclusive.
 	if entity.Versioned && entity.AppendOnly {
-		errors = append(errors, SchemaError{
+		errors = append(errors, model.SchemaError{
 			Entity:   entity.Name,
 			Message:  "versioned and append_only are mutually exclusive: an append-only entity cannot have version history (versions require updates)",
 			Severity: "error",
@@ -52,7 +44,7 @@ func Validate(entity *model.Entity, rawYAML map[string]interface{}, metaSchema *
 	// Check for reserved field name collisions.
 	for _, field := range entity.Fields {
 		if conventions.IsReservedFieldName(field.Name, entity.Name) {
-			errors = append(errors, SchemaError{
+			errors = append(errors, model.SchemaError{
 				Entity:   entity.Name,
 				Field:    field.Name,
 				Message:  fmt.Sprintf("field %q is reserved and must not be declared in entity files (it is injected automatically)", field.Name),
@@ -78,7 +70,7 @@ func Validate(entity *model.Entity, rawYAML map[string]interface{}, metaSchema *
 	// Scan raw YAML for forbidden patterns.
 	violations := vocabulary.ScanForForbiddenPatterns(rawYAML)
 	for _, v := range violations {
-		errors = append(errors, SchemaError{
+		errors = append(errors, model.SchemaError{
 			Entity:   entity.Name,
 			Field:    v.Location,
 			Message:  fmt.Sprintf("forbidden pattern '%s': %s (alternative: %s)", v.Pattern, v.Rationale, v.Alternative),
@@ -90,24 +82,22 @@ func Validate(entity *model.Entity, rawYAML map[string]interface{}, metaSchema *
 }
 
 // validateFields checks each field's type, constraints, modifiers, and naming.
-func validateFields(fields []model.Field, entityName string, metaSchema *MetaSchema, knownEntities map[string]bool) []SchemaError {
-	var errors []SchemaError
+func validateFields(fields []model.Field, entityName string, metaSchema *MetaSchema, knownEntities map[string]bool) []model.SchemaError {
+	var errors []model.SchemaError
 
 	// Collect all field names for duplicate detection and cross-references.
 	allFieldNames := make([]string, 0, len(fields))
-	fieldNameMap := make(map[string]string) // name -> type for JSON discriminator validation
 	nameCount := make(map[string]int)
 
 	for _, f := range fields {
 		allFieldNames = append(allFieldNames, f.Name)
-		fieldNameMap[f.Name] = f.Type
 		nameCount[f.Name]++
 	}
 
 	// Check for duplicate field names.
 	for name, count := range nameCount {
 		if count > 1 {
-			errors = append(errors, SchemaError{
+			errors = append(errors, model.SchemaError{
 				Entity:   entityName,
 				Field:    name,
 				Message:  fmt.Sprintf("duplicate field name %q (appears %d times)", name, count),
@@ -119,7 +109,7 @@ func validateFields(fields []model.Field, entityName string, metaSchema *MetaSch
 	for _, field := range fields {
 		// Validate field name.
 		if err := conventions.ValidateFieldName(field.Name, field.Type); err != nil {
-			errors = append(errors, SchemaError{
+			errors = append(errors, model.SchemaError{
 				Entity:   entityName,
 				Field:    field.Name,
 				Message:  fmt.Sprintf("invalid field name: %v", err),
@@ -129,7 +119,7 @@ func validateFields(fields []model.Field, entityName string, metaSchema *MetaSch
 
 		// Validate type is one of the nine allowed types.
 		if !vocabulary.IsValidType(field.Type) {
-			errors = append(errors, SchemaError{
+			errors = append(errors, model.SchemaError{
 				Entity:   entityName,
 				Field:    field.Name,
 				Message:  fmt.Sprintf("unknown field type %q", field.Type),
@@ -139,11 +129,11 @@ func validateFields(fields []model.Field, entityName string, metaSchema *MetaSch
 		}
 
 		// Build constraint map from field properties.
-		constraintMap := buildFieldConstraintMap(field)
+		constraintMap := buildConstraintMap(field)
 
 		// Validate constraints against the type's allowed/required constraints.
 		if err := vocabulary.ValidateConstraints(field.Type, constraintMap); err != nil {
-			errors = append(errors, SchemaError{
+			errors = append(errors, model.SchemaError{
 				Entity:   entityName,
 				Field:    field.Name,
 				Message:  fmt.Sprintf("constraint error: %v", err),
@@ -151,10 +141,10 @@ func validateFields(fields []model.Field, entityName string, metaSchema *MetaSch
 			})
 		}
 
-		// Validate modifiers.
+		// Validate default value if present.
 		if field.Default != nil {
 			if err := vocabulary.ValidateDefault(field.Type, field.Default); err != nil {
-				errors = append(errors, SchemaError{
+				errors = append(errors, model.SchemaError{
 					Entity:   entityName,
 					Field:    field.Name,
 					Message:  fmt.Sprintf("invalid default: %v", err),
@@ -163,9 +153,10 @@ func validateFields(fields []model.Field, entityName string, metaSchema *MetaSch
 			}
 		}
 
+		// Validate unique modifier.
 		if field.Unique {
 			if err := vocabulary.ValidateUnique(field.Type); err != nil {
-				errors = append(errors, SchemaError{
+				errors = append(errors, model.SchemaError{
 					Entity:   entityName,
 					Field:    field.Name,
 					Message:  fmt.Sprintf("invalid unique modifier: %v", err),
@@ -174,9 +165,10 @@ func validateFields(fields []model.Field, entityName string, metaSchema *MetaSch
 			}
 		}
 
+		// Validate composite uniqueness scope.
 		if len(field.MustBeUniqueWithin) > 0 {
 			if err := vocabulary.ValidateMustBeUniqueWithin(field.MustBeUniqueWithin, allFieldNames); err != nil {
-				errors = append(errors, SchemaError{
+				errors = append(errors, model.SchemaError{
 					Entity:   entityName,
 					Field:    field.Name,
 					Message:  fmt.Sprintf("invalid must_be_unique_within: %v", err),
@@ -185,25 +177,10 @@ func validateFields(fields []model.Field, entityName string, metaSchema *MetaSch
 			}
 		}
 
-		// Validate modifier compatibility with type.
-		if err := vocabulary.ValidateModifiersForType(
-			field.Type,
-			field.Default != nil, field.Default,
-			field.Unique,
-			len(field.MustBeUniqueWithin) > 0,
-		); err != nil {
-			errors = append(errors, SchemaError{
-				Entity:   entityName,
-				Field:    field.Name,
-				Message:  fmt.Sprintf("modifier error: %v", err),
-				Severity: "error",
-			})
-		}
-
 		// FK-specific validation.
 		if field.Type == "foreign_key" {
 			if field.References == "" {
-				errors = append(errors, SchemaError{
+				errors = append(errors, model.SchemaError{
 					Entity:   entityName,
 					Field:    field.Name,
 					Message:  "foreign_key field missing 'references'",
@@ -211,7 +188,7 @@ func validateFields(fields []model.Field, entityName string, metaSchema *MetaSch
 				})
 			} else {
 				if err := conventions.ValidateFKName(field.Name, field.References); err != nil {
-					errors = append(errors, SchemaError{
+					errors = append(errors, model.SchemaError{
 						Entity:   entityName,
 						Field:    field.Name,
 						Message:  fmt.Sprintf("FK naming: %v", err),
@@ -224,7 +201,7 @@ func validateFields(fields []model.Field, entityName string, metaSchema *MetaSch
 				// (which isn't in knownEntities yet).
 				if field.References != entityName {
 					if err := vocabulary.ValidateReferences(field.References, knownEntities); err != nil {
-						errors = append(errors, SchemaError{
+						errors = append(errors, model.SchemaError{
 							Entity:   entityName,
 							Field:    field.Name,
 							Message:  fmt.Sprintf("FK reference: %v", err),
@@ -238,15 +215,16 @@ func validateFields(fields []model.Field, entityName string, metaSchema *MetaSch
 		// JSON-specific validation.
 		if field.Type == "json" {
 			if field.JsonTypeDiscriminator == "" {
-				errors = append(errors, SchemaError{
+				errors = append(errors, model.SchemaError{
 					Entity:   entityName,
 					Field:    field.Name,
 					Message:  "json field missing 'json_type_discriminator'",
 					Severity: "error",
 				})
 			} else {
-				if err := vocabulary.ValidateJsonDiscriminator(field.JsonTypeDiscriminator, fieldNameMap); err != nil {
-					errors = append(errors, SchemaError{
+				// ValidateJsonDiscriminator takes (discriminatorField string, entityFields []string).
+				if err := vocabulary.ValidateJsonDiscriminator(field.JsonTypeDiscriminator, allFieldNames); err != nil {
+					errors = append(errors, model.SchemaError{
 						Entity:   entityName,
 						Field:    field.Name,
 						Message:  fmt.Sprintf("JSON discriminator: %v", err),
@@ -261,8 +239,8 @@ func validateFields(fields []model.Field, entityName string, metaSchema *MetaSch
 }
 
 // validateIndexes checks that index field references exist on the entity.
-func validateIndexes(indexes []model.Index, fields []model.Field, entityName string) []SchemaError {
-	var errors []SchemaError
+func validateIndexes(indexes []model.Index, fields []model.Field, entityName string) []model.SchemaError {
+	var errors []model.SchemaError
 
 	// Build set of field names.
 	fieldSet := make(map[string]bool, len(fields))
@@ -279,7 +257,7 @@ func validateIndexes(indexes []model.Index, fields []model.Field, entityName str
 
 	for i, idx := range indexes {
 		if len(idx.Fields) == 0 {
-			errors = append(errors, SchemaError{
+			errors = append(errors, model.SchemaError{
 				Entity:   entityName,
 				Message:  fmt.Sprintf("index %d has no fields", i),
 				Severity: "error",
@@ -289,7 +267,7 @@ func validateIndexes(indexes []model.Index, fields []model.Field, entityName str
 
 		for _, fieldName := range idx.Fields {
 			if !fieldSet[fieldName] {
-				errors = append(errors, SchemaError{
+				errors = append(errors, model.SchemaError{
 					Entity:   entityName,
 					Field:    fieldName,
 					Message:  fmt.Sprintf("index %d references unknown field %q", i, fieldName),
@@ -303,8 +281,8 @@ func validateIndexes(indexes []model.Index, fields []model.Field, entityName str
 }
 
 // validateGovernance checks that governance keys are recognized by the meta-schema.
-func validateGovernance(governance map[string]bool, metaSchema *MetaSchema, entityName string) []SchemaError {
-	var errors []SchemaError
+func validateGovernance(governance map[string]bool, metaSchema *MetaSchema, entityName string) []model.SchemaError {
+	var errors []model.SchemaError
 
 	allowedSet := make(map[string]bool, len(metaSchema.AllowedGovernanceKeys))
 	for _, key := range metaSchema.AllowedGovernanceKeys {
@@ -313,7 +291,7 @@ func validateGovernance(governance map[string]bool, metaSchema *MetaSchema, enti
 
 	for key := range governance {
 		if !allowedSet[key] {
-			errors = append(errors, SchemaError{
+			errors = append(errors, model.SchemaError{
 				Entity:   entityName,
 				Message:  fmt.Sprintf("unknown governance key %q (allowed: %v)", key, metaSchema.AllowedGovernanceKeys),
 				Severity: "error",
@@ -324,23 +302,28 @@ func validateGovernance(governance map[string]bool, metaSchema *MetaSchema, enti
 	return errors
 }
 
-// buildFieldConstraintMap builds a constraint map from a model.Field
-// for validation by vocabulary.ValidateConstraints.
-func buildFieldConstraintMap(field model.Field) map[string]interface{} {
+// buildConstraintMap builds a constraint map from a model.Field for use
+// with vocabulary.ValidateConstraints and vocabulary.GetPostgresType.
+// This is the canonical copy — used by validator, differ, generator, and meta.
+func buildConstraintMap(field model.Field) map[string]interface{} {
 	m := make(map[string]interface{})
 
-	if field.MaxLength != nil {
-		m["max_length"] = *field.MaxLength
+	// MaxLength and MinLength are plain int; 0 means unset.
+	if field.MaxLength > 0 {
+		m["max_length"] = field.MaxLength
 	}
-	if field.MinLength != nil {
-		m["min_length"] = *field.MinLength
+	if field.MinLength > 0 {
+		m["min_length"] = field.MinLength
 	}
+
+	// MaxValue and MinValue are *float64.
 	if field.MaxValue != nil {
-		m["max_value"] = field.MaxValue
+		m["max_value"] = *field.MaxValue
 	}
 	if field.MinValue != nil {
-		m["min_value"] = field.MinValue
+		m["min_value"] = *field.MinValue
 	}
+
 	if field.PrecisionDecimalPlaces != nil {
 		m["precision_decimal_places"] = *field.PrecisionDecimalPlaces
 	}

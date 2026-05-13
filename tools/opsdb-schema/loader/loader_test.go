@@ -80,6 +80,9 @@ func TestParseDirectoryYAML(t *testing.T) {
 
 // --- Validation Tests ---
 
+// NOTE: testutil.EntityWithReservedFieldCollision may need to be added to
+// internal/testutil/fixtures.go if it does not exist. This test validates
+// that the validator rejects entity files declaring reserved field names.
 func TestValidateRejectsReservedFieldNames(t *testing.T) {
 	repoDir := testutil.SchemaRepoDir(t, testutil.EntityWithReservedFieldCollision())
 	entityPath := filepath.Join(repoDir, "schema", "domains", "test", "entity_000.yaml")
@@ -183,6 +186,8 @@ func TestForbiddenLogic(t *testing.T) {
 	}
 }
 
+// NOTE: testutil.EntityWithForbiddenTemplating may need to be added to
+// internal/testutil/fixtures.go if it does not exist.
 func TestForbiddenTemplating(t *testing.T) {
 	repoDir := testutil.SchemaRepoDir(t, testutil.EntityWithForbiddenTemplating())
 	entityPath := filepath.Join(repoDir, "schema", "domains", "test", "entity_000.yaml")
@@ -206,6 +211,9 @@ func TestForbiddenTemplating(t *testing.T) {
 }
 
 // --- Resolver Tests ---
+
+// NOTE: testutil.SchemaRepoDirOrdered and testutil.ThreeEntityChain may need
+// to be added to internal/testutil/fixtures.go if they do not exist.
 
 func TestResolverTopologicalSort(t *testing.T) {
 	parent, child := testutil.TwoEntitiesWithFK()
@@ -349,6 +357,13 @@ func TestInjectorVersioningSibling(t *testing.T) {
 	sibling, exists := schema.Entities[siblingName]
 	if !exists {
 		t.Fatalf("sibling %s not found", siblingName)
+	}
+
+	if !sibling.IsSibling {
+		t.Error("sibling should have IsSibling = true")
+	}
+	if sibling.ParentEntity != entity.Name {
+		t.Errorf("sibling ParentEntity should be %s, got %s", entity.Name, sibling.ParentEntity)
 	}
 
 	sibFields := make(map[string]bool)
@@ -530,12 +545,11 @@ func TestEvolutionForbidsNarrowingRange(t *testing.T) {
 // --- Generator Tests ---
 
 func TestGeneratorCreateTable(t *testing.T) {
-	maxLen := 255
 	entity := &model.Entity{
 		Name: "test_table", Category: "identity",
 		Fields: []model.Field{
 			{Name: "id", Type: "int", Nullable: false, IsReserved: true},
-			{Name: "label", Type: "varchar", Nullable: false, MaxLength: &maxLen},
+			{Name: "label", Type: "varchar", Nullable: false, MaxLength: 255},
 			{Name: "status", Type: "enum", Nullable: false, EnumValues: []string{"active", "inactive"}},
 		},
 	}
