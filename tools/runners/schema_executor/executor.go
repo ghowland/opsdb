@@ -1,5 +1,3 @@
-//# tools/runners/schema-executor/executor.go
-
 package executor
 
 import (
@@ -8,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ghowland/opsdb/internal/pg"
 	runner "github.com/ghowland/opsdb/tools/opsdb_runner_lib"
 	"github.com/ghowland/opsdb/tools/opsdb_schema/loader"
 )
@@ -18,7 +17,7 @@ type SchemaChangeWork struct {
 	Label        string
 	Description  string
 	TargetCommit string
-	CreatedTime  time.Time
+	CreatedTime  string
 }
 
 // SchemaApplyResult holds the outcome of applying one schema change.
@@ -44,24 +43,28 @@ type SchemaExecutorSummary struct {
 }
 
 // GetApprovedSchemaChanges reads approved schema change sets from OpsDB.
+// Returns them ordered by created_time ascending (oldest first).
 func GetApprovedSchemaChanges(client *runner.APIClient, maxChanges int) ([]SchemaChangeWork, error) {
-	results, err := client.Search("_schema_change_set", map[string]interface{}{
-		"status": "approved",
-	}, []string{"created_time asc"}, maxChanges)
+	results, err := client.Search("_schema_change_set",
+		[]runner.SearchFilter{
+			{Field: "status", Operator: "eq", Value: "approved"},
+		},
+		[]runner.OrderSpec{{Field: "created_time", Direction: "asc"}},
+		maxChanges, "")
 	if err != nil {
-		return nil, fmt.Errorf("failed to search approved schema change sets: %w", err)
+		return nil, fmt.Errorf("searching approved schema change sets: %w", err)
 	}
 
 	changes := make([]SchemaChangeWork, 0, len(results.Rows))
 	for _, row := range results.Rows {
-		changeSetID, _ := row.IntField("id")
-		label, _ := row.StringField("label")
-		description, _ := row.StringField("description")
-		targetCommit, _ := row.StringField("target_commit_hash")
-		createdTime, _ := row.TimeField("created_time")
+		csID, _ := extractInt(row, "id")
+		label, _ := row["label"].(string)
+		description, _ := row["description"].(string)
+		targetCommit, _ := row["target_commit_hash"].(string)
+		createdTime, _ := row["created_time"].(string)
 
 		changes = append(changes, SchemaChangeWork{
-			ChangeSetID:  changeSetID,
+			ChangeSetID:  csID,
 			Label:        label,
 			Description:  description,
 			TargetCommit: targetCommit,
@@ -112,11 +115,13 @@ func CheckoutCommit(repoPath string, commit string) error {
 }
 
 // ApplySchemaChange runs the full schema loader pipeline for one change.
+// This is the one runner that needs direct database access because it
+// executes DDL — the runner-lib API client cannot run DDL statements.
 // Returns the apply result with counts and any errors.
-func ApplySchemaChange(repoPath string, db *runner.DBHandle, change *SchemaChangeWork, verbose bool) (*SchemaApplyResult, error) {
+func ApplySchemaChange(db *pg.DB, repoPath string, change *SchemaChangeWork, verbose bool) (*SchemaApplyResult, error) {
 	result := &SchemaApplyResult{ChangeSetID: change.ChangeSetID}
 
-	// step 1: load schema from repo
+	// Step 1: load schema from repo.
 	schema, err := loader.Load(repoPath)
 	if err != nil {
 		result.Success = false
@@ -124,15 +129,15 @@ func ApplySchemaChange(repoPath string, db *runner.DBHandle, change *SchemaChang
 		return result, nil
 	}
 
-	// step 2: read current database state
-	current, err := loader.ReadCurrentState(db.DB)
+	// Step 2: read current database state.
+	current, err := loader.ReadCurrentState(db)
 	if err != nil {
 		result.Success = false
 		result.ErrorMessage = fmt.Sprintf("read current state failed: %v", err)
 		return result, nil
 	}
 
-	// step 3: diff desired vs current
+	// Step 3: diff desired vs current.
 	diff, err := loader.Diff(schema, current)
 	if err != nil {
 		result.Success = false
@@ -140,7 +145,7 @@ func ApplySchemaChange(repoPath string, db *runner.DBHandle, change *SchemaChang
 		return result, nil
 	}
 
-	// step 4: check evolution rules
+	// Step 4: check evolution rules.
 	evolution, err := loader.CheckEvolution(diff)
 	if err != nil {
 		result.Success = false
@@ -158,7 +163,7 @@ func ApplySchemaChange(repoPath string, db *runner.DBHandle, change *SchemaChang
 		return result, nil
 	}
 
-	// step 5: generate DDL
+	// Step 5: generate DDL.
 	statements, err := loader.GenerateDDL(schema, evolution.Allowed)
 	if err != nil {
 		result.Success = false
@@ -172,8 +177,8 @@ func ApplySchemaChange(repoPath string, db *runner.DBHandle, change *SchemaChang
 		return result, nil
 	}
 
-	// step 6: apply DDL within transaction with advisory lock
-	applyResult, err := loader.Apply(db.DB, statements, verbose)
+	// Step 6: apply DDL within transaction with advisory lock.
+	applyResult, err := loader.Apply(db, statements, verbose)
 	if err != nil {
 		result.Success = false
 		result.ErrorMessage = fmt.Sprintf("DDL apply failed: %v", err)
@@ -186,14 +191,14 @@ func ApplySchemaChange(repoPath string, db *runner.DBHandle, change *SchemaChang
 	result.IndexesCreated = applyResult.IndexesCreated
 	result.StatementsExecuted = applyResult.StatementsExecuted
 
-	// step 7: populate meta tables
-	// meta population happens within the same transaction that apply
-	// used, so the DDL and meta updates are atomic
+	// Step 7: populate meta tables within a separate transaction.
 	label := change.Label
 	if label == "" {
 		label = fmt.Sprintf("schema_change_set_%d", change.ChangeSetID)
 	}
-	err = loader.PopulateMeta(db.DB, schema, evolution.Allowed, label)
+	err = pg.WithTransaction(db, func(tx *pg.Tx) error {
+		return loader.PopulateMeta(tx, schema, evolution.Allowed, label)
+	})
 	if err != nil {
 		result.Success = false
 		result.ErrorMessage = fmt.Sprintf("meta population failed after DDL apply: %v", err)
@@ -206,220 +211,98 @@ func ApplySchemaChange(repoPath string, db *runner.DBHandle, change *SchemaChang
 
 // FinalizeSchemaChange updates the _schema_change_set status to applied
 // or failed based on the apply result.
-func FinalizeSchemaChange(client *runner.APIClient, changeSetID int, success bool, errorMessage string) error {
-	if success {
-		err := client.WriteObservation("_schema_change_set", changeSetID, "status", "applied")
-		if err != nil {
-			return fmt.Errorf("failed to mark schema change set %d as applied: %w", changeSetID, err)
-		}
-		err = client.WriteObservation("_schema_change_set", changeSetID, "applied_time", time.Now().UTC())
-		if err != nil {
-			return fmt.Errorf("failed to set applied_time on schema change set %d: %w", changeSetID, err)
-		}
+func FinalizeSchemaChange(client *runner.APIClient, changeSetID int, applyResult *SchemaApplyResult, runnerJobID int) error {
+	status := "applied"
+	if !applyResult.Success {
+		status = "failed"
+	}
+
+	finalizeData := map[string]interface{}{
+		"change_set_id":  changeSetID,
+		"status":         status,
+		"finalized_time": time.Now().UTC().Format(time.RFC3339Nano),
+	}
+	if applyResult.Success {
+		finalizeData["tables_created"] = applyResult.TablesCreated
+		finalizeData["fields_added"] = applyResult.FieldsAdded
+		finalizeData["constraints_modified"] = applyResult.ConstraintsModified
+		finalizeData["statements_executed"] = applyResult.StatementsExecuted
 	} else {
-		err := client.WriteObservation("_schema_change_set", changeSetID, "status", "failed")
-		if err != nil {
-			return fmt.Errorf("failed to mark schema change set %d as failed: %w", changeSetID, err)
+		finalizeData["error_message"] = applyResult.ErrorMessage
+		if len(applyResult.ForbiddenChanges) > 0 {
+			finalizeData["forbidden_changes"] = applyResult.ForbiddenChanges
 		}
-		err = client.WriteObservation("_schema_change_set", changeSetID, "error_message", errorMessage)
-		if err != nil {
-			return fmt.Errorf("failed to set error_message on schema change set %d: %w", changeSetID, err)
-		}
+	}
+
+	_, err := client.WriteObservation(&runner.WriteObservationParams{
+		TargetTable:  "_schema_change_set",
+		Key:          fmt.Sprintf("finalize:%d", changeSetID),
+		Value:        status,
+		DataJSON:     finalizeData,
+		RunnerJobID:  runnerJobID,
+		ObservedTime: time.Now(),
+	})
+	if err != nil {
+		return fmt.Errorf("finalizing schema change set %d as %s: %w", changeSetID, status, err)
 	}
 
 	return nil
 }
 
 // WriteSchemaEvidence creates an evidence_record documenting the schema change.
-func WriteSchemaEvidence(client *runner.APIClient, result *SchemaApplyResult, runnerJobID int) error {
-	evidenceData := map[string]interface{}{
-		"change_set_id":        result.ChangeSetID,
-		"success":              result.Success,
-		"tables_created":       result.TablesCreated,
-		"fields_added":         result.FieldsAdded,
-		"constraints_modified": result.ConstraintsModified,
-		"indexes_created":      result.IndexesCreated,
-		"statements_executed":  result.StatementsExecuted,
-	}
-
-	if len(result.ForbiddenChanges) > 0 {
-		evidenceData["forbidden_changes"] = result.ForbiddenChanges
-	}
-	if result.ErrorMessage != "" {
-		evidenceData["error_message"] = result.ErrorMessage
-	}
-
+func WriteSchemaEvidence(client *runner.APIClient, applyResult *SchemaApplyResult, runnerJobID int) error {
 	outcome := "pass"
-	if !result.Success {
+	if !applyResult.Success {
 		outcome = "fail"
 	}
 
-	description := fmt.Sprintf("Schema change set %d", result.ChangeSetID)
-	if result.Success {
+	description := fmt.Sprintf("Schema change set %d", applyResult.ChangeSetID)
+	if applyResult.Success {
 		description = fmt.Sprintf("Schema change set %d applied: %d tables created, %d fields added, %d constraints modified",
-			result.ChangeSetID, result.TablesCreated, result.FieldsAdded, result.ConstraintsModified)
+			applyResult.ChangeSetID, applyResult.TablesCreated, applyResult.FieldsAdded, applyResult.ConstraintsModified)
 	} else {
-		description = fmt.Sprintf("Schema change set %d failed: %s", result.ChangeSetID, result.ErrorMessage)
+		description = fmt.Sprintf("Schema change set %d failed: %s",
+			applyResult.ChangeSetID, applyResult.ErrorMessage)
 	}
 
-	evidence := map[string]interface{}{
-		"evidence_record_type":      "schema_evolution",
-		"description":               description,
-		"outcome":                   outcome,
-		"runner_job_id":             runnerJobID,
-		"evidence_record_data_json": evidenceData,
+	evidenceData := map[string]interface{}{
+		"evidence_record_type": "schema_evolution",
+		"description":          description,
+		"outcome":              outcome,
+		"change_set_id":        applyResult.ChangeSetID,
+		"tables_created":       applyResult.TablesCreated,
+		"fields_added":         applyResult.FieldsAdded,
+		"constraints_modified": applyResult.ConstraintsModified,
+		"indexes_created":      applyResult.IndexesCreated,
+		"statements_executed":  applyResult.StatementsExecuted,
 	}
 
-	_, err := client.CreateEntity("evidence_record", evidence)
+	if len(applyResult.ForbiddenChanges) > 0 {
+		evidenceData["forbidden_changes"] = applyResult.ForbiddenChanges
+	}
+	if applyResult.ErrorMessage != "" {
+		evidenceData["error_message"] = applyResult.ErrorMessage
+	}
+
+	_, err := client.WriteObservation(&runner.WriteObservationParams{
+		TargetTable:  "evidence_record",
+		Key:          fmt.Sprintf("schema_evolution:%d", applyResult.ChangeSetID),
+		Value:        outcome,
+		DataJSON:     evidenceData,
+		RunnerJobID:  runnerJobID,
+		ObservedTime: time.Now(),
+	})
 	if err != nil {
-		return fmt.Errorf("failed to write schema evidence record for change set %d: %w", result.ChangeSetID, err)
+		return fmt.Errorf("writing schema evidence record for change set %d: %w", applyResult.ChangeSetID, err)
 	}
 
 	return nil
 }
 
-// ProcessCycle runs one complete get/act/set cycle for the schema executor.
-func ProcessCycle(client *runner.APIClient, repoPath string, db *runner.DBHandle, maxChanges int, requireClean bool, autoPull bool, dryRun bool, runnerJobID int, logger *runner.Logger) (*SchemaExecutorSummary, error) {
-	summary := &SchemaExecutorSummary{}
-
-	// GET phase: read approved schema change sets
-	changes, err := GetApprovedSchemaChanges(client, maxChanges)
-	if err != nil {
-		return summary, fmt.Errorf("get phase failed: %w", err)
-	}
-	summary.ChangesProcessed = len(changes)
-
-	if len(changes) == 0 {
-		logger.Info("no approved schema change sets to process")
-		return summary, nil
-	}
-
-	logger.Info("found approved schema change sets",
-		runner.Field{Key: "count", Value: len(changes)},
-	)
-
-	// dry run: log what would happen, then return
-	if dryRun {
-		for _, change := range changes {
-			logger.Info("dry run: would apply schema change set",
-				runner.Field{Key: "change_set_id", Value: change.ChangeSetID},
-				runner.Field{Key: "label", Value: change.Label},
-				runner.Field{Key: "description", Value: change.Description},
-				runner.Field{Key: "target_commit", Value: change.TargetCommit},
-				runner.Field{Key: "created_time", Value: change.CreatedTime.Format(time.RFC3339)},
-			)
-		}
-		return summary, nil
-	}
-
-	// validate git state once before processing any changes
-	err = ValidateGitState(repoPath, requireClean, autoPull)
-	if err != nil {
-		return summary, fmt.Errorf("git state validation failed: %w", err)
-	}
-
-	// ACT phase: apply each schema change set in order
-	for _, change := range changes {
-		changeLogger := logger.With(
-			runner.Field{Key: "schema_change_set_id", Value: change.ChangeSetID},
-			runner.Field{Key: "label", Value: change.Label},
-		)
-
-		// checkout target commit for this change
-		err := CheckoutCommit(repoPath, change.TargetCommit)
-		if err != nil {
-			changeLogger.Error("failed to checkout target commit",
-				runner.Field{Key: "commit", Value: change.TargetCommit},
-				runner.Field{Key: "error", Value: err.Error()},
-			)
-			summary.ChangesFailed++
-			summary.Errors = append(summary.Errors,
-				fmt.Sprintf("change_set %d: checkout failed: %v", change.ChangeSetID, err))
-
-			finalizeErr := FinalizeSchemaChange(client, change.ChangeSetID, false, err.Error())
-			if finalizeErr != nil {
-				changeLogger.Error("failed to finalize schema change set",
-					runner.Field{Key: "error", Value: finalizeErr.Error()},
-				)
-			}
-			continue
-		}
-
-		changeLogger.Info("applying schema change set",
-			runner.Field{Key: "description", Value: change.Description},
-			runner.Field{Key: "target_commit", Value: change.TargetCommit},
-		)
-
-		result, err := ApplySchemaChange(repoPath, db, &change, true)
-		if err != nil {
-			// unexpected error from the apply function itself (not a schema error)
-			changeLogger.Error("unexpected error during schema apply",
-				runner.Field{Key: "error", Value: err.Error()},
-			)
-			summary.ChangesFailed++
-			summary.Errors = append(summary.Errors,
-				fmt.Sprintf("change_set %d: unexpected error: %v", change.ChangeSetID, err))
-
-			finalizeErr := FinalizeSchemaChange(client, change.ChangeSetID, false, err.Error())
-			if finalizeErr != nil {
-				changeLogger.Error("failed to finalize schema change set",
-					runner.Field{Key: "error", Value: finalizeErr.Error()},
-				)
-			}
-			continue
-		}
-
-		summary.Results = append(summary.Results, *result)
-
-		if result.Success {
-			summary.ChangesApplied++
-			changeLogger.Info("schema change set applied",
-				runner.Field{Key: "tables_created", Value: result.TablesCreated},
-				runner.Field{Key: "fields_added", Value: result.FieldsAdded},
-				runner.Field{Key: "constraints_modified", Value: result.ConstraintsModified},
-				runner.Field{Key: "indexes_created", Value: result.IndexesCreated},
-				runner.Field{Key: "statements_executed", Value: result.StatementsExecuted},
-			)
-		} else {
-			summary.ChangesFailed++
-			summary.Errors = append(summary.Errors,
-				fmt.Sprintf("change_set %d: %s", change.ChangeSetID, result.ErrorMessage))
-
-			if len(result.ForbiddenChanges) > 0 {
-				for _, forbidden := range result.ForbiddenChanges {
-					changeLogger.Error("forbidden schema change",
-						runner.Field{Key: "detail", Value: forbidden},
-					)
-				}
-			}
-			changeLogger.Error("schema change set failed",
-				runner.Field{Key: "error", Value: result.ErrorMessage},
-			)
-		}
-
-		// SET phase per change: finalize status and write evidence
-		finalizeErr := FinalizeSchemaChange(client, change.ChangeSetID, result.Success, result.ErrorMessage)
-		if finalizeErr != nil {
-			changeLogger.Error("failed to finalize schema change set status",
-				runner.Field{Key: "error", Value: finalizeErr.Error()},
-			)
-			summary.Errors = append(summary.Errors,
-				fmt.Sprintf("change_set %d: finalize failed: %v", change.ChangeSetID, finalizeErr))
-		}
-
-		evidenceErr := WriteSchemaEvidence(client, result, runnerJobID)
-		if evidenceErr != nil {
-			changeLogger.Warn("failed to write schema evidence record",
-				runner.Field{Key: "error", Value: evidenceErr.Error()},
-			)
-		}
-	}
-
-	return summary, nil
-}
+// --- internal helpers ---
 
 // runGit executes a git command in the given directory and returns
-// combined output. Thin wrapper over os/exec.
+// combined output.
 func runGit(repoPath string, args ...string) ([]byte, error) {
 	fullArgs := append([]string{"-C", repoPath}, args...)
 	cmd := exec.Command("git", fullArgs...)
@@ -429,4 +312,22 @@ func runGit(repoPath string, args ...string) ([]byte, error) {
 			strings.Join(args, " "), err, strings.TrimSpace(string(output)))
 	}
 	return output, nil
+}
+
+// extractInt reads an integer from a row map, handling JSON float64 numbers.
+func extractInt(row map[string]interface{}, field string) (int, bool) {
+	val, ok := row[field]
+	if !ok {
+		return 0, false
+	}
+	switch v := val.(type) {
+	case float64:
+		return int(v), true
+	case int:
+		return v, true
+	case int64:
+		return int(v), true
+	default:
+		return 0, false
+	}
 }
