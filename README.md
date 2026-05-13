@@ -172,7 +172,7 @@ OpsDB is a skeleton implementation of a unified operations, automation, and audi
 
 ![Fig. 8: Operations and Audit as One System — operational events produce evidence as a native property of execution.](docs/figures/opsdb_08_operations_audit_unified.png)
 
-# Tracking Improvments
+# Tracking Skeleton Improvements
 
 ## tools/opsdb-api
 
