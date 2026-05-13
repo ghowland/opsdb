@@ -7,7 +7,7 @@ import (
 	"sort"
 	"time"
 
-	runner "github.com/ghowland/opsdb/tools/opsdb-runner-lib"
+	runner "github.com/ghowland/opsdb/tools/opsdb_runner_lib"
 )
 
 // RetentionTarget holds one retention policy and its computed deletion scope.

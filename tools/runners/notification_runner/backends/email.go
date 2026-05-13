@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
+	notification "github.com/ghowland/opsdb/tools/runners/notification_runner"
 	"github.com/google/uuid"
-	notification "github.com/ghowland/opsdb/tools/runners/notification-runner"
 )
 
 // EmailBackend delivers notifications via SMTP.
@@ -82,13 +82,13 @@ func (b *EmailBackend) Send(msg *notification.NotificationMessage) (*notificatio
 	result.MessageID = messageID
 
 	headers := map[string]string{
-		"From":         b.FromAddress,
-		"To":           msg.Recipient.Email,
-		"Subject":      msg.Subject,
-		"MIME-Version": "1.0",
-		"Content-Type": "text/plain; charset=utf-8",
-		"Message-ID":   "<" + messageID + ">",
-		"Date":         time.Now().UTC().Format(time.RFC1123Z),
+		"From":                 b.FromAddress,
+		"To":                   msg.Recipient.Email,
+		"Subject":              msg.Subject,
+		"MIME-Version":         "1.0",
+		"Content-Type":         "text/plain; charset=utf-8",
+		"Message-ID":           "<" + messageID + ">",
+		"Date":                 time.Now().UTC().Format(time.RFC1123Z),
 		"X-OpsDB-Trigger-Type": msg.Trigger.TriggerType,
 	}
 

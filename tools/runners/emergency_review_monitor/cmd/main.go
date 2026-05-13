@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	runner "github.com/ghowland/opsdb/tools/opsdb-runner-lib"
-	"github.com/ghowland/opsdb/tools/runners/emergency-review-monitor"
+	runner "github.com/ghowland/opsdb/tools/opsdb_runner_lib"
+	monitor "github.com/ghowland/opsdb/tools/runners/emergency_review_monitor"
 )
 
 func main() {
@@ -73,19 +73,19 @@ func main() {
 			planData := make([]map[string]interface{}, 0, len(overdue))
 			for _, r := range overdue {
 				planData = append(planData, map[string]interface{}{
-					"change_set_id":  r.ChangeSetID,
+					"change_set_id":   r.ChangeSetID,
 					"change_set_name": r.ChangeSetName,
-					"elapsed_hours":  r.ElapsedHours,
-					"has_finding":    r.ExistingFindingID != nil,
+					"elapsed_hours":   r.ElapsedHours,
+					"has_finding":     r.ExistingFindingID != nil,
 				})
 			}
 			runner.LogPlan(config.Logger, "overdue emergency reviews", planData)
 			runner.SkipActPhase(config.Logger)
 			runner.SkipSetPhase(config.Logger)
 			runner.FinishCycle(config, "completed", map[string]interface{}{
-				"dry_run":        true,
+				"dry_run":         true,
 				"reviews_checked": totalChecked,
-				"overdue_found":  len(overdue),
+				"overdue_found":   len(overdue),
 			})
 			runner.WaitForNextCycle(config)
 			continue

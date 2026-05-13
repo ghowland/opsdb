@@ -9,7 +9,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	runner "github.com/ghowland/opsdb/tools/opsdb-runner-lib"
+	runner "github.com/ghowland/opsdb/tools/opsdb_runner_lib"
 )
 
 func main() {
@@ -199,15 +199,15 @@ func runCycle(config *runner.RunnerConfig, logger *runner.Logger) (*SchemaExecut
 		// write evidence record for schema evolution
 		evidence := map[string]interface{}{
 			"evidence_record_type": "schema_evolution",
-			"description":         fmt.Sprintf("Applied schema change set %d: %s", changeSetID, description),
-			"outcome":             "pass",
+			"description":          fmt.Sprintf("Applied schema change set %d: %s", changeSetID, description),
+			"outcome":              "pass",
 			"evidence_record_data_json": map[string]interface{}{
 				"schema_change_set_id": changeSetID,
-				"commit_hash":         commitHash,
-				"tables_created":      result.TablesCreated,
-				"fields_added":        result.FieldsAdded,
+				"commit_hash":          commitHash,
+				"tables_created":       result.TablesCreated,
+				"fields_added":         result.FieldsAdded,
 				"constraints_modified": result.ConstraintsModified,
-				"ddl_statement_count": result.DDLStatements,
+				"ddl_statement_count":  result.DDLStatements,
 			},
 		}
 		_, evidenceErr := client.CreateEntity("evidence_record", evidence)
@@ -347,13 +347,13 @@ func applySchemaChange(client *runner.APIClient, logger *runner.Logger, repoPath
 
 // SchemaExecutorSummary holds the results of one schema executor cycle.
 type SchemaExecutorSummary struct {
-	ChangesProcessed     int
-	ChangesApplied       int
-	ChangesFailed        int
-	TablesCreated        int
-	FieldsAdded          int
-	ConstraintsModified  int
-	Errors               []string
+	ChangesProcessed    int
+	ChangesApplied      int
+	ChangesFailed       int
+	TablesCreated       int
+	FieldsAdded         int
+	ConstraintsModified int
+	Errors              []string
 }
 
 // SchemaApplyResult holds the outcome of applying one schema change set.
@@ -536,11 +536,11 @@ type SchemaState struct {
 }
 
 type SchemaDiffResult struct {
-	NewEntityCount       int
-	NewFieldCount        int
+	NewEntityCount         int
+	NewFieldCount          int
 	ChangedConstraintCount int
-	ForbiddenCount       int
-	Changes              []DiffChange
+	ForbiddenCount         int
+	Changes                []DiffChange
 }
 
 func (d *SchemaDiffResult) IsEmpty() bool {
@@ -549,11 +549,11 @@ func (d *SchemaDiffResult) IsEmpty() bool {
 }
 
 type DiffChange struct {
-	Entity              string
-	Field               string
-	ChangeType          string
-	IsForbidden         bool
-	ForbiddenRule       string
+	Entity               string
+	Field                string
+	ChangeType           string
+	IsForbidden          bool
+	ForbiddenRule        string
 	ForbiddenAlternative string
 }
 
@@ -577,8 +577,8 @@ type DDLStatement struct {
 }
 
 type ApplyResult struct {
-	EntitiesCreated    int
-	FieldsAdded        int
+	EntitiesCreated     int
+	FieldsAdded         int
 	ConstraintsModified int
 }
 

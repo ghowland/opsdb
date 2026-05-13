@@ -12,8 +12,8 @@ import (
 	"os"
 	"time"
 
+	notification "github.com/ghowland/opsdb/tools/runners/notification_runner"
 	"github.com/google/uuid"
-	notification "github.com/ghowland/opsdb/tools/runners/notification-runner"
 )
 
 // WebhookBackend delivers notifications via HTTP POST to a configured URL.
@@ -166,7 +166,7 @@ func (b *WebhookBackend) Healthy() bool {
 	healthClient := &http.Client{
 		Timeout: 5 * time.Second,
 		Transport: &http.Transport{
-			DialContext: (&net.Dialer{Timeout: 5 * time.Second}).DialContext,
+			DialContext:     (&net.Dialer{Timeout: 5 * time.Second}).DialContext,
 			TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS12},
 		},
 	}

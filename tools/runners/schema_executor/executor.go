@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	runner "github.com/ghowland/opsdb/tools/opsdb-runner-lib"
-	"github.com/ghowland/opsdb/tools/opsdb-schema/loader"
+	runner "github.com/ghowland/opsdb/tools/opsdb_runner_lib"
+	"github.com/ghowland/opsdb/tools/opsdb_schema/loader"
 )
 
 // SchemaChangeWork holds one approved schema change set to process.
@@ -23,15 +23,15 @@ type SchemaChangeWork struct {
 
 // SchemaApplyResult holds the outcome of applying one schema change.
 type SchemaApplyResult struct {
-	ChangeSetID        int
-	Success            bool
-	TablesCreated      int
-	FieldsAdded        int
+	ChangeSetID         int
+	Success             bool
+	TablesCreated       int
+	FieldsAdded         int
 	ConstraintsModified int
-	IndexesCreated     int
-	StatementsExecuted int
-	ForbiddenChanges   []string
-	ErrorMessage       string
+	IndexesCreated      int
+	StatementsExecuted  int
+	ForbiddenChanges    []string
+	ErrorMessage        string
 }
 
 // SchemaExecutorSummary holds the results of one executor cycle.

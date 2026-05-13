@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	runner "github.com/ghowland/opsdb/tools/opsdb-runner-lib"
+	runner "github.com/ghowland/opsdb/tools/opsdb_runner_lib"
 )
 
 // NotificationTrigger represents one state transition that requires notification.
@@ -448,15 +448,15 @@ func RecordDelivery(client *runner.APIClient, result *DeliveryResult, trigger *N
 	dedupKey := fmt.Sprintf("%s:%s:%d:%d", trigger.TriggerType, trigger.EntityType, trigger.EntityID, recipientUserID)
 
 	deliveryData := map[string]interface{}{
-		"trigger_type":     trigger.TriggerType,
-		"entity_type":      trigger.EntityType,
-		"entity_id":        trigger.EntityID,
+		"trigger_type":      trigger.TriggerType,
+		"entity_type":       trigger.EntityType,
+		"entity_id":         trigger.EntityID,
 		"recipient_user_id": recipientUserID,
-		"backend":          result.Backend,
-		"is_success":       result.Success,
-		"message_id":       result.MessageID,
-		"sent_time":        result.SentTime.UTC().Format(time.RFC3339Nano),
-		"dedup_key":        dedupKey,
+		"backend":           result.Backend,
+		"is_success":        result.Success,
+		"message_id":        result.MessageID,
+		"sent_time":         result.SentTime.UTC().Format(time.RFC3339Nano),
+		"dedup_key":         dedupKey,
 	}
 	if result.ErrorMsg != "" {
 		deliveryData["error_message"] = result.ErrorMsg

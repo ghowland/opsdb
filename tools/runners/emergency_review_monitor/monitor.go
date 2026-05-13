@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	runner "github.com/ghowland/opsdb/tools/opsdb-runner-lib"
+	runner "github.com/ghowland/opsdb/tools/opsdb_runner_lib"
 )
 
 // OverdueReview holds one emergency review that has passed its review window.
@@ -140,17 +140,17 @@ func FileOverdueFinding(client *runner.APIClient, review *OverdueReview, runnerJ
 	}
 
 	findingData := map[string]interface{}{
-		"finding_type":            "emergency_review_overdue",
-		"severity":                severity,
-		"title":                   fmt.Sprintf("Emergency change set %d overdue for review", review.ChangeSetID),
-		"description":             fmt.Sprintf("Change set '%s' was submitted as emergency %.0f hours ago and has not been reviewed. Review window is %d hours.", review.ChangeSetName, review.ElapsedHours, review.ReviewWindowHours),
-		"target_entity_type":      "change_set",
-		"target_entity_id":        review.ChangeSetID,
-		"submitter_ops_user_id":   review.SubmitterUserID,
-		"detected_time":           time.Now().UTC().Format(time.RFC3339Nano),
-		"emergency_review_id":     review.EmergencyReviewID,
-		"elapsed_hours":           review.ElapsedHours,
-		"review_window_hours":     review.ReviewWindowHours,
+		"finding_type":          "emergency_review_overdue",
+		"severity":              severity,
+		"title":                 fmt.Sprintf("Emergency change set %d overdue for review", review.ChangeSetID),
+		"description":           fmt.Sprintf("Change set '%s' was submitted as emergency %.0f hours ago and has not been reviewed. Review window is %d hours.", review.ChangeSetName, review.ElapsedHours, review.ReviewWindowHours),
+		"target_entity_type":    "change_set",
+		"target_entity_id":      review.ChangeSetID,
+		"submitter_ops_user_id": review.SubmitterUserID,
+		"detected_time":         time.Now().UTC().Format(time.RFC3339Nano),
+		"emergency_review_id":   review.EmergencyReviewID,
+		"elapsed_hours":         review.ElapsedHours,
+		"review_window_hours":   review.ReviewWindowHours,
 	}
 
 	result, err := client.WriteObservation(&runner.WriteObservationParams{

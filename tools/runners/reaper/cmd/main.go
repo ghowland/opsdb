@@ -9,7 +9,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	runner "github.com/ghowland/opsdb/tools/opsdb-runner-lib"
+	runner "github.com/ghowland/opsdb/tools/opsdb_runner_lib"
 )
 
 func main() {

@@ -6,9 +6,9 @@ import (
 	"os"
 	"time"
 
-	runner "github.com/ghowland/opsdb/tools/opsdb-runner-lib"
-	"github.com/ghowland/opsdb/tools/runners/notification-runner"
-	"github.com/ghowland/opsdb/tools/runners/notification-runner/backends"
+	runner "github.com/ghowland/opsdb/tools/opsdb_runner_lib"
+	notification "github.com/ghowland/opsdb/tools/runners/notification_runner"
+	"github.com/ghowland/opsdb/tools/runners/notification_runner/backends"
 )
 
 func main() {

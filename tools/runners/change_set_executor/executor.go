@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sort"
 
-	runner "github.com/ghowland/opsdb/tools/opsdb-runner-lib"
+	runner "github.com/ghowland/opsdb/tools/opsdb_runner_lib"
 )
 
 // ChangeSetBatch holds the data read during the get phase for one cycle.
