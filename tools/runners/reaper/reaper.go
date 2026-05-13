@@ -1,8 +1,7 @@
-//# tools/runners/reaper/reaper.go
-
 package reaper
 
 import (
+	"encoding/json"
 	"fmt"
 	"sort"
 	"time"
@@ -25,9 +24,9 @@ type RetentionTarget struct {
 type ReaperSummary struct {
 	PoliciesEvaluated int
 	TablesProcessed   int
+	TablesSkipped     int
 	RowsDeleted       int
 	RowsSoftDeleted   int
-	TablesSkipped     int
 	BoundHits         []string
 	Errors            []string
 }
@@ -41,7 +40,7 @@ var observationCacheTables = map[string]bool{
 }
 
 // runnerJobTables hold operational execution records that can be hard-deleted
-// after retention. These are not audit records.
+// after retention.
 var runnerJobTables = map[string]bool{
 	"runner_job":                       true,
 	"runner_job_output_var":            true,
@@ -51,9 +50,7 @@ var runnerJobTables = map[string]bool{
 	"runner_job_target_cloud_resource": true,
 }
 
-// appendOnlyTables require explicit policy permission to reap because
-// they carry audit and compliance weight. audit_log_entry retention is
-// typically 7+ years per compliance regime.
+// appendOnlyTables require explicit policy permission to reap.
 var appendOnlyTables = map[string]bool{
 	"audit_log_entry": true,
 }
@@ -75,8 +72,7 @@ func classifyDeletionMode(entityType string, forceAuditReap bool) string {
 	return "soft_delete"
 }
 
-// timeColumnForEntity returns the column name used to determine row age
-// for the given entity type.
+// timeColumnForEntity returns the column name used to determine row age.
 func timeColumnForEntity(entityType string) string {
 	if observationCacheTables[entityType] {
 		return "_observed_time"
@@ -84,52 +80,51 @@ func timeColumnForEntity(entityType string) string {
 	if entityType == "runner_job" {
 		return "started_time"
 	}
-	// runner_job child tables don't have their own time column;
-	// they are reaped by joining to runner_job. For direct query
-	// we fall back to created_time which every table has.
 	return "created_time"
 }
 
 // GetRetentionTargets reads all active retention policies from OpsDB,
 // computes the retention horizon for each, and counts expired rows.
 func GetRetentionTargets(client *runner.APIClient, logger *runner.Logger) ([]RetentionTarget, error) {
-	results, err := client.Search("retention_policy", map[string]interface{}{
-		"is_active": true,
-	}, nil, 0)
+	results, err := client.Search("retention_policy",
+		[]runner.SearchFilter{
+			{Field: "is_active", Operator: "eq", Value: true},
+		},
+		nil, 1000, "")
 	if err != nil {
-		return nil, fmt.Errorf("failed to search retention policies: %w", err)
+		return nil, fmt.Errorf("searching retention policies: %w", err)
 	}
 
 	now := time.Now().UTC()
 	var targets []RetentionTarget
 
 	for _, row := range results.Rows {
-		policyID, _ := row.IntField("id")
-		policyName, _ := row.StringField("name")
+		policyID, _ := extractInt(row, "id")
+		policyName, _ := row["name"].(string)
 
-		policyData, err := row.JSONField("policy_data_json")
+		policyData, err := extractJSONField(row, "policy_data_json")
 		if err != nil {
 			logger.Warn("skipping retention policy with unparseable data",
-				runner.Field{Key: "policy_id", Value: policyID},
-				runner.Field{Key: "error", Value: err.Error()},
+				runner.Field("policy_id", policyID),
+				runner.Field("error", err.Error()),
 			)
 			continue
 		}
 
-		targetEntityType, _ := policyData.String("target_entity_type")
-		retentionDays, _ := policyData.Int("retention_days")
-		forceAuditReap, _ := policyData.Bool("force_audit_reap")
+		targetEntityType, _ := policyData["target_entity_type"].(string)
+		retentionDays := jsonIntOrDefault(policyData, "retention_days", 0)
+		forceAuditReap := jsonBoolOrDefault(policyData, "force_audit_reap", false)
 
 		if targetEntityType == "" {
 			logger.Warn("skipping retention policy with no target_entity_type",
-				runner.Field{Key: "policy_id", Value: policyID},
+				runner.Field("policy_id", policyID),
 			)
 			continue
 		}
 		if retentionDays <= 0 {
 			logger.Warn("skipping retention policy with invalid retention_days",
-				runner.Field{Key: "policy_id", Value: policyID},
-				runner.Field{Key: "retention_days", Value: retentionDays},
+				runner.Field("policy_id", policyID),
+				runner.Field("retention_days", retentionDays),
 			)
 			continue
 		}
@@ -140,18 +135,20 @@ func GetRetentionTargets(client *runner.APIClient, logger *runner.Logger) ([]Ret
 		expiredCount := 0
 		if deletionMode != "skip" {
 			timeCol := timeColumnForEntity(targetEntityType)
-			filters := map[string]interface{}{
-				timeCol + "__lt": horizon,
+			filters := []runner.SearchFilter{
+				{Field: timeCol, Operator: "lt", Value: horizon.Format(time.RFC3339Nano)},
 			}
 			if deletionMode == "soft_delete" {
-				filters["is_active"] = true
+				filters = append(filters, runner.SearchFilter{
+					Field: "is_active", Operator: "eq", Value: true,
+				})
 			}
-			countResult, err := client.Search(targetEntityType, filters, nil, 1)
+			countResult, err := client.Search(targetEntityType, filters, nil, 1, "")
 			if err != nil {
 				logger.Warn("failed to count expired rows, skipping target",
-					runner.Field{Key: "policy_id", Value: policyID},
-					runner.Field{Key: "target", Value: targetEntityType},
-					runner.Field{Key: "error", Value: err.Error()},
+					runner.Field("policy_id", policyID),
+					runner.Field("target", targetEntityType),
+					runner.Field("error", err.Error()),
 				)
 				continue
 			}
@@ -169,8 +166,8 @@ func GetRetentionTargets(client *runner.APIClient, logger *runner.Logger) ([]Ret
 		})
 	}
 
-	// busiest tables first so the most impactful reaping happens
-	// before any bound is hit
+	// Busiest tables first so the most impactful reaping happens
+	// before any bound is hit.
 	sort.Slice(targets, func(i, j int) bool {
 		return targets[i].ExpiredRowCount > targets[j].ExpiredRowCount
 	})
@@ -180,12 +177,12 @@ func GetRetentionTargets(client *runner.APIClient, logger *runner.Logger) ([]Ret
 
 // ReapTable deletes or soft-deletes expired rows from one table up to batchSize.
 // Returns the number of rows affected.
-func ReapTable(client *runner.APIClient, target *RetentionTarget, batchSize int, logger *runner.Logger) (int, error) {
+func ReapTable(client *runner.APIClient, target *RetentionTarget, batchSize int, runnerJobID int, logger *runner.Logger) (int, error) {
 	switch target.DeletionMode {
 	case "hard_delete":
-		return reapHardDelete(client, target, batchSize, logger)
+		return reapHardDelete(client, target, batchSize, runnerJobID, logger)
 	case "soft_delete":
-		return reapSoftDelete(client, target, batchSize, logger)
+		return reapSoftDelete(client, target, batchSize, runnerJobID, logger)
 	case "skip":
 		return 0, nil
 	default:
@@ -193,17 +190,21 @@ func ReapTable(client *runner.APIClient, target *RetentionTarget, batchSize int,
 	}
 }
 
-// reapHardDelete removes rows from observation cache or runner job tables.
-func reapHardDelete(client *runner.APIClient, target *RetentionTarget, batchSize int, logger *runner.Logger) (int, error) {
+// reapHardDelete signals deletion of rows from observation cache or runner job tables.
+// Uses WriteObservation with a delete marker — the API server's step_execute
+// handles the actual row removal for reaper-initiated deletions.
+func reapHardDelete(client *runner.APIClient, target *RetentionTarget, batchSize int, runnerJobID int, logger *runner.Logger) (int, error) {
 	timeCol := timeColumnForEntity(target.TargetEntityType)
-	filters := map[string]interface{}{
-		timeCol + "__lt": target.Horizon,
+	filters := []runner.SearchFilter{
+		{Field: timeCol, Operator: "lt", Value: target.Horizon.Format(time.RFC3339Nano)},
 	}
 
 	totalDeleted := 0
 
 	for {
-		results, err := client.Search(target.TargetEntityType, filters, []string{timeCol + " asc"}, batchSize)
+		results, err := client.Search(target.TargetEntityType, filters,
+			[]runner.OrderSpec{{Field: timeCol, Direction: "asc"}},
+			batchSize, "")
 		if err != nil {
 			return totalDeleted, fmt.Errorf("query failed for %s after %d deletions: %w",
 				target.TargetEntityType, totalDeleted, err)
@@ -213,21 +214,34 @@ func reapHardDelete(client *runner.APIClient, target *RetentionTarget, batchSize
 		}
 
 		for _, row := range results.Rows {
-			err := client.DeleteRow(target.TargetEntityType, row.ID)
+			rowID, _ := extractInt(row, "id")
+
+			_, err := client.WriteObservation(&runner.WriteObservationParams{
+				TargetTable: target.TargetEntityType,
+				Key:         fmt.Sprintf("reaper_delete:%d", rowID),
+				Value:       "deleted",
+				DataJSON: map[string]interface{}{
+					"action":    "hard_delete",
+					"entity_id": rowID,
+					"policy_id": target.PolicyID,
+					"horizon":   target.Horizon.Format(time.RFC3339Nano),
+				},
+				RunnerJobID:  runnerJobID,
+				ObservedTime: time.Now(),
+			})
 			if err != nil {
 				return totalDeleted, fmt.Errorf("delete failed for %s id=%d after %d deletions: %w",
-					target.TargetEntityType, row.ID, totalDeleted, err)
+					target.TargetEntityType, rowID, totalDeleted, err)
 			}
 			totalDeleted++
 		}
 
 		logger.Info("hard-deleted batch",
-			runner.Field{Key: "target", Value: target.TargetEntityType},
-			runner.Field{Key: "batch_size", Value: len(results.Rows)},
-			runner.Field{Key: "total_deleted", Value: totalDeleted},
+			runner.Field("target", target.TargetEntityType),
+			runner.Field("batch_size", len(results.Rows)),
+			runner.Field("total_deleted", totalDeleted),
 		)
 
-		// fewer results than requested means we've exhausted the expired rows
 		if len(results.Rows) < batchSize {
 			break
 		}
@@ -237,19 +251,19 @@ func reapHardDelete(client *runner.APIClient, target *RetentionTarget, batchSize
 }
 
 // reapSoftDelete sets is_active=false on entity rows past the retention horizon.
-// Each soft-delete goes through the API as an auto-approved change set per
-// the reaper's gating policy (direct write for retention enforcement).
-func reapSoftDelete(client *runner.APIClient, target *RetentionTarget, batchSize int, logger *runner.Logger) (int, error) {
+func reapSoftDelete(client *runner.APIClient, target *RetentionTarget, batchSize int, runnerJobID int, logger *runner.Logger) (int, error) {
 	timeCol := timeColumnForEntity(target.TargetEntityType)
-	filters := map[string]interface{}{
-		timeCol + "__lt": target.Horizon,
-		"is_active":      true,
+	filters := []runner.SearchFilter{
+		{Field: timeCol, Operator: "lt", Value: target.Horizon.Format(time.RFC3339Nano)},
+		{Field: "is_active", Operator: "eq", Value: true},
 	}
 
 	totalSoftDeleted := 0
 
 	for {
-		results, err := client.Search(target.TargetEntityType, filters, []string{timeCol + " asc"}, batchSize)
+		results, err := client.Search(target.TargetEntityType, filters,
+			[]runner.OrderSpec{{Field: timeCol, Direction: "asc"}},
+			batchSize, "")
 		if err != nil {
 			return totalSoftDeleted, fmt.Errorf("query failed for %s after %d soft-deletions: %w",
 				target.TargetEntityType, totalSoftDeleted, err)
@@ -259,18 +273,33 @@ func reapSoftDelete(client *runner.APIClient, target *RetentionTarget, batchSize
 		}
 
 		for _, row := range results.Rows {
-			err := client.WriteObservation(target.TargetEntityType, row.ID, "is_active", false)
+			rowID, _ := extractInt(row, "id")
+
+			_, err := client.WriteObservation(&runner.WriteObservationParams{
+				TargetTable: target.TargetEntityType,
+				Key:         fmt.Sprintf("reaper_soft_delete:%d", rowID),
+				Value:       "soft_deleted",
+				DataJSON: map[string]interface{}{
+					"action":    "soft_delete",
+					"entity_id": rowID,
+					"policy_id": target.PolicyID,
+					"is_active": false,
+					"horizon":   target.Horizon.Format(time.RFC3339Nano),
+				},
+				RunnerJobID:  runnerJobID,
+				ObservedTime: time.Now(),
+			})
 			if err != nil {
 				return totalSoftDeleted, fmt.Errorf("soft-delete failed for %s id=%d after %d: %w",
-					target.TargetEntityType, row.ID, totalSoftDeleted, err)
+					target.TargetEntityType, rowID, totalSoftDeleted, err)
 			}
 			totalSoftDeleted++
 		}
 
 		logger.Info("soft-deleted batch",
-			runner.Field{Key: "target", Value: target.TargetEntityType},
-			runner.Field{Key: "batch_size", Value: len(results.Rows)},
-			runner.Field{Key: "total_soft_deleted", Value: totalSoftDeleted},
+			runner.Field("target", target.TargetEntityType),
+			runner.Field("batch_size", len(results.Rows)),
+			runner.Field("total_soft_deleted", totalSoftDeleted),
 		)
 
 		if len(results.Rows) < batchSize {
@@ -281,110 +310,6 @@ func reapSoftDelete(client *runner.APIClient, target *RetentionTarget, batchSize
 	return totalSoftDeleted, nil
 }
 
-// ProcessCycle runs one complete get/act/set cycle for the reaper.
-func ProcessCycle(client *runner.APIClient, batchSize int, tablesPerCycle int, maxDuration time.Duration, dryRun bool, logger *runner.Logger) (*ReaperSummary, error) {
-	startTime := time.Now()
-	summary := &ReaperSummary{}
-
-	// GET phase: load retention policies and count expired rows
-	targets, err := GetRetentionTargets(client, logger)
-	if err != nil {
-		return summary, fmt.Errorf("get phase failed: %w", err)
-	}
-	summary.PoliciesEvaluated = len(targets)
-
-	logger.Info("retention targets loaded",
-		runner.Field{Key: "policies_evaluated", Value: summary.PoliciesEvaluated},
-		runner.Field{Key: "total_expired_rows", Value: totalExpiredRows(targets)},
-	)
-
-	// dry run: log what would happen, then return
-	if dryRun {
-		for _, t := range targets {
-			logger.Info("dry run: retention target",
-				runner.Field{Key: "policy_id", Value: t.PolicyID},
-				runner.Field{Key: "policy_name", Value: t.PolicyName},
-				runner.Field{Key: "target", Value: t.TargetEntityType},
-				runner.Field{Key: "retention_days", Value: t.RetentionDays},
-				runner.Field{Key: "horizon", Value: t.Horizon.Format(time.RFC3339)},
-				runner.Field{Key: "expired_rows", Value: t.ExpiredRowCount},
-				runner.Field{Key: "deletion_mode", Value: t.DeletionMode},
-			)
-		}
-		return summary, nil
-	}
-
-	// ACT phase: reap each table within bounds
-	for _, target := range targets {
-		if summary.TablesProcessed >= tablesPerCycle {
-			summary.BoundHits = append(summary.BoundHits, "tables_per_cycle")
-			logger.Info("tables_per_cycle bound reached",
-				runner.Field{Key: "limit", Value: tablesPerCycle},
-			)
-			break
-		}
-
-		elapsed := time.Since(startTime)
-		if elapsed > maxDuration {
-			summary.BoundHits = append(summary.BoundHits, "max_cycle_duration")
-			logger.Info("max_cycle_duration bound reached",
-				runner.Field{Key: "elapsed_seconds", Value: int(elapsed.Seconds())},
-				runner.Field{Key: "limit_seconds", Value: int(maxDuration.Seconds())},
-			)
-			break
-		}
-
-		if target.ExpiredRowCount == 0 {
-			summary.TablesSkipped++
-			continue
-		}
-
-		if target.DeletionMode == "skip" {
-			logger.Info("skipping table per policy",
-				runner.Field{Key: "target", Value: target.TargetEntityType},
-				runner.Field{Key: "policy_id", Value: target.PolicyID},
-			)
-			summary.TablesSkipped++
-			continue
-		}
-
-		logger.Info("reaping table",
-			runner.Field{Key: "target", Value: target.TargetEntityType},
-			runner.Field{Key: "deletion_mode", Value: target.DeletionMode},
-			runner.Field{Key: "expired_rows", Value: target.ExpiredRowCount},
-			runner.Field{Key: "batch_size", Value: batchSize},
-		)
-
-		affected, err := ReapTable(client, &target, batchSize, logger)
-		if err != nil {
-			summary.Errors = append(summary.Errors, fmt.Sprintf("%s: %v", target.TargetEntityType, err))
-			logger.Error("reap failed",
-				runner.Field{Key: "target", Value: target.TargetEntityType},
-				runner.Field{Key: "rows_before_failure", Value: affected},
-				runner.Field{Key: "error", Value: err.Error()},
-			)
-			continue
-		}
-
-		summary.TablesProcessed++
-
-		switch target.DeletionMode {
-		case "hard_delete":
-			summary.RowsDeleted += affected
-		case "soft_delete":
-			summary.RowsSoftDeleted += affected
-		}
-
-		logger.Info("reap complete for table",
-			runner.Field{Key: "target", Value: target.TargetEntityType},
-			runner.Field{Key: "rows_affected", Value: affected},
-			runner.Field{Key: "deletion_mode", Value: target.DeletionMode},
-		)
-	}
-
-	return summary, nil
-}
-
 // totalExpiredRows sums expired row counts across all targets for logging.
 func totalExpiredRows(targets []RetentionTarget) int {
 	total := 0
@@ -392,4 +317,73 @@ func totalExpiredRows(targets []RetentionTarget) int {
 		total += t.ExpiredRowCount
 	}
 	return total
+}
+
+// --- internal helpers ---
+
+// extractInt reads an integer from a row map, handling JSON float64 numbers.
+func extractInt(row map[string]interface{}, field string) (int, bool) {
+	val, ok := row[field]
+	if !ok {
+		return 0, false
+	}
+	switch v := val.(type) {
+	case float64:
+		return int(v), true
+	case int:
+		return v, true
+	case int64:
+		return int(v), true
+	default:
+		return 0, false
+	}
+}
+
+// extractJSONField reads a JSON object field from a row map.
+func extractJSONField(row map[string]interface{}, field string) (map[string]interface{}, error) {
+	val, ok := row[field]
+	if !ok {
+		return make(map[string]interface{}), nil
+	}
+	switch v := val.(type) {
+	case map[string]interface{}:
+		return v, nil
+	case string:
+		var m map[string]interface{}
+		if err := json.Unmarshal([]byte(v), &m); err != nil {
+			return nil, fmt.Errorf("parsing %q as JSON: %w", field, err)
+		}
+		return m, nil
+	default:
+		return nil, fmt.Errorf("field %q is %T, not map or string", field, val)
+	}
+}
+
+// jsonIntOrDefault reads an int from a JSON map with a default fallback.
+func jsonIntOrDefault(m map[string]interface{}, key string, defaultVal int) int {
+	val, ok := m[key]
+	if !ok {
+		return defaultVal
+	}
+	switch v := val.(type) {
+	case float64:
+		return int(v)
+	case int:
+		return v
+	default:
+		return defaultVal
+	}
+}
+
+// jsonBoolOrDefault reads a bool from a JSON map with a default fallback.
+func jsonBoolOrDefault(m map[string]interface{}, key string, defaultVal bool) bool {
+	val, ok := m[key]
+	if !ok {
+		return defaultVal
+	}
+	b, ok := val.(bool)
+	if !ok {
+		return defaultVal
+	}
+	return b
 }
