@@ -1,3 +1,5 @@
+//# internal/testutil/pg.go
+
 package testutil
 
 import (
@@ -13,10 +15,6 @@ import (
 // TestDB holds connection information for a test Postgres instance.
 // The instance is managed externally (by test-integration.sh or a manually
 // started container). This package connects to it, not manages it.
-//
-// We deliberately avoid testcontainers-go to keep dependencies minimal.
-// The integration test script (scripts/test-integration.sh) starts and
-// stops the container. This package just connects.
 type TestDB struct {
 	DSN  string
 	Pool *pgxpool.Pool

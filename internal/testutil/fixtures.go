@@ -1,3 +1,5 @@
+//# internal/testutil/fixtures.go
+
 package testutil
 
 import (
@@ -23,7 +25,7 @@ fields:
 `
 }
 
-// EntityWithAllTypes returns YAML with one field of each of the nine types.
+// EntityWithAllTypes returns YAML with one field of each of the ten types.
 func EntityWithAllTypes() string {
 	return `name: all_types_entity
 description: "Entity with one field of each type"
@@ -568,6 +570,7 @@ allowed_categories:
 }
 
 // minimalReservedYAML returns embedded reserved.yaml content for test repos.
+// Matches the structure parsed by conventions/reserved.go.
 func minimalReservedYAML() string {
 	return `universal:
   fields:
@@ -617,16 +620,25 @@ governance:
       type: varchar
       nullable: true
       max_length: 255
+      enabled_by: _requires_group
       description: "group required for access"
     - name: _access_classification
       type: enum
       nullable: true
       enum_values: [public, internal, confidential, restricted, regulated]
+      enabled_by: _access_classification
       description: "data sensitivity level"
+    - name: _audit_chain_hash
+      type: varchar
+      nullable: true
+      max_length: 128
+      enabled_by: _audit_chain_hash
+      description: "cryptographic chain hash"
     - name: _retention_policy_id
       type: foreign_key
       nullable: true
       references: retention_policy
+      enabled_by: _retention_policy_id
       description: "retention policy override"
 
 observation:
@@ -634,16 +646,19 @@ observation:
     - name: _observed_time
       type: datetime
       nullable: true
+      enabled_by: _observed_time
       description: "when observation sampled"
     - name: _authority_id
       type: foreign_key
       nullable: true
       references: authority
+      enabled_by: _authority_id
       description: "source authority"
     - name: _puller_runner_job_id
       type: foreign_key
       nullable: true
       references: runner_job
+      enabled_by: _puller_runner_job_id
       description: "runner job that wrote"
 
 schema_metadata:
@@ -652,11 +667,13 @@ schema_metadata:
       type: foreign_key
       nullable: true
       references: _schema_version
+      enabled_by: _schema_version_introduced_id
       description: "schema version introduced"
     - name: _schema_version_deprecated_id
       type: foreign_key
       nullable: true
       references: _schema_version
+      enabled_by: _schema_version_deprecated_id
       description: "schema version deprecated"
 
 append_only:
@@ -665,20 +682,16 @@ append_only:
 
 database_roles:
   - name: opsdb_app_role
-    permissions: [SELECT, INSERT, UPDATE, DELETE]
-    applies_to: all
+    grants: [SELECT, INSERT, UPDATE, DELETE]
     description: "application role for API"
   - name: opsdb_admin_role
-    permissions: [ALL]
-    applies_to: all
+    grants: [ALL]
     description: "admin role for substrate operators"
   - name: opsdb_readonly_role
-    permissions: [SELECT]
-    applies_to: all
+    grants: [SELECT]
     description: "read-only role for auditors"
   - name: opsdb_runner_role
-    permissions: [SELECT, INSERT, UPDATE]
-    applies_to: all
+    grants: [SELECT, INSERT, UPDATE]
     description: "runner role"
 `
 }
@@ -693,7 +706,6 @@ func SchemaRepoDir(t *testing.T, entities ...string) string {
 
 	tmpDir := t.TempDir()
 
-	// Create directory structure.
 	schemaDir := filepath.Join(tmpDir, "schema")
 	dirs := []string{
 		filepath.Join(schemaDir, "meta"),
@@ -706,19 +718,16 @@ func SchemaRepoDir(t *testing.T, entities ...string) string {
 		}
 	}
 
-	// Write meta-schema.
 	metaPath := filepath.Join(schemaDir, "meta", "_schema_meta.yaml")
 	if err := os.WriteFile(metaPath, []byte(minimalMetaSchema()), 0644); err != nil {
 		t.Fatalf("writing meta-schema: %v", err)
 	}
 
-	// Write reserved conventions.
 	reservedPath := filepath.Join(schemaDir, "conventions", "reserved.yaml")
 	if err := os.WriteFile(reservedPath, []byte(minimalReservedYAML()), 0644); err != nil {
 		t.Fatalf("writing reserved conventions: %v", err)
 	}
 
-	// Write entity files and build directory.yaml imports list.
 	var imports []string
 	for i, entityYAML := range entities {
 		filename := fmt.Sprintf("entity_%03d.yaml", i)
@@ -731,9 +740,7 @@ func SchemaRepoDir(t *testing.T, entities ...string) string {
 		imports = append(imports, relPath)
 	}
 
-	// Write directory.yaml.
-	var directoryContent string
-	directoryContent = "# Auto-generated test directory\nimports:\n"
+	directoryContent := "# Auto-generated test directory\nimports:\n"
 	for _, imp := range imports {
 		directoryContent += fmt.Sprintf("  - %s\n", imp)
 	}
