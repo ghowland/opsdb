@@ -1,3 +1,5 @@
+//# internal/vocabulary/constraints.go
+
 package vocabulary
 
 import (
@@ -6,50 +8,22 @@ import (
 	"unicode"
 )
 
-// allowedConstraints maps field types to the constraint keys they accept.
-var allowedConstraints = map[string][]string{
-	"int":         {"min_value", "max_value"},
-	"float":       {"min_value", "max_value", "precision_decimal_places"},
-	"varchar":     {"min_length", "max_length"},
-	"text":        {"max_length"},
-	"boolean":     {},
-	"datetime":    {},
-	"date":        {},
-	"json":        {"json_type_discriminator"},
-	"enum":        {"enum_values"},
-	"foreign_key": {"references"},
-}
-
-// requiredConstraints maps field types to the constraint keys they must have.
-var requiredConstraints = map[string][]string{
-	"int":         {},
-	"float":       {},
-	"varchar":     {"max_length"},
-	"text":        {},
-	"boolean":     {},
-	"datetime":    {},
-	"date":        {},
-	"json":        {"json_type_discriminator"},
-	"enum":        {"enum_values"},
-	"foreign_key": {"references"},
-}
-
 // ValidateConstraints is the master constraint validator for a field.
 // Checks that only allowed constraints for the type are present,
 // required constraints are present, and values are valid.
+// Uses typeAllowedConstraints and typeRequiredConstraints from types.go
+// as the single source of truth.
 func ValidateConstraints(fieldType string, constraints map[string]interface{}) error {
-	allowed, ok := allowedConstraints[fieldType]
-	if !ok {
+	allowed := GetAllowedConstraints(fieldType)
+	if allowed == nil {
 		return fmt.Errorf("unknown field type %q: cannot validate constraints", fieldType)
 	}
 
-	// Build lookup set of allowed constraint keys.
 	allowedSet := make(map[string]bool, len(allowed))
 	for _, key := range allowed {
 		allowedSet[key] = true
 	}
 
-	// Check for unrecognized constraints.
 	for key := range constraints {
 		if !allowedSet[key] {
 			return fmt.Errorf("constraint %q is not allowed on field type %q (allowed: %s)",
@@ -57,8 +31,7 @@ func ValidateConstraints(fieldType string, constraints map[string]interface{}) e
 		}
 	}
 
-	// Check required constraints are present.
-	required := requiredConstraints[fieldType]
+	required := GetRequiredConstraints(fieldType)
 	for _, key := range required {
 		if _, present := constraints[key]; !present {
 			return fmt.Errorf("constraint %q is required for field type %q", key, fieldType)
@@ -234,9 +207,11 @@ func ValidatePrecision(places interface{}) error {
 	return nil
 }
 
-// --- helper functions ---
+// ---------------------------------------------------------------------------
+// Type conversion helpers — used by constraints and by other packages
+// that validate values from parsed YAML
+// ---------------------------------------------------------------------------
 
-// toFloat64 converts a numeric interface{} value (from YAML parsing) to float64.
 func toFloat64(v interface{}) (float64, error) {
 	switch n := v.(type) {
 	case float64:
@@ -254,7 +229,6 @@ func toFloat64(v interface{}) (float64, error) {
 	}
 }
 
-// toInt converts a numeric interface{} value to int.
 func toInt(v interface{}) (int, error) {
 	switch n := v.(type) {
 	case int:
@@ -278,7 +252,6 @@ func toInt(v interface{}) (int, error) {
 	}
 }
 
-// toStringSlice converts an interface{} (expected []interface{} from YAML) to []string.
 func toStringSlice(v interface{}) ([]string, error) {
 	switch s := v.(type) {
 	case []string:
@@ -298,8 +271,6 @@ func toStringSlice(v interface{}) ([]string, error) {
 	}
 }
 
-// checkEnumValueFormat validates that an enum value contains only lowercase
-// letters, digits, and underscores.
 func checkEnumValueFormat(v string) error {
 	for i, r := range v {
 		if r == '_' {
@@ -319,7 +290,6 @@ func checkEnumValueFormat(v string) error {
 	return nil
 }
 
-// validatePositiveInt checks that a value is a positive integer (>= 1).
 func validatePositiveInt(v interface{}, name string) error {
 	i, err := toInt(v)
 	if err != nil {
@@ -331,7 +301,6 @@ func validatePositiveInt(v interface{}, name string) error {
 	return nil
 }
 
-// validateNonNegativeInt checks that a value is a non-negative integer (>= 0).
 func validateNonNegativeInt(v interface{}, name string) error {
 	i, err := toInt(v)
 	if err != nil {

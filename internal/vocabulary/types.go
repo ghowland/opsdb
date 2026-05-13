@@ -1,10 +1,12 @@
+//# internal/vocabulary/types.go
+
 package vocabulary
 
 import (
 	"fmt"
 )
 
-// allowedTypeSet is the lookup set for the nine permitted field types.
+// allowedTypeSet is the lookup set for the ten permitted field types.
 var allowedTypeSet = map[string]bool{
 	"int":         true,
 	"float":       true,
@@ -47,10 +49,10 @@ var postgresTypeMap = map[string]string{
 
 // GetPostgresType returns the Postgres DDL type string for a schema type.
 // VARCHAR requires max_length from the constraints map. All others are
-// fixed mappings. Returns an error-indicating string if type is unknown.
+// fixed mappings.
 func GetPostgresType(typeName string, constraints map[string]interface{}) string {
 	if typeName == "varchar" {
-		maxLen := 255 // fallback, though validator should have caught missing max_length
+		maxLen := 255
 		if ml, ok := constraints["max_length"]; ok {
 			if mlInt, err := toInt(ml); err == nil {
 				maxLen = mlInt
@@ -66,9 +68,11 @@ func GetPostgresType(typeName string, constraints map[string]interface{}) string
 	return fmt.Sprintf("UNKNOWN_TYPE(%s)", typeName)
 }
 
-// typeAllowedConstraints maps field types to their optional constraints.
-// Required constraints (max_length for varchar, enum_values for enum, etc.)
-// are listed in typeRequiredConstraints.
+// ---------------------------------------------------------------------------
+// Constraints per type — single source of truth
+// ---------------------------------------------------------------------------
+
+// typeAllowedConstraints maps field types to the constraint keys they accept.
 var typeAllowedConstraints = map[string][]string{
 	"int":         {"min_value", "max_value"},
 	"float":       {"min_value", "max_value", "precision_decimal_places"},
@@ -82,7 +86,7 @@ var typeAllowedConstraints = map[string][]string{
 	"foreign_key": {"references"},
 }
 
-// typeRequiredConstraints maps field types to constraints that must be present.
+// typeRequiredConstraints maps field types to constraint keys that must be present.
 var typeRequiredConstraints = map[string][]string{
 	"int":         {},
 	"float":       {},
@@ -97,7 +101,6 @@ var typeRequiredConstraints = map[string][]string{
 }
 
 // GetAllowedConstraints returns which constraints are permitted for this type.
-// Includes both optional and required constraints.
 func GetAllowedConstraints(typeName string) []string {
 	if constraints, ok := typeAllowedConstraints[typeName]; ok {
 		return constraints
@@ -113,6 +116,10 @@ func GetRequiredConstraints(typeName string) []string {
 	return nil
 }
 
+// ---------------------------------------------------------------------------
+// Modifiers per type — single source of truth
+// ---------------------------------------------------------------------------
+
 // typeAllowedModifiers maps field types to their permitted modifiers.
 var typeAllowedModifiers = map[string][]string{
 	"int":         {"nullable", "default", "unique", "must_be_unique_within"},
@@ -127,16 +134,8 @@ var typeAllowedModifiers = map[string][]string{
 	"foreign_key": {"nullable"},
 }
 
-// GetAllowedModifiers returns which modifiers are permitted for this type.
-func GetAllowedModifiers(typeName string) []string {
-	if modifiers, ok := typeAllowedModifiers[typeName]; ok {
-		return modifiers
-	}
-	return nil
-}
-
 // typeForbiddenModifiers maps field types to modifiers that are explicitly
-// not allowed. This is the inverse of allowed — used for clearer error messages.
+// not allowed. Used for clearer error messages.
 var typeForbiddenModifiers = map[string][]string{
 	"int":         {},
 	"float":       {},
@@ -148,6 +147,14 @@ var typeForbiddenModifiers = map[string][]string{
 	"json":        {"default", "unique", "must_be_unique_within"},
 	"enum":        {},
 	"foreign_key": {"default", "unique", "must_be_unique_within"},
+}
+
+// GetAllowedModifiers returns which modifiers are permitted for this type.
+func GetAllowedModifiers(typeName string) []string {
+	if modifiers, ok := typeAllowedModifiers[typeName]; ok {
+		return modifiers
+	}
+	return nil
 }
 
 // GetForbiddenModifiers returns which modifiers are explicitly forbidden
@@ -162,8 +169,7 @@ func GetForbiddenModifiers(typeName string) []string {
 // IsModifierAllowed checks whether a specific modifier is allowed on a
 // specific field type.
 func IsModifierAllowed(typeName string, modifierName string) bool {
-	allowed := GetAllowedModifiers(typeName)
-	for _, m := range allowed {
+	for _, m := range GetAllowedModifiers(typeName) {
 		if m == modifierName {
 			return true
 		}
@@ -174,8 +180,7 @@ func IsModifierAllowed(typeName string, modifierName string) bool {
 // IsModifierForbidden checks whether a specific modifier is explicitly
 // forbidden on a specific field type.
 func IsModifierForbidden(typeName string, modifierName string) bool {
-	forbidden := GetForbiddenModifiers(typeName)
-	for _, m := range forbidden {
+	for _, m := range GetForbiddenModifiers(typeName) {
 		if m == modifierName {
 			return true
 		}
@@ -184,8 +189,7 @@ func IsModifierForbidden(typeName string, modifierName string) bool {
 }
 
 // ValidateModifiersForType checks all modifiers present on a field against
-// the allowed and forbidden lists for its type. Returns an error describing
-// the first invalid modifier found.
+// the allowed and forbidden lists for its type.
 func ValidateModifiersForType(typeName string, hasDefault bool, defaultValue interface{}, hasUnique bool, hasMustBeUniqueWithin bool) error {
 	if hasDefault {
 		if IsModifierForbidden(typeName, "default") {

@@ -1,3 +1,5 @@
+//# internal/vocabulary/forbidden.go
+
 package vocabulary
 
 import (
@@ -7,10 +9,10 @@ import (
 
 // ForbiddenViolation records a detected forbidden pattern in entity YAML.
 type ForbiddenViolation struct {
-	Pattern     string // regex, embedded_logic, inheritance, templating, import, deletion, type_change, rename
-	Location    string // YAML path where violation found (e.g. "fields[2].default")
-	Rationale   string // why this is forbidden
-	Alternative string // what to do instead
+	Pattern     string
+	Location    string
+	Rationale   string
+	Alternative string
 }
 
 // inheritanceKeys are top-level or nested keys that indicate inheritance.
@@ -29,7 +31,7 @@ var inheritanceKeys = map[string]bool{
 // importKeys are keys that indicate file-level imports.
 var importKeys = map[string]bool{
 	"import":  true,
-	"imports": false, // "imports" at top level in directory.yaml is allowed, but not in entity files
+	"imports": true,
 	"include": true,
 	"require": true,
 	"$ref":    true,
@@ -88,8 +90,8 @@ var embeddedLogicFunctions = []string{
 	"RANDOM(", "random(",
 }
 
-// regexMetachars are characters that indicate regex syntax when found in
-// constraint values (not in descriptions or free-form text).
+// regexMetachars are patterns that indicate regex syntax when found in
+// constraint values.
 var regexMetachars = []string{
 	"^[", "[a-z]", "[A-Z]", "[0-9]",
 	"]+$", "]+", ".*", ".+",
@@ -102,71 +104,49 @@ var regexMetachars = []string{
 func ScanForForbiddenPatterns(rawYAML map[string]interface{}) []ForbiddenViolation {
 	var violations []ForbiddenViolation
 
-	// Check top-level keys for forbidden patterns.
 	topKeys := collectKeys(rawYAML)
 
-	if CheckForInheritance(topKeys) {
-		for _, key := range topKeys {
-			if inheritanceKeys[key] {
-				violations = append(violations, ForbiddenViolation{
-					Pattern:     "inheritance",
-					Location:    key,
-					Rationale:   "no inheritance, extends, or base class — each entity declares its fields independently",
-					Alternative: "declare fields on each entity independently; reserved fields are the only controlled exception",
-				})
-			}
+	// Check top-level keys against each forbidden category.
+	for _, key := range topKeys {
+		if inheritanceKeys[key] {
+			violations = append(violations, ForbiddenViolation{
+				Pattern:     "inheritance",
+				Location:    key,
+				Rationale:   "no inheritance, extends, or base class — each entity declares its fields independently",
+				Alternative: "declare fields on each entity independently; reserved fields are the only controlled exception",
+			})
 		}
-	}
-
-	if CheckForImports(topKeys) {
-		for _, key := range topKeys {
-			if importKeys[key] {
-				violations = append(violations, ForbiddenViolation{
-					Pattern:     "import",
-					Location:    key,
-					Rationale:   "entity files do not import other files — only directory.yaml controls loading",
-					Alternative: "use directory.yaml to control entity loading order; shared structure uses reserved field injection",
-				})
-			}
+		if importKeys[key] {
+			violations = append(violations, ForbiddenViolation{
+				Pattern:     "import",
+				Location:    key,
+				Rationale:   "entity files do not import other files — only directory.yaml controls loading",
+				Alternative: "use directory.yaml to control entity loading order; shared structure uses reserved field injection",
+			})
 		}
-	}
-
-	if CheckForDeletionMarkers(topKeys) {
-		for _, key := range topKeys {
-			if deletionKeys[key] {
-				violations = append(violations, ForbiddenViolation{
-					Pattern:     "deletion",
-					Location:    key,
-					Rationale:   "fields and entities cannot be deleted — deletion breaks history, version rows, and audit log",
-					Alternative: "deprecate: mark _schema_version_deprecated_id; column and data remain as tombstone",
-				})
-			}
+		if deletionKeys[key] {
+			violations = append(violations, ForbiddenViolation{
+				Pattern:     "deletion",
+				Location:    key,
+				Rationale:   "fields and entities cannot be deleted — deletion breaks history, version rows, and audit log",
+				Alternative: "deprecate: mark _schema_version_deprecated_id; column and data remain as tombstone",
+			})
 		}
-	}
-
-	if CheckForTypeChangeMarkers(topKeys) {
-		for _, key := range topKeys {
-			if typeChangeKeys[key] {
-				violations = append(violations, ForbiddenViolation{
-					Pattern:     "type_change",
-					Location:    key,
-					Rationale:   "field types cannot be changed — type changes break consumers and stored data",
-					Alternative: "use duplication pattern: add new field with new type, double-write, migrate readers, deprecate old",
-				})
-			}
+		if typeChangeKeys[key] {
+			violations = append(violations, ForbiddenViolation{
+				Pattern:     "type_change",
+				Location:    key,
+				Rationale:   "field types cannot be changed — type changes break consumers and stored data",
+				Alternative: "use duplication pattern: add new field with new type, double-write, migrate readers, deprecate old",
+			})
 		}
-	}
-
-	if CheckForRenameMarkers(topKeys) {
-		for _, key := range topKeys {
-			if renameKeys[key] {
-				violations = append(violations, ForbiddenViolation{
-					Pattern:     "rename",
-					Location:    key,
-					Rationale:   "fields and entities cannot be renamed — renames break every consumer",
-					Alternative: "add new field with new name, deprecate old; both coexist",
-				})
-			}
+		if renameKeys[key] {
+			violations = append(violations, ForbiddenViolation{
+				Pattern:     "rename",
+				Location:    key,
+				Rationale:   "fields and entities cannot be renamed — renames break every consumer",
+				Alternative: "add new field with new name, deprecate old; both coexist",
+			})
 		}
 	}
 
@@ -205,8 +185,7 @@ func scanFieldMap(fieldMap map[string]interface{}, fieldIndex int) []ForbiddenVi
 	}
 
 	// Check field-level keys for forbidden markers.
-	fieldKeys := collectKeys(fieldMap)
-	for _, key := range fieldKeys {
+	for key := range fieldMap {
 		if deletionKeys[key] {
 			violations = append(violations, ForbiddenViolation{
 				Pattern:     "deletion",
@@ -323,6 +302,11 @@ func scanValuesRecursive(m map[string]interface{}, path string) []ForbiddenViola
 	return violations
 }
 
+// ---------------------------------------------------------------------------
+// Check functions — used by forbidden scanner, modifier validator, and
+// other packages that need to detect forbidden patterns in values
+// ---------------------------------------------------------------------------
+
 // CheckForRegex checks if a string value contains regex metacharacter
 // patterns used as constraints.
 func CheckForRegex(value string) bool {
@@ -332,13 +316,11 @@ func CheckForRegex(value string) bool {
 		}
 	}
 
-	// Check for common regex delimiters: starts with ^ and ends with $
 	trimmed := strings.TrimSpace(value)
 	if strings.HasPrefix(trimmed, "^") && strings.HasSuffix(trimmed, "$") {
 		return true
 	}
 
-	// Check for character class syntax with quantifiers.
 	if strings.Contains(value, "[") && strings.Contains(value, "]") {
 		afterBracket := value[strings.Index(value, "]")+1:]
 		if strings.HasPrefix(afterBracket, "+") ||
@@ -359,15 +341,12 @@ func CheckForEmbeddedLogic(value interface{}) bool {
 		return false
 	}
 
-	// Check for known SQL and programming functions.
 	for _, fn := range embeddedLogicFunctions {
 		if strings.Contains(strVal, fn) {
 			return true
 		}
 	}
 
-	// Check for arithmetic expressions in default-like contexts.
-	// Look for patterns like "previous_value + 1", "field * 2", etc.
 	arithmeticOps := []string{" + ", " - ", " * ", " / ", " % "}
 	for _, op := range arithmeticOps {
 		if strings.Contains(strVal, op) {
@@ -375,7 +354,6 @@ func CheckForEmbeddedLogic(value interface{}) bool {
 		}
 	}
 
-	// Check for explicit expression markers.
 	if strings.HasPrefix(strVal, "=") {
 		return true
 	}
@@ -410,7 +388,6 @@ func CheckForTemplating(value string) bool {
 }
 
 // CheckForImports checks for import-related keys in a key list.
-// Note: "imports" is only forbidden in entity files, not in directory.yaml.
 func CheckForImports(keys []string) bool {
 	for _, key := range keys {
 		if importKeys[key] {

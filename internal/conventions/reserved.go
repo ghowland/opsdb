@@ -1,3 +1,5 @@
+//# internal/conventions/reserved.go
+
 package conventions
 
 import (
@@ -9,8 +11,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// reservedFileSchema mirrors the YAML structure of conventions/reserved.yaml
-// for parsing. Internal to this file — callers use the model types.
+// reservedFileSchema mirrors the YAML structure of conventions/reserved.yaml.
 type reservedFileSchema struct {
 	Universal struct {
 		Fields []reservedFieldDef `yaml:"fields"`
@@ -22,16 +23,17 @@ type reservedFileSchema struct {
 		Fields []reservedFieldDef `yaml:"fields"`
 	} `yaml:"hierarchical"`
 	VersioningSibling struct {
-		Fields []reservedFieldDef `yaml:"fields"`
+		Fields      []reservedFieldDef   `yaml:"fields"`
+		Constraints []reservedConstraint `yaml:"constraints"`
 	} `yaml:"versioning_sibling"`
 	Governance struct {
-		Fields []reservedFieldDef `yaml:"fields"`
+		Fields []reservedGovernanceDef `yaml:"fields"`
 	} `yaml:"governance"`
 	Observation struct {
-		Fields []reservedFieldDef `yaml:"fields"`
+		Fields []reservedGovernanceDef `yaml:"fields"`
 	} `yaml:"observation"`
 	SchemaMetadata struct {
-		Fields []reservedFieldDef `yaml:"fields"`
+		Fields []reservedGovernanceDef `yaml:"fields"`
 	} `yaml:"schema_metadata"`
 	AppendOnly struct {
 		RevokeOperations []string `yaml:"revoke_operations"`
@@ -50,17 +52,33 @@ type reservedFieldDef struct {
 	Unique      bool        `yaml:"unique"`
 	EnumValues  []string    `yaml:"enum_values"`
 	MaxLength   int         `yaml:"max_length"`
+	MinValue    *float64    `yaml:"min_value"`
+}
+
+type reservedGovernanceDef struct {
+	Name        string      `yaml:"name"`
+	Type        string      `yaml:"type"`
+	Nullable    bool        `yaml:"nullable"`
+	Default     interface{} `yaml:"default"`
+	Description string      `yaml:"description"`
+	References  string      `yaml:"references"`
+	EnumValues  []string    `yaml:"enum_values"`
+	MaxLength   int         `yaml:"max_length"`
+	EnabledBy   string      `yaml:"enabled_by"`
+}
+
+type reservedConstraint struct {
+	Type   string   `yaml:"type"`
+	Fields []string `yaml:"fields"`
 }
 
 type reservedRoleDef struct {
 	Name        string   `yaml:"name"`
-	Permissions []string `yaml:"permissions"`
-	AppliesTo   string   `yaml:"applies_to"`
+	Grants      []string `yaml:"grants"`
 	Description string   `yaml:"description"`
 }
 
-// staticReservedNames is the set of field names that are always reserved,
-// regardless of entity. Checked without needing to load the YAML file.
+// staticReservedNames is the set of field names that are always reserved.
 var staticReservedNames = map[string]bool{
 	"id":           true,
 	"created_time": true,
@@ -69,25 +87,12 @@ var staticReservedNames = map[string]bool{
 }
 
 // versioningSiblingStaticNames is the set of field names reserved on
-// version sibling tables (not templated — always the same name).
+// version sibling tables.
 var versioningSiblingStaticNames = map[string]bool{
-	"version_serial":              true,
-	"is_active_version":           true,
+	"version_serial":               true,
+	"is_active_version":            true,
 	"approved_for_production_time": true,
-}
-
-// allGovernanceNames collects every governance, observation, and schema
-// metadata field name. Used by IsReservedFieldName.
-var allGovernanceNames = map[string]bool{
-	"_requires_group":               true,
-	"_access_classification":        true,
-	"_audit_chain_hash":             true,
-	"_retention_policy_id":          true,
-	"_schema_version_introduced_id": true,
-	"_schema_version_deprecated_id": true,
-	"_observed_time":                true,
-	"_authority_id":                 true,
-	"_puller_runner_job_id":         true,
+	"change_set_id":                true,
 }
 
 // LoadReserved reads and parses conventions/reserved.yaml into a ReservedConfig.
@@ -102,54 +107,85 @@ func LoadReserved(path string) (*model.ReservedConfig, error) {
 		return nil, fmt.Errorf("parsing reserved conventions YAML: %w", err)
 	}
 
-	config := &model.ReservedConfig{
-		GovernanceFields: make(map[string]model.Field),
-	}
+	config := &model.ReservedConfig{}
 
 	// Universal fields: id, created_time, updated_time.
 	for _, fd := range raw.Universal.Fields {
-		config.UniversalFields = append(config.UniversalFields, toModelField(fd, true, false))
+		config.Universal = append(config.Universal, toModelField(fd))
 	}
-	// If YAML was empty or missing, provide hardcoded defaults.
-	if len(config.UniversalFields) == 0 {
-		config.UniversalFields = hardcodedUniversalFields()
+	if len(config.Universal) == 0 {
+		config.Universal = hardcodedUniversalFields()
 	}
 
 	// Soft delete fields.
 	for _, fd := range raw.SoftDelete.Fields {
-		config.SoftDeleteFields = append(config.SoftDeleteFields, toModelField(fd, true, false))
+		config.SoftDelete = append(config.SoftDelete, toModelField(fd))
 	}
-	if len(config.SoftDeleteFields) == 0 {
-		config.SoftDeleteFields = hardcodedSoftDeleteFields()
+	if len(config.SoftDelete) == 0 {
+		config.SoftDelete = hardcodedSoftDeleteFields()
 	}
 
-	// Versioning sibling fields (templates — {entity} substituted at injection time).
+	// Hierarchical fields (templates — {entity} substituted at injection time).
+	for _, fd := range raw.Hierarchical.Fields {
+		config.Hierarchical = append(config.Hierarchical, toModelField(fd))
+	}
+
+	// Versioning sibling fields and constraints.
 	for _, fd := range raw.VersioningSibling.Fields {
-		config.VersionSiblingFields = append(config.VersionSiblingFields, toModelField(fd, true, false))
+		config.VersioningSibling = append(config.VersioningSibling, toModelField(fd))
 	}
-	if len(config.VersionSiblingFields) == 0 {
-		config.VersionSiblingFields = hardcodedVersionSiblingFields()
+	if len(config.VersioningSibling) == 0 {
+		config.VersioningSibling = hardcodedVersionSiblingFields()
+	}
+	for _, c := range raw.VersioningSibling.Constraints {
+		config.VersioningConstraints = append(config.VersioningConstraints, model.ConstraintDef{
+			Type:   c.Type,
+			Fields: c.Fields,
+		})
 	}
 
-	// Governance fields — keyed by a logical flag name.
-	for _, fd := range raw.Governance.Fields {
-		config.GovernanceFields[fd.Name] = toModelField(fd, false, true)
+	// Governance fields.
+	for _, gd := range raw.Governance.Fields {
+		config.Governance = append(config.Governance, model.GovernanceFieldDef{
+			Field:     governanceToModelField(gd),
+			EnabledBy: gd.EnabledBy,
+		})
 	}
-	for _, fd := range raw.Observation.Fields {
-		config.GovernanceFields[fd.Name] = toModelField(fd, false, true)
+
+	// Observation fields.
+	for _, gd := range raw.Observation.Fields {
+		config.Observation = append(config.Observation, model.GovernanceFieldDef{
+			Field:     governanceToModelField(gd),
+			EnabledBy: gd.EnabledBy,
+		})
 	}
-	for _, fd := range raw.SchemaMetadata.Fields {
-		config.GovernanceFields[fd.Name] = toModelField(fd, false, true)
+
+	// Schema metadata fields.
+	for _, gd := range raw.SchemaMetadata.Fields {
+		config.SchemaMetadata = append(config.SchemaMetadata, model.GovernanceFieldDef{
+			Field:     governanceToModelField(gd),
+			EnabledBy: gd.EnabledBy,
+		})
 	}
-	// Ensure hardcoded governance fields exist even if YAML was sparse.
+
+	// Ensure hardcoded governance/observation/schema metadata defaults exist.
 	ensureGovernanceDefaults(config)
+
+	// Append-only config.
+	config.AppendOnly = model.AppendOnlyConfig{
+		PostgresRevokeRoles: raw.AppendOnly.RevokeFromRoles,
+	}
+	if len(config.AppendOnly.PostgresRevokeRoles) == 0 {
+		config.AppendOnly.PostgresRevokeRoles = []string{
+			"opsdb_app_role", "opsdb_runner_role", "opsdb_readonly_role",
+		}
+	}
 
 	// Database roles.
 	for _, rd := range raw.DatabaseRoles {
 		config.DatabaseRoles = append(config.DatabaseRoles, model.RoleDefinition{
 			Name:        rd.Name,
-			Permissions: rd.Permissions,
-			AppliesTo:   rd.AppliesTo,
+			Grants:      rd.Grants,
 			Description: rd.Description,
 		})
 	}
@@ -157,34 +193,21 @@ func LoadReserved(path string) (*model.ReservedConfig, error) {
 		config.DatabaseRoles = hardcodedDatabaseRoles()
 	}
 
-	// Append-only config.
-	config.AppendOnlyRevokeOps = raw.AppendOnly.RevokeOperations
-	config.AppendOnlyRevokeRoles = raw.AppendOnly.RevokeFromRoles
-	if len(config.AppendOnlyRevokeOps) == 0 {
-		config.AppendOnlyRevokeOps = []string{"UPDATE", "DELETE"}
-	}
-	if len(config.AppendOnlyRevokeRoles) == 0 {
-		config.AppendOnlyRevokeRoles = []string{"opsdb_app_role", "opsdb_runner_role", "opsdb_readonly_role"}
-	}
-
 	return config, nil
 }
 
 // IsReservedFieldName checks if a field name is reserved.
 // Accounts for entity-name-templated names like parent_{entity}_id
-// and versioning sibling names like {entity}_id, parent_{entity}_version_id.
+// and versioning sibling names.
 func IsReservedFieldName(name string, entityName string) bool {
-	// Static universal reserved names.
 	if staticReservedNames[name] {
 		return true
 	}
 
-	// Governance fields.
-	if allGovernanceNames[name] {
+	if GovernanceFieldNames()[name] {
 		return true
 	}
 
-	// Versioning sibling static names.
 	if versioningSiblingStaticNames[name] {
 		return true
 	}
@@ -194,19 +217,13 @@ func IsReservedFieldName(name string, entityName string) bool {
 		return true
 	}
 
-	// Templated versioning sibling FK to parent: {entityName}_id
-	// (on the sibling table, this is the FK back to the parent entity)
+	// Templated versioning sibling FK: {entityName}_id
 	if name == entityName+"_id" {
 		return true
 	}
 
 	// Templated versioning sibling self-FK: parent_{entityName}_version_id
 	if name == "parent_"+entityName+"_version_id" {
-		return true
-	}
-
-	// change_set_id is reserved on version sibling tables.
-	if name == "change_set_id" {
 		return true
 	}
 
@@ -239,7 +256,6 @@ func GetHierarchicalFields(entityName string) []model.Field {
 }
 
 // GetVersioningSiblingFields returns fields for the {entityName}_version table.
-// These are the structural versioning fields, not copies of the parent's data fields.
 func GetVersioningSiblingFields(entityName string) []model.Field {
 	return []model.Field{
 		{
@@ -255,7 +271,7 @@ func GetVersioningSiblingFields(entityName string) []model.Field {
 			Type:        "int",
 			Nullable:    false,
 			Description: "monotonic version number per entity instance",
-			MinValue:    intPtr(1),
+			MinValue:    float64Ptr(1),
 			IsReserved:  true,
 		},
 		{
@@ -293,111 +309,71 @@ func GetVersioningSiblingFields(entityName string) []model.Field {
 }
 
 // GetGovernanceFields returns governance field definitions for enabled flags.
-// The enabled map keys correspond to governance field names.
 func GetGovernanceFields(enabled map[string]bool) []model.Field {
 	var fields []model.Field
 
-	// Governance fields proper.
 	if enabled["_requires_group"] {
 		fields = append(fields, model.Field{
-			Name:        "_requires_group",
-			Type:        "varchar",
-			Nullable:    true,
-			MaxLength:   intPtr(255),
-			Description: "group required for access beyond standard role",
-			IsReserved:  true,
-			IsGovernance: true,
+			Name: "_requires_group", Type: "varchar", Nullable: true,
+			MaxLength: intPtr(255), Description: "group required for access beyond standard role",
+			IsReserved: true, IsGovernance: true,
 		})
 	}
 	if enabled["_access_classification"] {
 		fields = append(fields, model.Field{
-			Name:        "_access_classification",
-			Type:        "enum",
-			Nullable:    true,
+			Name: "_access_classification", Type: "enum", Nullable: true,
 			EnumValues:  []string{"public", "internal", "confidential", "restricted", "regulated"},
 			Description: "data sensitivity level for access decisions and logging",
-			IsReserved:  true,
-			IsGovernance: true,
+			IsReserved:  true, IsGovernance: true,
 		})
 	}
 	if enabled["_audit_chain_hash"] {
 		fields = append(fields, model.Field{
-			Name:        "_audit_chain_hash",
-			Type:        "varchar",
-			Nullable:    true,
-			MaxLength:   intPtr(128),
-			Description: "cryptographic chain hash over prior entry",
-			IsReserved:  true,
-			IsGovernance: true,
+			Name: "_audit_chain_hash", Type: "varchar", Nullable: true,
+			MaxLength: intPtr(128), Description: "cryptographic chain hash over prior entry",
+			IsReserved: true, IsGovernance: true,
 		})
 	}
 	if enabled["_retention_policy_id"] {
 		fields = append(fields, model.Field{
-			Name:        "_retention_policy_id",
-			Type:        "foreign_key",
-			Nullable:    true,
-			References:  "retention_policy",
-			Description: "override of default retention policy",
-			IsReserved:  true,
-			IsGovernance: true,
+			Name: "_retention_policy_id", Type: "foreign_key", Nullable: true,
+			References: "retention_policy", Description: "override of default retention policy",
+			IsReserved: true, IsGovernance: true,
 		})
 	}
-
-	// Schema metadata fields.
 	if enabled["_schema_version_introduced_id"] {
 		fields = append(fields, model.Field{
-			Name:        "_schema_version_introduced_id",
-			Type:        "foreign_key",
-			Nullable:    true,
-			References:  "_schema_version",
-			Description: "schema version that introduced this entity or field",
-			IsReserved:  true,
-			IsGovernance: true,
+			Name: "_schema_version_introduced_id", Type: "foreign_key", Nullable: true,
+			References: "_schema_version", Description: "schema version that introduced this entity or field",
+			IsReserved: true, IsGovernance: true,
 		})
 	}
 	if enabled["_schema_version_deprecated_id"] {
 		fields = append(fields, model.Field{
-			Name:        "_schema_version_deprecated_id",
-			Type:        "foreign_key",
-			Nullable:    true,
-			References:  "_schema_version",
-			Description: "schema version that deprecated this entity or field",
-			IsReserved:  true,
-			IsGovernance: true,
+			Name: "_schema_version_deprecated_id", Type: "foreign_key", Nullable: true,
+			References: "_schema_version", Description: "schema version that deprecated this entity or field",
+			IsReserved: true, IsGovernance: true,
 		})
 	}
-
-	// Observation fields.
 	if enabled["_observed_time"] {
 		fields = append(fields, model.Field{
-			Name:        "_observed_time",
-			Type:        "datetime",
-			Nullable:    true,
+			Name: "_observed_time", Type: "datetime", Nullable: true,
 			Description: "when observation was sampled from authority",
-			IsReserved:  true,
-			IsGovernance: true,
+			IsReserved:  true, IsGovernance: true,
 		})
 	}
 	if enabled["_authority_id"] {
 		fields = append(fields, model.Field{
-			Name:        "_authority_id",
-			Type:        "foreign_key",
-			Nullable:    true,
-			References:  "authority",
-			Description: "source authority of observation",
-			IsReserved:  true,
-			IsGovernance: true,
+			Name: "_authority_id", Type: "foreign_key", Nullable: true,
+			References: "authority", Description: "source authority of observation",
+			IsReserved: true, IsGovernance: true,
 		})
 	}
 	if enabled["_puller_runner_job_id"] {
 		fields = append(fields, model.Field{
-			Name:        "_puller_runner_job_id",
-			Type:        "foreign_key",
-			Nullable:    true,
-			References:  "runner_job",
-			Description: "runner job that wrote this observation",
-			IsReserved:  true,
-			IsGovernance: true,
+			Name: "_puller_runner_job_id", Type: "foreign_key", Nullable: true,
+			References: "runner_job", Description: "runner job that wrote this observation",
+			IsReserved: true, IsGovernance: true,
 		})
 	}
 
@@ -409,30 +385,21 @@ func GetDatabaseRoles() []model.RoleDefinition {
 	return hardcodedDatabaseRoles()
 }
 
-// --- hardcoded defaults (used when YAML file is empty or missing sections) ---
+// --- hardcoded defaults ---
 
 func hardcodedUniversalFields() []model.Field {
 	return []model.Field{
 		{
-			Name:        "id",
-			Type:        "int",
-			Nullable:    false,
-			Description: "primary key auto-increment",
-			IsReserved:  true,
+			Name: "id", Type: "int", Nullable: false,
+			Description: "primary key auto-increment", IsReserved: true,
 		},
 		{
-			Name:        "created_time",
-			Type:        "datetime",
-			Nullable:    false,
-			Description: "set on insert",
-			IsReserved:  true,
+			Name: "created_time", Type: "datetime", Nullable: false,
+			Description: "set on insert", IsReserved: true,
 		},
 		{
-			Name:        "updated_time",
-			Type:        "datetime",
-			Nullable:    false,
-			Description: "set on insert and update",
-			IsReserved:  true,
+			Name: "updated_time", Type: "datetime", Nullable: false,
+			Description: "set on insert and update", IsReserved: true,
 		},
 	}
 }
@@ -440,42 +407,28 @@ func hardcodedUniversalFields() []model.Field {
 func hardcodedSoftDeleteFields() []model.Field {
 	return []model.Field{
 		{
-			Name:        "is_active",
-			Type:        "boolean",
-			Nullable:    false,
-			Default:     true,
-			Description: "soft delete state; false means logically deleted",
-			IsReserved:  true,
+			Name: "is_active", Type: "boolean", Nullable: false,
+			Default: true, Description: "soft delete state; false means logically deleted",
+			IsReserved: true,
 		},
 	}
 }
 
 func hardcodedVersionSiblingFields() []model.Field {
-	// These are templates — {entity} is substituted at injection time.
-	// Stored here as the non-templated structural fields only.
 	return []model.Field{
 		{
-			Name:        "version_serial",
-			Type:        "int",
-			Nullable:    false,
+			Name: "version_serial", Type: "int", Nullable: false,
 			Description: "monotonic version number per entity instance",
-			MinValue:    intPtr(1),
-			IsReserved:  true,
+			MinValue:    float64Ptr(1), IsReserved: true,
 		},
 		{
-			Name:        "is_active_version",
-			Type:        "boolean",
-			Nullable:    false,
-			Default:     false,
-			Description: "true for current active version only",
-			IsReserved:  true,
+			Name: "is_active_version", Type: "boolean", Nullable: false,
+			Default: false, Description: "true for current active version only",
+			IsReserved: true,
 		},
 		{
-			Name:        "approved_for_production_time",
-			Type:        "datetime",
-			Nullable:    true,
-			Description: "when this version went live",
-			IsReserved:  true,
+			Name: "approved_for_production_time", Type: "datetime", Nullable: true,
+			Description: "when this version went live", IsReserved: true,
 		},
 	}
 }
@@ -484,100 +437,115 @@ func hardcodedDatabaseRoles() []model.RoleDefinition {
 	return []model.RoleDefinition{
 		{
 			Name:        "opsdb_app_role",
-			Permissions: []string{"SELECT", "INSERT", "UPDATE", "DELETE"},
-			AppliesTo:   "all",
+			Grants:      []string{"SELECT", "INSERT", "UPDATE", "DELETE"},
 			Description: "application role for API — full CRUD on non-append-only tables",
 		},
 		{
 			Name:        "opsdb_admin_role",
-			Permissions: []string{"ALL"},
-			AppliesTo:   "all",
+			Grants:      []string{"ALL"},
 			Description: "admin role for substrate operators — DDL and data, under SoD",
 		},
 		{
 			Name:        "opsdb_readonly_role",
-			Permissions: []string{"SELECT"},
-			AppliesTo:   "all",
+			Grants:      []string{"SELECT"},
 			Description: "read-only role for auditors and dashboards",
 		},
 		{
 			Name:        "opsdb_runner_role",
-			Permissions: []string{"SELECT", "INSERT", "UPDATE"},
-			AppliesTo:   "all",
+			Grants:      []string{"SELECT", "INSERT", "UPDATE"},
 			Description: "runner role — read and write but not delete (soft-delete via UPDATE)",
 		},
 	}
 }
 
-// ensureGovernanceDefaults fills in governance field definitions that were
-// not present in the YAML file, using hardcoded values.
+// ensureGovernanceDefaults fills in governance/observation/schema metadata
+// definitions that were not present in the YAML file.
 func ensureGovernanceDefaults(config *model.ReservedConfig) {
-	defaults := map[string]model.Field{
-		"_requires_group": {
+	governanceDefaults := []model.GovernanceFieldDef{
+		{EnabledBy: "_requires_group", Field: model.Field{
 			Name: "_requires_group", Type: "varchar", Nullable: true,
 			MaxLength: intPtr(255), Description: "group required for access beyond standard role",
 			IsReserved: true, IsGovernance: true,
-		},
-		"_access_classification": {
+		}},
+		{EnabledBy: "_access_classification", Field: model.Field{
 			Name: "_access_classification", Type: "enum", Nullable: true,
-			EnumValues: []string{"public", "internal", "confidential", "restricted", "regulated"},
+			EnumValues:  []string{"public", "internal", "confidential", "restricted", "regulated"},
 			Description: "data sensitivity level", IsReserved: true, IsGovernance: true,
-		},
-		"_audit_chain_hash": {
+		}},
+		{EnabledBy: "_audit_chain_hash", Field: model.Field{
 			Name: "_audit_chain_hash", Type: "varchar", Nullable: true,
 			MaxLength: intPtr(128), Description: "cryptographic chain hash",
 			IsReserved: true, IsGovernance: true,
-		},
-		"_retention_policy_id": {
+		}},
+		{EnabledBy: "_retention_policy_id", Field: model.Field{
 			Name: "_retention_policy_id", Type: "foreign_key", Nullable: true,
 			References: "retention_policy", Description: "retention policy override",
 			IsReserved: true, IsGovernance: true,
-		},
-		"_schema_version_introduced_id": {
-			Name: "_schema_version_introduced_id", Type: "foreign_key", Nullable: true,
-			References: "_schema_version", Description: "schema version introduced",
-			IsReserved: true, IsGovernance: true,
-		},
-		"_schema_version_deprecated_id": {
-			Name: "_schema_version_deprecated_id", Type: "foreign_key", Nullable: true,
-			References: "_schema_version", Description: "schema version deprecated",
-			IsReserved: true, IsGovernance: true,
-		},
-		"_observed_time": {
+		}},
+	}
+	observationDefaults := []model.GovernanceFieldDef{
+		{EnabledBy: "_observed_time", Field: model.Field{
 			Name: "_observed_time", Type: "datetime", Nullable: true,
 			Description: "when observation was sampled", IsReserved: true, IsGovernance: true,
-		},
-		"_authority_id": {
+		}},
+		{EnabledBy: "_authority_id", Field: model.Field{
 			Name: "_authority_id", Type: "foreign_key", Nullable: true,
 			References: "authority", Description: "source authority of observation",
 			IsReserved: true, IsGovernance: true,
-		},
-		"_puller_runner_job_id": {
+		}},
+		{EnabledBy: "_puller_runner_job_id", Field: model.Field{
 			Name: "_puller_runner_job_id", Type: "foreign_key", Nullable: true,
 			References: "runner_job", Description: "runner job that wrote observation",
 			IsReserved: true, IsGovernance: true,
-		},
+		}},
 	}
-	for key, field := range defaults {
-		if _, exists := config.GovernanceFields[key]; !exists {
-			config.GovernanceFields[key] = field
-		}
+	schemaDefaults := []model.GovernanceFieldDef{
+		{EnabledBy: "_schema_version_introduced_id", Field: model.Field{
+			Name: "_schema_version_introduced_id", Type: "foreign_key", Nullable: true,
+			References: "_schema_version", Description: "schema version introduced",
+			IsReserved: true, IsGovernance: true,
+		}},
+		{EnabledBy: "_schema_version_deprecated_id", Field: model.Field{
+			Name: "_schema_version_deprecated_id", Type: "foreign_key", Nullable: true,
+			References: "_schema_version", Description: "schema version deprecated",
+			IsReserved: true, IsGovernance: true,
+		}},
 	}
+
+	config.Governance = mergeGovernanceDefs(config.Governance, governanceDefaults)
+	config.Observation = mergeGovernanceDefs(config.Observation, observationDefaults)
+	config.SchemaMetadata = mergeGovernanceDefs(config.SchemaMetadata, schemaDefaults)
 }
 
+// mergeGovernanceDefs adds defaults that aren't already present by EnabledBy key.
+func mergeGovernanceDefs(existing []model.GovernanceFieldDef, defaults []model.GovernanceFieldDef) []model.GovernanceFieldDef {
+	have := make(map[string]bool, len(existing))
+	for _, gd := range existing {
+		have[gd.EnabledBy] = true
+	}
+	for _, gd := range defaults {
+		if !have[gd.EnabledBy] {
+			existing = append(existing, gd)
+		}
+	}
+	return existing
+}
+
+// --- conversion helpers ---
+
 // toModelField converts a parsed YAML field definition to a model.Field.
-func toModelField(fd reservedFieldDef, isReserved bool, isGovernance bool) model.Field {
+func toModelField(fd reservedFieldDef) model.Field {
 	f := model.Field{
-		Name:         fd.Name,
-		Type:         fd.Type,
-		Nullable:     fd.Nullable,
-		Default:      fd.Default,
-		Description:  fd.Description,
-		References:   fd.References,
-		Unique:       fd.Unique,
-		EnumValues:   fd.EnumValues,
-		IsReserved:   isReserved,
-		IsGovernance: isGovernance,
+		Name:        fd.Name,
+		Type:        fd.Type,
+		Nullable:    fd.Nullable,
+		Default:     fd.Default,
+		Description: fd.Description,
+		References:  fd.References,
+		Unique:      fd.Unique,
+		EnumValues:  fd.EnumValues,
+		IsReserved:  true,
+		MinValue:    fd.MinValue,
 	}
 	if fd.MaxLength > 0 {
 		f.MaxLength = intPtr(fd.MaxLength)
@@ -585,8 +553,32 @@ func toModelField(fd reservedFieldDef, isReserved bool, isGovernance bool) model
 	return f
 }
 
-// intPtr returns a pointer to an int value. Utility for optional int fields.
+// governanceToModelField converts a governance YAML definition to a model.Field.
+func governanceToModelField(gd reservedGovernanceDef) model.Field {
+	f := model.Field{
+		Name:         gd.Name,
+		Type:         gd.Type,
+		Nullable:     gd.Nullable,
+		Default:      gd.Default,
+		Description:  gd.Description,
+		References:   gd.References,
+		EnumValues:   gd.EnumValues,
+		IsReserved:   true,
+		IsGovernance: true,
+	}
+	if gd.MaxLength > 0 {
+		f.MaxLength = intPtr(gd.MaxLength)
+	}
+	return f
+}
+
+// intPtr returns a pointer to an int value.
 func intPtr(v int) *int {
+	return &v
+}
+
+// float64Ptr returns a pointer to a float64 value.
+func float64Ptr(v float64) *float64 {
 	return &v
 }
 

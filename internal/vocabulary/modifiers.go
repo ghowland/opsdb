@@ -1,3 +1,5 @@
+//# internal/vocabulary/modifiers.go
+
 package vocabulary
 
 import (
@@ -17,6 +19,7 @@ var validModifiers = map[string]bool{
 var forbiddenDefaultTypes = map[string]bool{
 	"foreign_key": true,
 	"datetime":    true,
+	"date":        true,
 	"json":        true,
 }
 
@@ -39,12 +42,10 @@ func ValidateDefault(fieldType string, defaultValue interface{}) error {
 		return nil
 	}
 
-	// Certain types cannot have defaults at all.
 	if forbiddenDefaultTypes[fieldType] {
 		return fmt.Errorf("default values are not allowed on %s fields", fieldType)
 	}
 
-	// Check for embedded logic in string defaults.
 	if strVal, ok := defaultValue.(string); ok {
 		if CheckForEmbeddedLogic(strVal) {
 			return fmt.Errorf("default value %q contains embedded logic (function call or expression); defaults must be literals", strVal)
@@ -54,7 +55,6 @@ func ValidateDefault(fieldType string, defaultValue interface{}) error {
 		}
 	}
 
-	// Type-specific validation.
 	switch fieldType {
 	case "boolean":
 		if err := validateBooleanDefault(defaultValue); err != nil {
@@ -76,16 +76,6 @@ func ValidateDefault(fieldType string, defaultValue interface{}) error {
 		if err := validateStringDefault(defaultValue); err != nil {
 			return err
 		}
-	case "date":
-		if err := validateStringDefault(defaultValue); err != nil {
-			return err
-		}
-		// Date defaults must look like a date literal, not a function.
-		if strVal, ok := defaultValue.(string); ok {
-			if strings.Contains(strVal, "(") {
-				return fmt.Errorf("default value %q for date field looks like a function call; use a literal date", strVal)
-			}
-		}
 	}
 
 	return nil
@@ -101,19 +91,18 @@ func ValidateUnique(fieldType string) error {
 
 // ValidateMustBeUniqueWithin validates that composite uniqueness scope field
 // names reference real fields in the same entity. The field list must be
-// non-empty and every name must exist.
+// non-empty and every name must exist with no duplicates.
 func ValidateMustBeUniqueWithin(fieldNames []string, entityFields []string) error {
 	if len(fieldNames) == 0 {
 		return fmt.Errorf("must_be_unique_within is empty; provide at least one field name")
 	}
 
-	// Build lookup set of entity field names.
 	fieldSet := make(map[string]bool, len(entityFields))
 	for _, f := range entityFields {
 		fieldSet[f] = true
 	}
 
-	// Check each referenced field exists.
+	seen := make(map[string]bool, len(fieldNames))
 	for _, name := range fieldNames {
 		if name == "" {
 			return fmt.Errorf("must_be_unique_within contains empty field name")
@@ -121,11 +110,6 @@ func ValidateMustBeUniqueWithin(fieldNames []string, entityFields []string) erro
 		if !fieldSet[name] {
 			return fmt.Errorf("must_be_unique_within references field %q which does not exist on this entity", name)
 		}
-	}
-
-	// Check for duplicates in the scope list.
-	seen := make(map[string]bool, len(fieldNames))
-	for _, name := range fieldNames {
 		if seen[name] {
 			return fmt.Errorf("must_be_unique_within contains duplicate field %q", name)
 		}
@@ -135,7 +119,8 @@ func ValidateMustBeUniqueWithin(fieldNames []string, entityFields []string) erro
 	return nil
 }
 
-// validateBooleanDefault checks that a boolean field's default is true or false.
+// --- per-type default validators ---
+
 func validateBooleanDefault(value interface{}) error {
 	switch v := value.(type) {
 	case bool:
@@ -151,7 +136,6 @@ func validateBooleanDefault(value interface{}) error {
 	}
 }
 
-// validateIntDefault checks that an int field's default is a whole number.
 func validateIntDefault(value interface{}) error {
 	switch v := value.(type) {
 	case int:
@@ -177,7 +161,6 @@ func validateIntDefault(value interface{}) error {
 	}
 }
 
-// validateFloatDefault checks that a float field's default is numeric.
 func validateFloatDefault(value interface{}) error {
 	switch value.(type) {
 	case float64, float32, int, int32, int64:
@@ -189,7 +172,6 @@ func validateFloatDefault(value interface{}) error {
 	}
 }
 
-// validateStringDefault checks that a string field's default is a string literal.
 func validateStringDefault(value interface{}) error {
 	switch value.(type) {
 	case string:
