@@ -1,4 +1,4 @@
-//# tools/opsdb-api/cmd/main.go
+//# tools/opsdb_api/cmd/main.go
 
 package main
 
@@ -14,12 +14,12 @@ import (
 	"time"
 
 	"github.com/ghowland/opsdb/internal/pg"
-	"github.com/ghowland/opsdb/tools/opsdb-api/auth"
-	"github.com/ghowland/opsdb/tools/opsdb-api/config"
-	"github.com/ghowland/opsdb/tools/opsdb-api/gate"
-	"github.com/ghowland/opsdb/tools/opsdb-api/operations"
-	"github.com/ghowland/opsdb/tools/opsdb-api/reportkeys"
-	runtimeschema "github.com/ghowland/opsdb/tools/opsdb-api/schema"
+	"github.com/ghowland/opsdb/tools/opsdb_api/auth"
+	"github.com/ghowland/opsdb/tools/opsdb_api/config"
+	"github.com/ghowland/opsdb/tools/opsdb_api/gate"
+	"github.com/ghowland/opsdb/tools/opsdb_api/operations"
+	"github.com/ghowland/opsdb/tools/opsdb_api/reportkeys"
+	runtimeschema "github.com/ghowland/opsdb/tools/opsdb_api/schema"
 )
 
 func main() {
@@ -131,7 +131,7 @@ func main() {
 
 	// Start a background goroutine that polls _schema_version every 30
 	// seconds and reloads the runtime schema when a new version is detected.
-	// This lets the API pick up schema-executor applies without a full
+	// This lets the API pick up schema_executor applies without a full
 	// restart.
 	schemaRefreshCtx, schemaRefreshCancel := context.WithCancel(context.Background())
 	defer schemaRefreshCancel()
@@ -142,10 +142,10 @@ func main() {
 	serverErr := make(chan error, 1)
 	go func() {
 		if cfg.TLSCertPath != "" && cfg.TLSKeyPath != "" {
-			fmt.Fprintf(os.Stdout, "opsdb-api listening on %s (TLS)\n", cfg.ListenAddress)
+			fmt.Fprintf(os.Stdout, "opsdb_api listening on %s (TLS)\n", cfg.ListenAddress)
 			serverErr <- server.ListenAndServeTLS(cfg.TLSCertPath, cfg.TLSKeyPath)
 		} else {
-			fmt.Fprintf(os.Stdout, "opsdb-api listening on %s\n", cfg.ListenAddress)
+			fmt.Fprintf(os.Stdout, "opsdb_api listening on %s\n", cfg.ListenAddress)
 			serverErr <- server.ListenAndServe()
 		}
 	}()
@@ -175,7 +175,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Fprintf(os.Stdout, "opsdb-api stopped\n")
+	fmt.Fprintf(os.Stdout, "opsdb_api stopped\n")
 }
 
 // newAuthProvider creates the appropriate auth provider based on the
@@ -220,7 +220,7 @@ func registerRoutes(mux *http.ServeMux, ops *operations.Handlers, gatePipeline *
 	mux.HandleFunc("/api/v1/changeset/reject", ops.RejectChangeSet)
 	mux.HandleFunc("/api/v1/changeset/cancel", ops.CancelChangeSet)
 
-	// Executor operations (called by the change-set-executor runner)
+	// Executor operations (called by the change_set_executor runner)
 	mux.HandleFunc("/api/v1/changeset/apply-field-change", ops.ApplyFieldChange)
 	mux.HandleFunc("/api/v1/changeset/mark-applied", ops.MarkApplied)
 
@@ -258,7 +258,7 @@ func handleReadyz(w http.ResponseWriter, r *http.Request, g *gate.Gate) {
 
 // refreshSchemaLoop polls for schema version changes every 30 seconds
 // and reloads the runtime schema when a new version is detected. This
-// lets the API pick up schema applies from the schema-executor runner
+// lets the API pick up schema applies from the schema_executor runner
 // without requiring a full restart.
 func refreshSchemaLoop(ctx context.Context, db *pg.DB, rtSchema *runtimeschema.RuntimeSchema) {
 	ticker := time.NewTicker(30 * time.Second)

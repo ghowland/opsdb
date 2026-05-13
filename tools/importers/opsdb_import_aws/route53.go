@@ -1,4 +1,4 @@
-// === importers/opsdb-import-aws/route53.go ===
+// === importers/opsdb_import_aws/route53.go ===
 package main
 
 import (

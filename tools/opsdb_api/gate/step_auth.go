@@ -1,11 +1,11 @@
-//# tools/opsdb-api/gate/step_auth.go
+//# tools/opsdb_api/gate/step_auth.go
 
 package gate
 
 import (
 	"fmt"
 
-	"github.com/ghowland/opsdb/tools/opsdb-api/auth"
+	"github.com/ghowland/opsdb/tools/opsdb_api/auth"
 )
 
 // stepAuthenticate is gate step 1: Authentication.

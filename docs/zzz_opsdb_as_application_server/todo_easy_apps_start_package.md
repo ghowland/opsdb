@@ -42,7 +42,7 @@ The loader must parse YAML, validate it, generate DDL, create tables, and popula
 
 ### 2.1 YAML Parser
 
-**Exists:** `tools/opsdb-schema/loader/parser.go` (17KB).
+**Exists:** `tools/opsdb_schema/loader/parser.go` (17KB).
 
 **Needed:** Verify parsing handles every field type (int, float, varchar, text, boolean, datetime, date, json, enum, foreign_key), every modifier (nullable, default, unique), and every constraint (min_value, max_value, min_length, max_length, enum_values, references, precision_decimal_places, must_be_unique_within). Verify JSON schema parsing for discriminated payloads — the `json_schemas/` directory has 80+ JSON schema files that must parse correctly. Verify `directory.yaml` ordering is respected — entities are loaded in dependency order.
 
@@ -50,7 +50,7 @@ The loader must parse YAML, validate it, generate DDL, create tables, and popula
 
 ### 2.2 Validator
 
-**Exists:** `tools/opsdb-schema/loader/validator.go` (10KB).
+**Exists:** `tools/opsdb_schema/loader/validator.go` (10KB).
 
 **Needed:** Verify validation catches every forbidden pattern from the vocabulary: no regex, no embedded logic, no conditional constraints, no inheritance, no templating, no imports within entity files. Verify naming convention enforcement from `internal/conventions/naming.go` — singular names, lowercase underscore, FK naming, datetime suffix, boolean prefix, governance field prefix. Verify constraint consistency — min_value <= max_value, enum_values non-empty, FK references point to entities that exist in the manifest.
 
@@ -58,7 +58,7 @@ The loader must parse YAML, validate it, generate DDL, create tables, and popula
 
 ### 2.3 Resolver
 
-**Exists:** `tools/opsdb-schema/loader/resolver.go` (7KB).
+**Exists:** `tools/opsdb_schema/loader/resolver.go` (7KB).
 
 **Needed:** Verify foreign key resolution — every `references` field points to an entity type that exists and has been loaded (dependency order from `directory.yaml`). Verify self-referential foreign keys (hierarchical entities). Verify bridge table relationships resolve correctly in both directions.
 
@@ -66,7 +66,7 @@ The loader must parse YAML, validate it, generate DDL, create tables, and popula
 
 ### 2.4 Injector
 
-**Exists:** `tools/opsdb-schema/loader/injector.go` (9KB).
+**Exists:** `tools/opsdb_schema/loader/injector.go` (9KB).
 
 **Needed:** Verify reserved field injection based on `schema/conventions/reserved.yaml`. Every entity gets `id`, `created_time`, `updated_time`. Entities with `soft_delete: true` get `is_active`. Entities with `versioned: true` get a versioning sibling table. Entities with `hierarchical: true` get a self-referential FK. Governance fields (`_requires_group`, `_access_classification`, etc.) are injected when declared.
 
@@ -74,7 +74,7 @@ The loader must parse YAML, validate it, generate DDL, create tables, and popula
 
 ### 2.5 DDL Generator
 
-**Exists:** `tools/opsdb-schema/loader/generator.go` (12KB).
+**Exists:** `tools/opsdb_schema/loader/generator.go` (12KB).
 
 **Needed:** Verify DDL generation for Postgres. Correct column types (int → INTEGER, float → DOUBLE PRECISION, varchar → VARCHAR(N), text → TEXT, boolean → BOOLEAN, datetime → TIMESTAMPTZ, date → DATE, json → JSONB, enum → VARCHAR with CHECK, foreign_key → INTEGER REFERENCES). Correct constraints (NOT NULL, DEFAULT, UNIQUE, CHECK for min/max, CHECK for enum values, FOREIGN KEY with REFERENCES). Correct index generation. Correct versioning sibling table generation — `*_version` table with all parent fields plus version metadata. Correct audit log table with no UPDATE/DELETE grants.
 
@@ -82,7 +82,7 @@ The loader must parse YAML, validate it, generate DDL, create tables, and popula
 
 ### 2.6 Schema Differ
 
-**Exists:** `tools/opsdb-schema/loader/differ.go` (20KB).
+**Exists:** `tools/opsdb_schema/loader/differ.go` (20KB).
 
 **Needed:** Verify diff computation between current schema (from `_schema_*` metadata tables) and proposed schema (from YAML files). Detect: new entities, new fields, widened numeric ranges, widened string lengths, new enum values, new indexes. Detect and reject: deleted fields, renamed fields, type changes, narrowed ranges, removed enum values, tightened uniqueness.
 
@@ -90,7 +90,7 @@ The loader must parse YAML, validate it, generate DDL, create tables, and popula
 
 ### 2.7 Evolution Enforcer
 
-**Exists:** `tools/opsdb-schema/loader/evolution.go` (11KB).
+**Exists:** `tools/opsdb_schema/loader/evolution.go` (11KB).
 
 **Needed:** Verify enforcement of every forbidden change from the schema evolution rules. Deletions rejected. Renames rejected. Type changes rejected. Range narrowing rejected. Enum value removal rejected. Uniqueness tightening rejected. Each rejection produces a structured error identifying the entity, field, and specific rule violated. Allowed changes pass: new fields (nullable), new enum values, widened ranges, widened lengths, new entities, new indexes.
 
@@ -98,7 +98,7 @@ The loader must parse YAML, validate it, generate DDL, create tables, and popula
 
 ### 2.8 Schema Applier
 
-**Exists:** `tools/opsdb-schema/loader/applier.go` (3KB).
+**Exists:** `tools/opsdb_schema/loader/applier.go` (3KB).
 
 **Needed:** Verify atomic application of DDL changes within a transaction. Advisory lock acquired before application. DDL executed. Schema metadata tables updated. Advisory lock released. If any step fails, the transaction rolls back and the schema metadata remains unchanged.
 
@@ -106,7 +106,7 @@ The loader must parse YAML, validate it, generate DDL, create tables, and popula
 
 ### 2.9 Schema Metadata Population
 
-**Exists:** `tools/opsdb-schema/loader/meta.go` (10KB).
+**Exists:** `tools/opsdb_schema/loader/meta.go` (10KB).
 
 **Needed:** Verify that after schema application, the `_schema_entity_type`, `_schema_field`, `_schema_relationship`, and `_schema_version` tables accurately reflect the current schema. Every entity type, every field with every constraint, every relationship, and a version record linking to the schema change set.
 
@@ -120,7 +120,7 @@ Each step must be fully operational. The pipeline orchestrator must execute step
 
 ### 3.1 Pipeline Orchestrator
 
-**Exists:** `tools/opsdb-api/gate/gate.go` (8KB).
+**Exists:** `tools/opsdb_api/gate/gate.go` (8KB).
 
 **Needed:** Verify the orchestrator calls each step in sequence (1-10), passes context between steps, halts on first failure, and returns a structured error identifying the failing step, the field or policy that caused the failure, and the constraint or rule that was violated. Verify that audit logging (step 8) runs on both success and failure paths.
 
@@ -128,7 +128,7 @@ Each step must be fully operational. The pipeline orchestrator must execute step
 
 ### 3.2 Step 1: Authentication
 
-**Exists:** `tools/opsdb-api/gate/step_auth.go` (1.8KB), `tools/opsdb-api/auth/` (four provider files totaling 35KB).
+**Exists:** `tools/opsdb_api/gate/step_auth.go` (1.8KB), `tools/opsdb_api/auth/` (four provider files totaling 35KB).
 
 **Needed:** Verify OIDC provider authenticates human users via SSO token. Verify service account provider authenticates runners via credential. Verify YAML provider authenticates dev users from the DOS auth config (for local development without an IdP). Each provider resolves the caller to an internal user identity. Failed authentication halts the pipeline at step 1.
 
@@ -136,7 +136,7 @@ Each step must be fully operational. The pipeline orchestrator must execute step
 
 ### 3.3 Step 2: Authorization (Five Layers)
 
-**Exists:** `tools/opsdb-api/gate/step_authz.go` (17KB).
+**Exists:** `tools/opsdb_api/gate/step_authz.go` (17KB).
 
 **Needed:** Verify all five layers compose via AND, first denial halts.
 
@@ -154,7 +154,7 @@ Layer 5: Evaluate policy rules — separation of duty, time-of-day restrictions,
 
 ### 3.4 Step 3: Schema Validation
 
-**Exists:** `tools/opsdb-api/gate/step_schema_validate.go` (7KB).
+**Exists:** `tools/opsdb_api/gate/step_schema_validate.go` (7KB).
 
 **Needed:** For write operations, verify every field in the request exists in the schema metadata for the target entity type. Verify the field type matches (integer value for int field, string for varchar, etc.). Verify required fields are present on creates. Reject unknown fields. Reject type mismatches. Produce structured errors identifying the field and the expected type.
 
@@ -162,7 +162,7 @@ Layer 5: Evaluate policy rules — separation of duty, time-of-day restrictions,
 
 ### 3.5 Step 4: Bound Validation
 
-**Exists:** `tools/opsdb-api/gate/step_bound_validate.go` (15KB).
+**Exists:** `tools/opsdb_api/gate/step_bound_validate.go` (15KB).
 
 **Needed:** Verify every field value falls within declared constraints. Integer and float within min_value/max_value. String length within min_length/max_length. Enum value within enum_values set. Foreign key target exists in the referenced table. JSON payload matches the discriminated schema for its type value. Produce structured errors identifying the field, the constraint, the limit, and the submitted value.
 
@@ -170,7 +170,7 @@ Layer 5: Evaluate policy rules — separation of duty, time-of-day restrictions,
 
 ### 3.6 Step 5: Policy Evaluation
 
-**Exists:** `tools/opsdb-api/gate/step_policy.go` (14KB).
+**Exists:** `tools/opsdb_api/gate/step_policy.go` (14KB).
 
 **Needed:** Query policy rows matching the operation's entity type, field, namespace, data classification, and security zone. Evaluate cross-field invariants (semantic_invariant policies). Evaluate separation of duty rules. Evaluate time-of-day restrictions. Evaluate custom policy constraints. Produce structured errors identifying the policy rule that triggered and the condition that wasn't met.
 
@@ -178,7 +178,7 @@ Layer 5: Evaluate policy rules — separation of duty, time-of-day restrictions,
 
 ### 3.7 Step 6: Versioning Preparation
 
-**Exists:** `tools/opsdb-api/gate/step_versioning.go` (2.3KB).
+**Exists:** `tools/opsdb_api/gate/step_versioning.go` (2.3KB).
 
 **Needed:** For writes to versioned entities, prepare a version row containing the full entity state after the write. All fields, not just the changed ones. Link to the change set that will produce this version. Set version serial to next monotonic value. Set is_current flag. Clear is_current on the previous version row.
 
@@ -186,7 +186,7 @@ Layer 5: Evaluate policy rules — separation of duty, time-of-day restrictions,
 
 ### 3.8 Step 7: Change Management Routing
 
-**Exists:** `tools/opsdb-api/gate/step_changemgmt.go` (15KB).
+**Exists:** `tools/opsdb_api/gate/step_changemgmt.go` (15KB).
 
 **Needed:** For change set submissions, evaluate approval rule policies to determine routing. Walk ownership and stakeholder bridges for touched entities to find approver groups. Create `change_set_approval_required` rows specifying groups and counts needed. If auto-approval policies match, transition the change set to approved without human intervention. If emergency flag is set, apply emergency path logic — reduced approvals, mandatory review record.
 
@@ -194,7 +194,7 @@ Layer 5: Evaluate policy rules — separation of duty, time-of-day restrictions,
 
 ### 3.9 Step 8: Audit Logging
 
-**Exists:** `tools/opsdb-api/gate/step_audit.go` (9KB).
+**Exists:** `tools/opsdb_api/gate/step_audit.go` (9KB).
 
 **Needed:** Write an append-only entry to `audit_log_entry` recording: caller identity, operation, target entity type and ID, outcome (success or specific failure), contextual metadata (client IP, user agent, request ID, change set ID), and timestamp. Run on both success and rejection paths. If cryptographic chaining is enabled, hash the entry over its contents plus the prior entry's hash.
 
@@ -202,7 +202,7 @@ Layer 5: Evaluate policy rules — separation of duty, time-of-day restrictions,
 
 ### 3.10 Step 9: Execution
 
-**Exists:** `tools/opsdb-api/gate/step_execute.go` (21KB).
+**Exists:** `tools/opsdb_api/gate/step_execute.go` (21KB).
 
 **Needed:** Execute the actual database operation — INSERT, UPDATE, soft DELETE, or change set creation — atomically with the audit log entry and the version row (if applicable). For change set applies, execute each field change in the declared apply order. For bulk change sets, chunk execution with rollback on failure.
 
@@ -210,7 +210,7 @@ Layer 5: Evaluate policy rules — separation of duty, time-of-day restrictions,
 
 ### 3.11 Step 10: Response Construction
 
-**Exists:** `tools/opsdb-api/gate/step_response.go` (2.7KB).
+**Exists:** `tools/opsdb_api/gate/step_response.go` (2.7KB).
 
 **Needed:** Construct the response with: affected row IDs, computed approval requirements (if change set), audit entry ID for correlation, version serial (if versioned), and any warnings. Filter response fields by the caller's access classification (fields they can't see are omitted with metadata indicating omission).
 
@@ -224,7 +224,7 @@ The sixteen operations exposed through the HTTP API.
 
 ### 4.1 Read Operations
 
-**Exists:** `tools/opsdb-api/operations/read.go` (24KB).
+**Exists:** `tools/opsdb_api/operations/read.go` (24KB).
 
 **Needed:** Verify `get_entity` — fetch one row by primary key, filtered by authorization. Verify `get_entity_history` — fetch the version chain for one entity. Verify `get_entity_at_time` — reconstruct field values at a timestamp from version rows. Verify `search` — filter predicates, join paths, projection, ordering, cursor pagination, freshness annotations, view modes (standard, with_history, at_time). Verify `get_dependencies` — walk relationship graphs. Verify `resolve_authority_pointer` — look up external fact locations.
 
@@ -232,7 +232,7 @@ The sixteen operations exposed through the HTTP API.
 
 ### 4.2 Write Operations
 
-**Exists:** `tools/opsdb-api/operations/write_changeset.go` (20KB), `tools/opsdb-api/operations/write_observation.go` (9KB).
+**Exists:** `tools/opsdb_api/operations/write_changeset.go` (20KB), `tools/opsdb_api/operations/write_observation.go` (9KB).
 
 **Needed:** Verify `submit_change_set` — create a change set with field changes, route through approval. Verify `write_observation` — runner writes cached data with direct write gating. Verify `emergency_apply` — reduced approvals with emergency flag and review record. Verify `bulk_submit_change_set` — chunked validation and atomic apply. Verify `apply_change_set_field_change` — executor applies one approved field change.
 
@@ -240,7 +240,7 @@ The sixteen operations exposed through the HTTP API.
 
 ### 4.3 Change Management Actions
 
-**Exists:** `tools/opsdb-api/operations/changeset_actions.go` (17KB).
+**Exists:** `tools/opsdb_api/operations/changeset_actions.go` (17KB).
 
 **Needed:** Verify `approve_change_set` — an authorized approver approves, approval count tracks toward threshold. Verify `reject_change_set` — an authorized approver rejects with reason. Verify `cancel_change_set` — the proposer withdraws. Verify `mark_change_set_applied` — the executor marks completion after all field changes apply.
 
@@ -248,7 +248,7 @@ The sixteen operations exposed through the HTTP API.
 
 ### 4.4 Watch Operation
 
-**Exists:** `tools/opsdb-api/operations/watch.go` (12KB).
+**Exists:** `tools/opsdb_api/operations/watch.go` (12KB).
 
 **Needed:** Verify streaming subscription to entity changes with resume token. On reconnect, fetch current state then stream from the token.
 
@@ -256,7 +256,7 @@ The sixteen operations exposed through the HTTP API.
 
 ### 4.5 Optimistic Concurrency
 
-**Exists:** `tools/opsdb-api/concurrency/optimistic.go` (4KB).
+**Exists:** `tools/opsdb_api/concurrency/optimistic.go` (4KB).
 
 **Needed:** Verify version stamp comparison at change set submission. Each field change carries the version of the entity the submitter drafted against. If the entity has advanced since drafting, submission fails with a stale_version error identifying which entities are stale.
 
@@ -264,7 +264,7 @@ The sixteen operations exposed through the HTTP API.
 
 ### 4.6 Report Key Enforcement
 
-**Exists:** `tools/opsdb-api/reportkeys/enforcer.go` (10KB).
+**Exists:** `tools/opsdb_api/reportkeys/enforcer.go` (10KB).
 
 **Needed:** Verify that runners can only write to observation keys declared in their runner_report_key rows. A runner attempting to write an undeclared key is rejected with a structured error.
 
@@ -272,7 +272,7 @@ The sixteen operations exposed through the HTTP API.
 
 ### 4.7 Runtime Schema
 
-**Exists:** `tools/opsdb-api/schema/runtime_schema.go` (12KB).
+**Exists:** `tools/opsdb_api/schema/runtime_schema.go` (12KB).
 
 **Needed:** Verify the API loads schema metadata from the `_schema_*` tables at startup and uses it for all validation. Verify schema changes are picked up without API restart (either polling or notification from the schema executor).
 
@@ -286,7 +286,7 @@ The runners that the substrate needs to function. Application-specific runners a
 
 ### 5.1 Change Set Executor
 
-**Exists:** `tools/runners/change-set-executor/` (11KB).
+**Exists:** `tools/runners/change_set_executor/` (11KB).
 
 **Needed:** Verify the executor reads approved change sets, applies each field change through the API in the declared apply order, and marks the change set as applied. Handle failure: if a field change fails, the change set transitions to failed with the error recorded.
 
@@ -302,7 +302,7 @@ The runners that the substrate needs to function. Application-specific runners a
 
 ### 5.3 Notification Runner
 
-**Exists:** `tools/runners/notification-runner/` (36KB total with backends).
+**Exists:** `tools/runners/notification_runner/` (36KB total with backends).
 
 **Needed:** Verify the runner detects state transitions requiring notification — change sets entering pending_approval, change sets applied, emergency changes, evidence record failures. Verify recipient resolution through on_call_assignment entities. Verify dispatch through configured channels — email backend and webhook backend are implemented. Verify escalation path logic — if primary contact doesn't respond within the configured window, escalate to the next step.
 
@@ -310,7 +310,7 @@ The runners that the substrate needs to function. Application-specific runners a
 
 ### 5.4 Schema Executor
 
-**Exists:** `tools/runners/schema-executor/` (34KB).
+**Exists:** `tools/runners/schema_executor/` (34KB).
 
 **Needed:** Verify the executor reads approved schema change sets, generates DDL from the approved changes, applies the DDL atomically with advisory locking, and updates the schema metadata tables. Verify the API picks up the schema change after application.
 
@@ -318,7 +318,7 @@ The runners that the substrate needs to function. Application-specific runners a
 
 ### 5.5 Emergency Review Monitor
 
-**Exists:** `tools/runners/emergency-review-monitor/` (14KB).
+**Exists:** `tools/runners/emergency_review_monitor/` (14KB).
 
 **Needed:** Verify the monitor reads emergency_review records with pending status and checks against the review deadline. Verify overdue reviews trigger escalation through the notification runner. Verify completed reviews update the record status.
 
@@ -332,7 +332,7 @@ The shared library that application developers use to write custom runners.
 
 ### 6.1 API Client
 
-**Exists:** `tools/opsdb-runner-lib/api_client.go` (26KB).
+**Exists:** `tools/opsdb_runner_lib/api_client.go` (26KB).
 
 **Needed:** Verify all API operations are callable through the client — search, get_entity, submit_change_set, write_observation, approve, reject, cancel. Verify authentication with service account credentials. Verify correlation ID propagation — every API call carries the runner job ID for audit trail composition. Verify automatic retry on stale version errors (configurable). Verify report key fail-fast — check declared keys before making the API call.
 
@@ -340,7 +340,7 @@ The shared library that application developers use to write custom runners.
 
 ### 6.2 Configuration
 
-**Exists:** `tools/opsdb-runner-lib/config.go` (11KB).
+**Exists:** `tools/opsdb_runner_lib/config.go` (11KB).
 
 **Needed:** Verify runner configuration loading from the DOS config and from the runner spec entity in OpsDB. Verify bound loading — retry budget, execution time, scope per cycle, memory limit. Verify target loading — which entity types the runner can read and write.
 
@@ -348,7 +348,7 @@ The shared library that application developers use to write custom runners.
 
 ### 6.3 Lifecycle
 
-**Exists:** `tools/opsdb-runner-lib/lifecycle.go` (7KB).
+**Exists:** `tools/opsdb_runner_lib/lifecycle.go` (7KB).
 
 **Needed:** Verify the three-phase lifecycle — get, act, set — with clean boundaries. Verify the runner writes a job record at cycle start and updates it at cycle end with duration, records processed, and errors. Verify graceful shutdown — the runner completes its current cycle before stopping.
 
@@ -356,7 +356,7 @@ The shared library that application developers use to write custom runners.
 
 ### 6.4 Retry and Resilience
 
-**Exists:** `tools/opsdb-runner-lib/retry.go` (5KB).
+**Exists:** `tools/opsdb_runner_lib/retry.go` (5KB).
 
 **Needed:** Verify exponential backoff with jitter. Verify circuit breaking with per-target state. Verify retry budget enforcement — a runner that exhausts its retry budget stops and records which bound was hit.
 
@@ -364,7 +364,7 @@ The shared library that application developers use to write custom runners.
 
 ### 6.5 Logging
 
-**Exists:** `tools/opsdb-runner-lib/logging.go` (4KB).
+**Exists:** `tools/opsdb_runner_lib/logging.go` (4KB).
 
 **Needed:** Verify structured log format with runner job ID, correlation ID, runner spec name, version, and source location on every line. Verify consistent format across all runners.
 
@@ -372,7 +372,7 @@ The shared library that application developers use to write custom runners.
 
 ### 6.6 Dry Run
 
-**Exists:** `tools/opsdb-runner-lib/dryrun.go` (1.6KB).
+**Exists:** `tools/opsdb_runner_lib/dryrun.go` (1.6KB).
 
 **Needed:** Verify dry run mode — the runner executes the get and act phases but skips the set phase. Logs what it would write without writing.
 
@@ -420,7 +420,7 @@ The `opsdb` command that developers interact with.
 
 ### 8.1 Build System
 
-**Needed:** Build script that compiles four Go binaries (`opsdb`, `opsdb-api`, `opsdb-schema`, `opsdb-runner`) for amd64 and arm64. Static linking for portability. Version stamping from git tag.
+**Needed:** Build script that compiles four Go binaries (`opsdb`, `opsdb_api`, `opsdb_schema`, `opsdb-runner`) for amd64 and arm64. Static linking for portability. Version stamping from git tag.
 
 **Done when:** `make build` produces four statically linked binaries in `./dist/` with version information embedded.
 
@@ -457,7 +457,7 @@ Post-install script prints: "Run 'opsdb init myapp' to create a new project."
 
 ### 9.1 Schema Loader Tests
 
-**Exists:** `tools/opsdb-schema/loader/loader_test.go` (23KB).
+**Exists:** `tools/opsdb_schema/loader/loader_test.go` (23KB).
 
 **Needed:** Verify test coverage for every field type, every constraint, every modifier, every forbidden pattern, every evolution rule. Tests run against a real Postgres instance (not mocks).
 
@@ -505,7 +505,7 @@ Post-install script prints: "Run 'opsdb init myapp' to create a new project."
 
 ### 10.3 Man Pages
 
-**Needed:** Man pages for `opsdb`, `opsdb-api`, `opsdb-schema`, `opsdb-runner`. Each documents the command's flags, configuration, and behavior. Installed to `/usr/share/man/` by the package.
+**Needed:** Man pages for `opsdb`, `opsdb_api`, `opsdb_schema`, `opsdb-runner`. Each documents the command's flags, configuration, and behavior. Installed to `/usr/share/man/` by the package.
 
 **Done when:** `man opsdb` displays usage documentation after package installation.
 

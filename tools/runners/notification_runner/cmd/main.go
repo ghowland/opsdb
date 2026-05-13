@@ -16,12 +16,12 @@ func main() {
 	flag.Parse()
 
 	if *dosPath == "" {
-		fmt.Fprintf(os.Stderr, "usage: notification-runner --dos <dos-directory>\n")
+		fmt.Fprintf(os.Stderr, "usage: notification_runner --dos <dos-directory>\n")
 		os.Exit(2)
 	}
 	_ = dosPath
 
-	config, err := runner.Init("notification-runner")
+	config, err := runner.Init("notification_runner")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "init failed: %v\n", err)
 		os.Exit(1)

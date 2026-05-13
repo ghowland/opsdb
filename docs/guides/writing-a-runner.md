@@ -10,7 +10,7 @@ Every runner follows the same three-phase shape:
 2. **Act** — do work in the world through shared libraries. Side effects happen here.
 3. **Set** — write results back to OpsDB. Every write through the API.
 
-The runner library (`opsdb-runner-lib`) handles lifecycle, API client, logging,
+The runner library (`opsdb_runner_lib`) handles lifecycle, API client, logging,
 retry, and dry-run support. Your runner code is 200-500 lines of domain-specific
 logic. The library does the heavy lifting.
 

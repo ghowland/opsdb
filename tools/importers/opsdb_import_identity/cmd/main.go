@@ -1,4 +1,4 @@
-// === importers/opsdb-import-identity/cmd/main.go ===
+// === importers/opsdb_import_identity/cmd/main.go ===
 package main
 
 import (
@@ -28,7 +28,7 @@ func main() {
 		os.Exit(2)
 	}
 
-	config, err := runner.Init("opsdb-import-identity", *dosPath)
+	config, err := runner.Init("opsdb_import_identity", *dosPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: failed to initialize: %v\n", err)
 		os.Exit(2)

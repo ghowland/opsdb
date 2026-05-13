@@ -109,9 +109,9 @@ A useful way to approach the project is:
 - `docs/` for worldview, architecture, and decisions
 - `schema/` for data model definitions
 - `internal/` for shared packages and vocabulary
-- `tools/opsdb-schema/` for schema loading and DDL generation
-- `tools/opsdb-api/` for the gate pipeline
-- `tools/opsdb-runner-lib/` for runner lifecycle and API access
+- `tools/opsdb_schema/` for schema loading and DDL generation
+- `tools/opsdb_api/` for the gate pipeline
+- `tools/opsdb_runner_lib/` for runner lifecycle and API access
 - `tools/` importer and runner directories for concrete operational patterns
 
 If you want to understand the intended mechanics, the code stubs and IOSE-style docs are often more informative than the higher-level spec, because they show the actual interfaces and package relationships.
@@ -174,7 +174,7 @@ OpsDB is a skeleton implementation of a unified operations, automation, and audi
 
 # Tracking Skeleton Improvements
 
-## tools/opsdb-api
+## tools/opsdb_api
 
 - Second LLM pass complete.  These have been rewritten again with an LLM to integrate them, so they should be able to be worked into functioning.
 
@@ -182,11 +182,11 @@ OpsDB is a skeleton implementation of a unified operations, automation, and audi
 
 - Second LLM pass complete.  These have been rewritten again with LLMs to integrate them.  Not ready for compilation, just moved closer.
 
-## tools/opsdb-schema/*
+## tools/opsdb_schema/*
 
 - Second LLM pass complete
 
-## tools/opsdb-runner-lib/*
+## tools/opsdb_runner_lib/*
 
 - Second LLM pass complete
 

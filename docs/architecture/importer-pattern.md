@@ -120,7 +120,7 @@ The importers provide the continuous bridge between world-as-it-is and OpsDB-as-
 
 ## Shipped Importers
 
-### AWS Importer (opsdb-import-aws)
+### AWS Importer (opsdb_import_aws)
 
 Reads from AWS APIs using the standard SDK with read-only IAM credentials. Never writes to AWS.
 
@@ -142,7 +142,7 @@ Cloud accounts become `cloud_account` rows (via seed scripts or promotion). Regi
 
 The importer declares report keys for every state_key it writes — host_cpu, host_memory, ec2_instance_state, rds_status, and so on. The API rejects any key the importer hasn't declared.
 
-### GCP Importer (opsdb-import-gcp)
+### GCP Importer (opsdb_import_gcp)
 
 Same pattern as the AWS importer, different APIs.
 
@@ -150,7 +150,7 @@ Same pattern as the AWS importer, different APIs.
 
 The importer uses GCP client libraries, handles pagination and quota, and scans multiple projects as configured.
 
-### Kubernetes Importer (opsdb-import-k8s)
+### Kubernetes Importer (opsdb_import_k8s)
 
 Reads from the Kubernetes API using in-cluster service account credentials or kubeconfig.
 
@@ -174,7 +174,7 @@ Reads from the Kubernetes API using in-cluster service account credentials or ku
 
 The Kubernetes importer uses the watch API for near-real-time state tracking. On startup or reconnect, it does a full list operation (level-triggered backstop) to establish current state, then watches for incremental changes. If the watch stream disconnects, the importer re-lists and resumes. Missed events are impossible because the re-list captures current state regardless of what happened during the disconnection.
 
-### Identity Importer (opsdb-import-identity)
+### Identity Importer (opsdb_import_identity)
 
 Reads from identity providers. Ships with Okta, Azure AD, and LDAP backends.
 
@@ -188,7 +188,7 @@ Reads from identity providers. Ships with Okta, Azure AD, and LDAP backends.
 
 The identity importer is critical for the authorization model. Without accurate identity data, the five-layer auth model cannot evaluate group memberships or role assignments. This importer typically runs on a short cycle (every few minutes) to keep identity data current.
 
-### Monitoring Importer (opsdb-import-monitoring)
+### Monitoring Importer (opsdb_import_monitoring)
 
 Reads from monitoring systems. Ships with Prometheus and Datadog backends.
 
@@ -202,7 +202,7 @@ The monitoring importer does not import raw metrics — OpsDB is not a time-seri
 
 **Metric metadata** — which metrics exist, their types (counter, gauge, histogram), their labels, and their associated services — writes to `observation_cache_metric`. This enables queries like "what metrics are available for this service" without hitting Prometheus directly.
 
-### On-Call Importer (opsdb-import-oncall)
+### On-Call Importer (opsdb_import_oncall)
 
 Reads from PagerDuty or Opsgenie.
 
@@ -214,7 +214,7 @@ Reads from PagerDuty or Opsgenie.
 
 **Service-to-escalation mappings** become `service_escalation_path` rows with severity thresholds.
 
-### Secret Metadata Importer (opsdb-import-secrets)
+### Secret Metadata Importer (opsdb_import_secrets)
 
 Reads from Vault, AWS Secrets Manager, or GCP Secret Manager.
 

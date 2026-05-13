@@ -1,4 +1,4 @@
-//# tools/opsdb-api/operations/resolve.go
+//# tools/opsdb_api/operations/resolve.go
 
 package operations
 
@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/ghowland/opsdb/internal/pg"
-	"github.com/ghowland/opsdb/tools/opsdb-api/gate"
+	"github.com/ghowland/opsdb/tools/opsdb_api/gate"
 )
 
 // ---------------------------------------------------------------------------

@@ -1,4 +1,4 @@
-// === importers/opsdb-import-aws/iam.go ===
+// === importers/opsdb_import_aws/iam.go ===
 package main
 
 import (
@@ -118,23 +118,23 @@ func mapIAMRole(client *iam.Client, ctx context.Context, role iamtypes.Role) (Ob
 		StateKey:   "aws_iam_role",
 		Value:      roleName,
 		DataJSON: map[string]interface{}{
-			"cloud_resource_type":     "iam_role",
-			"role_name":               roleName,
-			"role_arn":                 roleArn,
-			"role_id":                 aws.ToString(role.RoleId),
-			"path":                    aws.ToString(role.Path),
-			"description":             aws.ToString(role.Description),
-			"created_time":            createDate,
-			"max_session_duration":    maxSessionDuration,
-			"attached_policy_count":   len(attachedPolicies),
-			"attached_policy_names":   policyNames,
-			"attached_policy_arns":    policyArns,
-			"inline_policy_count":     len(inlinePolicies),
-			"inline_policy_names":     inlinePolicies,
-			"trust_principals":        trustPrincipals,
-			"last_used_time":          lastUsedTime,
-			"last_used_region":        lastUsedRegion,
-			"tags":                    tags,
+			"cloud_resource_type":   "iam_role",
+			"role_name":             roleName,
+			"role_arn":              roleArn,
+			"role_id":               aws.ToString(role.RoleId),
+			"path":                  aws.ToString(role.Path),
+			"description":           aws.ToString(role.Description),
+			"created_time":          createDate,
+			"max_session_duration":  maxSessionDuration,
+			"attached_policy_count": len(attachedPolicies),
+			"attached_policy_names": policyNames,
+			"attached_policy_arns":  policyArns,
+			"inline_policy_count":   len(inlinePolicies),
+			"inline_policy_names":   inlinePolicies,
+			"trust_principals":      trustPrincipals,
+			"last_used_time":        lastUsedTime,
+			"last_used_region":      lastUsedRegion,
+			"tags":                  tags,
 		},
 	}, nil
 }

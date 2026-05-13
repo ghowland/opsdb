@@ -14,12 +14,12 @@ func main() {
 	flag.Parse()
 
 	if *dosPath == "" {
-		fmt.Fprintf(os.Stderr, "usage: opsdb-import-aws --dos <dos-directory>\n")
+		fmt.Fprintf(os.Stderr, "usage: opsdb_import_aws --dos <dos-directory>\n")
 		os.Exit(2)
 	}
 	_ = dosPath // used by runner.Init via environment or config resolution
 
-	config, err := runner.Init("opsdb-import-aws")
+	config, err := runner.Init("opsdb_import_aws")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "init failed: %v\n", err)
 		os.Exit(1)

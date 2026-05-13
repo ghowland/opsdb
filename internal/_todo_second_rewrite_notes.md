@@ -46,9 +46,9 @@ No circular dependencies exist. `conventions` imports `model` for struct types. 
 
 ### External consumers
 
-- `tools/opsdb-schema/` — uses `model`, `conventions`, `vocabulary`, `pg`, `testutil`
-- `tools/opsdb-api/` — uses `pg` only (API uses its own `schema/runtime_schema.go` for runtime type data, not `model` or `vocabulary`)
-- `tools/opsdb-runner-lib/` — does not use internal packages directly (communicates via API)
+- `tools/opsdb_schema/` — uses `model`, `conventions`, `vocabulary`, `pg`, `testutil`
+- `tools/opsdb_api/` — uses `pg` only (API uses its own `schema/runtime_schema.go` for runtime type data, not `model` or `vocabulary`)
+- `tools/opsdb_runner_lib/` — does not use internal packages directly (communicates via API)
 
 ---
 
@@ -191,7 +191,7 @@ Pointer fields (`*int`, `*float64`) distinguish "not set" from "set to zero." Th
 |---|---|---|
 | PostgresRevokeRoles | []string | Roles to revoke UPDATE/DELETE from |
 
-**SchemaVersionInfo**, **MetaSchema**, **TypeDefinition**, **FieldSchemaDefinition**, **IndexSchemaDefinition**, **GovernanceSchemaDefinition**, **ForbiddenPattern**, **EvolutionRuleSet**, **EvolutionRule**, **ForbiddenEvolutionRule** — supporting structs for meta-schema and evolution rules. See source for field definitions; these are consumed by `tools/opsdb-schema/loader/` and not by the API server.
+**SchemaVersionInfo**, **MetaSchema**, **TypeDefinition**, **FieldSchemaDefinition**, **IndexSchemaDefinition**, **GovernanceSchemaDefinition**, **ForbiddenPattern**, **EvolutionRuleSet**, **EvolutionRule**, **ForbiddenEvolutionRule** — supporting structs for meta-schema and evolution rules. See source for field definitions; these are consumed by `tools/opsdb_schema/loader/` and not by the API server.
 
 ---
 
@@ -601,7 +601,7 @@ Provides test schema fragments. Functions return YAML strings and pre-built Enti
 
 ## 7. Cross-Package Integration Points
 
-### 7.1 Schema engine pipeline (`tools/opsdb-schema/`)
+### 7.1 Schema engine pipeline (`tools/opsdb_schema/`)
 
 The schema engine calls internal packages in this order:
 
@@ -623,7 +623,7 @@ The schema engine calls internal packages in this order:
 9. Applier uses `pg.WithSerializableTransaction()`, `pg.WaitForAdvisoryLock()`
 10. Meta populator uses `pg.ExecInTx()`, `pg.QueryRowInTx()`
 
-### 7.2 API server (`tools/opsdb-api/`)
+### 7.2 API server (`tools/opsdb_api/`)
 
 The API server uses only `internal/pg/`. It does NOT use `model`, `conventions`, or `vocabulary` at runtime. The API's runtime type information comes from `schema/runtime_schema.go` which reads `_schema_entity_type`, `_schema_field`, and `_schema_relationship` tables populated by the schema engine.
 

@@ -1,4 +1,4 @@
-//# tools/opsdb-api/gate/step_bound_validate.go
+//# tools/opsdb_api/gate/step_bound_validate.go
 
 package gate
 
@@ -698,7 +698,7 @@ func jsonFieldTypeMatches(value interface{}, expectedType string) bool {
 //	AccessClassification
 type RuntimeFieldMeta = interface {
 	// This alias will be replaced with a concrete struct import when
-	// tools/opsdb-api/schema is written. For now, step_bound_validate
+	// tools/opsdb_api/schema is written. For now, step_bound_validate
 	// accesses field metadata through ctx.Schema.GetField() which
 	// returns whatever the runtime schema package defines.
 }

@@ -1,4 +1,4 @@
-// === importers/opsdb-import-aws/s3.go ===
+// === importers/opsdb_import_aws/s3.go ===
 package main
 
 import (
@@ -210,9 +210,9 @@ func bucketErrorObservation(bucketName string, region string, errMsg string) Obs
 		Value:      fmt.Sprintf("failed to import: %s", errMsg),
 		DataJSON: map[string]interface{}{
 			"cloud_resource_type": "s3_bucket",
-			"bucket_name":        bucketName,
-			"region":             region,
-			"error":              errMsg,
+			"bucket_name":         bucketName,
+			"region":              region,
+			"error":               errMsg,
 		},
 	}
 }

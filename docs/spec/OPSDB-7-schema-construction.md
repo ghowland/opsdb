@@ -27,7 +27,7 @@ The OpsDB design demands a single source of truth. The schema and the validation
 
 ### 1.2 The solution
 
-The schema lives as data — hierarchical YAML or JSON files in a git repository conventionally named `opsdb-schema`. A `directory.yaml` at the repo root lists all entity files in import order. Each entity file describes one table: fields, types, foreign keys, bounds, enum sets, and constraints. The file format is declarative; there is no logic, no regex, no templating, no computed values, no inheritance.
+The schema lives as data — hierarchical YAML or JSON files in a git repository conventionally named `opsdb_schema`. A `directory.yaml` at the repo root lists all entity files in import order. Each entity file describes one table: fields, types, foreign keys, bounds, enum sets, and constraints. The file format is declarative; there is no logic, no regex, no templating, no computed values, no inheritance.
 
 A loader reads the schema files, validates them against the meta-schema, resolves all foreign-key references, and produces two things in lockstep: the relational database structure (CREATE TABLE statements, indexes, FK constraints, CHECK constraints where the storage engine supports them) and the API's bound-validation metadata (rows in the `_schema_*` tables that the API consults during the gate's bound-validation step). One source of data; two synchronized outputs.
 
@@ -75,14 +75,14 @@ This paper inherits the conventions established across the prior series.
 
 ## 3. Repository layout
 
-The schema repository is conventionally named `opsdb-schema`. It is a normal git repository accessed through the org's normal git workflow (PRs, code review, branch protections, merge discipline). The schema's evolution is git history; the schema repo is the source of truth for the schema's design intent.
+The schema repository is conventionally named `opsdb_schema`. It is a normal git repository accessed through the org's normal git workflow (PRs, code review, branch protections, merge discipline). The schema's evolution is git history; the schema repo is the source of truth for the schema's design intent.
 
 ### 3.1 The repository tree
 
 The directory structure mirrors the comprehensive cuts from OPSDB-4 §3. Each top-level directory groups entities by the operational domain they describe.
 
 ```
-opsdb-schema/
+opsdb_schema/
 ├── directory.yaml
 ├── conventions/
 │   └── reserved.yaml
@@ -896,7 +896,7 @@ Beyond the initial bootstrap, schema changes flow through change management. The
 
 ### 11.1 The propose-review-apply cycle
 
-A schema change starts as a git PR against the `opsdb-schema` repo. The author edits files: adds a new entity file, adds fields to an existing file, widens an enum's values list, adds an index. The PR is reviewed by the schema steward (per OPSDB-2 §14.12) and by any other reviewers the org's git workflow requires.
+A schema change starts as a git PR against the `opsdb_schema` repo. The author edits files: adds a new entity file, adds fields to an existing file, widens an enum's values list, adds an index. The PR is reviewed by the schema steward (per OPSDB-2 §14.12) and by any other reviewers the org's git workflow requires.
 
 Review checks structural integrity (the loader can validate the PR's branch independently before merge, though that's a CI concern not a schema-construction-design concern), checks adherence to DSNC, checks that additions are comprehensive (slicing the pie correctly per the construction discipline of OPSDB-2 §14.1).
 

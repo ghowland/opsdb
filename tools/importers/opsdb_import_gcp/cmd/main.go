@@ -15,12 +15,12 @@ func main() {
 	flag.Parse()
 
 	if *dosPath == "" {
-		fmt.Fprintf(os.Stderr, "usage: opsdb-import-gcp --dos <dos-directory>\n")
+		fmt.Fprintf(os.Stderr, "usage: opsdb_import_gcp --dos <dos-directory>\n")
 		os.Exit(2)
 	}
 	_ = dosPath
 
-	config, err := runner.Init("opsdb-import-gcp")
+	config, err := runner.Init("opsdb_import_gcp")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "init failed: %v\n", err)
 		os.Exit(1)

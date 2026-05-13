@@ -1,4 +1,4 @@
-// === importers/opsdb-import-aws/rds.go ===
+// === importers/opsdb_import_aws/rds.go ===
 package main
 
 import (

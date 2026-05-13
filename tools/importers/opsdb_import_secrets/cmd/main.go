@@ -22,9 +22,9 @@ func main() {
 		os.Exit(2)
 	}
 
-	config, err := runner.Init("opsdb-import-secrets", *dosPath)
+	config, err := runner.Init("opsdb_import_secrets", *dosPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: failed to initialize opsdb-import-secrets: %v\n", err)
+		fmt.Fprintf(os.Stderr, "error: failed to initialize opsdb_import_secrets: %v\n", err)
 		os.Exit(2)
 	}
 	defer runner.Shutdown(config)
@@ -37,7 +37,7 @@ func main() {
 		os.Exit(2)
 	}
 
-	logger.Info("opsdb-import-secrets starting",
+	logger.Info("opsdb_import_secrets starting",
 		runner.Field{Key: "dos_path", Value: *dosPath},
 		runner.Field{Key: "backend", Value: backend},
 	)
@@ -84,7 +84,7 @@ func main() {
 		runner.WaitForNextCycle(config)
 	}
 
-	logger.Info("opsdb-import-secrets stopped")
+	logger.Info("opsdb_import_secrets stopped")
 	os.Exit(0)
 }
 

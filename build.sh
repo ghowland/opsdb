@@ -4,6 +4,6 @@ make build
 make test
 make fmt
 make lint
-make build-one CMD=./tools/opsdb-api/cmd OUT=opsdb-api
-make run CMD=./tools/opsdb-schema/cmd
+make build-one CMD=./tools/opsdb_api/cmd OUT=opsdb_api
+make run CMD=./tools/opsdb_schema/cmd
 

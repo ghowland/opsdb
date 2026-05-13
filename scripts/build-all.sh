@@ -13,20 +13,20 @@ LDFLAGS="-X main.Version=${VERSION} -X main.BuildTime=${BUILD_TIME}"
 mkdir -p "$BUILD_DIR"
 
 TARGETS=(
-    "tools/opsdb-schema/cmd"
-    "tools/opsdb-api/cmd"
-    "tools/importers/opsdb-import-aws/cmd"
-    "tools/importers/opsdb-import-gcp/cmd"
+    "tools/opsdb_schema/cmd"
+    "tools/opsdb_api/cmd"
+    "tools/importers/opsdb_import_aws/cmd"
+    "tools/importers/opsdb_import_gcp/cmd"
     "tools/importers/opsdb_import_k8s/cmd"
     "tools/importers/opsdb_import_identity/cmd"
     "tools/importers/opsdb_import_monitoring/cmd"
     "tools/importers/opsdb_import_oncall/cmd"
     "tools/importers/opsdb_import_secrets/cmd"
-    "tools/runners/change-set-executor/cmd"
-    "tools/runners/emergency-review-monitor/cmd"
-    "tools/runners/notification-runner/cmd"
+    "tools/runners/change_set_executor/cmd"
+    "tools/runners/emergency_review_monitor/cmd"
+    "tools/runners/notification_runner/cmd"
     "tools/runners/reaper/cmd"
-    "tools/runners/schema-executor/cmd"
+    "tools/runners/schema_executor/cmd"
 )
 
 FAILED=0

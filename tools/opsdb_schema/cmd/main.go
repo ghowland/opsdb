@@ -9,7 +9,7 @@ import (
 
 	"github.com/ghowland/opsdb/internal/model"
 	"github.com/ghowland/opsdb/internal/pg"
-	"github.com/ghowland/opsdb/tools/opsdb-schema/loader"
+	"github.com/ghowland/opsdb/tools/opsdb_schema/loader"
 )
 
 // Version and BuildTime are set via ldflags at build time.
@@ -28,12 +28,12 @@ func main() {
 	flag.Parse()
 
 	if *showVersion {
-		fmt.Printf("opsdb-schema %s (built %s)\n", Version, BuildTime)
+		fmt.Printf("opsdb_schema %s (built %s)\n", Version, BuildTime)
 		os.Exit(0)
 	}
 
 	if flag.NArg() < 1 {
-		fmt.Fprintf(os.Stderr, "usage: opsdb-schema <command> [flags]\n")
+		fmt.Fprintf(os.Stderr, "usage: opsdb_schema <command> [flags]\n")
 		fmt.Fprintf(os.Stderr, "commands: validate, plan, apply, diff, export, init\n")
 		os.Exit(2)
 	}

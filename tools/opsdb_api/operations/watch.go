@@ -1,4 +1,4 @@
-//# tools/opsdb-api/operations/watch.go
+//# tools/opsdb_api/operations/watch.go
 
 package operations
 
@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/ghowland/opsdb/internal/pg"
-	"github.com/ghowland/opsdb/tools/opsdb-api/gate"
-	runtimeschema "github.com/ghowland/opsdb/tools/opsdb-api/schema"
+	"github.com/ghowland/opsdb/tools/opsdb_api/gate"
+	runtimeschema "github.com/ghowland/opsdb/tools/opsdb_api/schema"
 )
 
 // ---------------------------------------------------------------------------

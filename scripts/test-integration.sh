@@ -107,7 +107,7 @@ if [ -n "$TEST_FILTER" ]; then
 fi
 
 echo "running schema loader unit tests..."
-go test $GO_TEST_FLAGS ./tools/opsdb-schema/loader/... || { echo "FAILED: schema loader tests"; exit 1; }
+go test $GO_TEST_FLAGS ./tools/opsdb_schema/loader/... || { echo "FAILED: schema loader tests"; exit 1; }
 
 echo "running internal package tests..."
 go test $GO_TEST_FLAGS ./internal/... || { echo "FAILED: internal package tests"; exit 1; }
@@ -118,7 +118,7 @@ echo "--- Phase 2: Schema Apply ---"
 reset_database
 
 echo "applying schema to test database..."
-go run ./tools/opsdb-schema/cmd apply \
+go run ./tools/opsdb_schema/cmd apply \
     --repo "$REPO_ROOT" \
     --dsn "$DSN" \
     --verbose 2>&1 | tail -5
@@ -138,7 +138,7 @@ fi
 echo ""
 echo "--- Phase 3: Schema Idempotency ---"
 
-DIFF_OUTPUT=$(go run ./tools/opsdb-schema/cmd diff \
+DIFF_OUTPUT=$(go run ./tools/opsdb_schema/cmd diff \
     --repo "$REPO_ROOT" \
     --dsn "$DSN" 2>&1 || true)
 
@@ -154,9 +154,9 @@ fi
 # phase 4: API tests (if API test files exist)
 echo ""
 echo "--- Phase 4: API Tests ---"
-if find "$REPO_ROOT/tools/opsdb-api" -name '*_test.go' -size +0c 2>/dev/null | grep -q .; then
+if find "$REPO_ROOT/tools/opsdb_api" -name '*_test.go' -size +0c 2>/dev/null | grep -q .; then
     echo "running API tests..."
-    go test $GO_TEST_FLAGS ./tools/opsdb-api/... || { echo "FAILED: API tests"; exit 1; }
+    go test $GO_TEST_FLAGS ./tools/opsdb_api/... || { echo "FAILED: API tests"; exit 1; }
 else
     echo "no API test files with content found, skipping"
 fi
@@ -164,9 +164,9 @@ fi
 # phase 5: runner library tests
 echo ""
 echo "--- Phase 5: Runner Library Tests ---"
-if find "$REPO_ROOT/tools/opsdb-runner-lib" -name '*_test.go' -size +0c 2>/dev/null | grep -q .; then
+if find "$REPO_ROOT/tools/opsdb_runner_lib" -name '*_test.go' -size +0c 2>/dev/null | grep -q .; then
     echo "running runner library tests..."
-    go test $GO_TEST_FLAGS ./tools/opsdb-runner-lib/... || { echo "FAILED: runner library tests"; exit 1; }
+    go test $GO_TEST_FLAGS ./tools/opsdb_runner_lib/... || { echo "FAILED: runner library tests"; exit 1; }
 else
     echo "no runner library test files with content found, skipping"
 fi

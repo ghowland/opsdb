@@ -14,12 +14,12 @@ func main() {
 	flag.Parse()
 
 	if *dosPath == "" {
-		fmt.Fprintf(os.Stderr, "usage: emergency-review-monitor --dos <dos-directory>\n")
+		fmt.Fprintf(os.Stderr, "usage: emergency_review_monitor --dos <dos-directory>\n")
 		os.Exit(2)
 	}
 	_ = dosPath
 
-	config, err := runner.Init("emergency-review-monitor")
+	config, err := runner.Init("emergency_review_monitor")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "init failed: %v\n", err)
 		os.Exit(1)

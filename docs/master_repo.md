@@ -31,7 +31,7 @@ opsdb/
 │
 ├── tools/
 │   │
-│   ├── opsdb-schema/
+│   ├── opsdb_schema/
 │   │   ├── cmd/
 │   │   │   └── main.go                     # CLI entrypoint
 │   │   ├── loader/
@@ -47,7 +47,7 @@ opsdb/
 │   │   │   └── meta.go                     # _schema_* table population
 │   │   └── loader_test.go                  # unit tests for loader package
 │   │
-│   ├── opsdb-api/
+│   ├── opsdb_api/
 │   │   ├── cmd/
 │   │   │   └── main.go
 │   │   ├── gate/
@@ -83,20 +83,20 @@ opsdb/
 │   │   └── config/
 │   │       └── config.go                   # API configuration loading
 │   │
-│   ├── opsdb-runner-lib/
+│   ├── opsdb_runner_lib/
 │   │   ├── lifecycle.go                    # init, cycle, shutdown, bound enforcement
-│   │   ├── api_client.go                   # wraps opsdb-api HTTP calls
+│   │   ├── api_client.go                   # wraps opsdb_api HTTP calls
 │   │   ├── logging.go                      # structured logging with runner context
 │   │   ├── retry.go                        # retry with backoff, jitter, idempotency keys
 │   │   ├── dryrun.go                       # dry-run mode support
 │   │   └── config.go                       # runner configuration from spec + env
 │   │
 │   ├── runners/
-│   │   ├── change-set-executor/
+│   │   ├── change_set_executor/
 │   │   │   ├── cmd/
 │   │   │   │   └── main.go
 │   │   │   └── executor.go                 # drains approved change_sets
-│   │   ├── schema-executor/
+│   │   ├── schema_executor/
 │   │   │   ├── cmd/
 │   │   │   │   └── main.go
 │   │   │   └── executor.go                 # applies approved _schema_change_sets
@@ -104,11 +104,11 @@ opsdb/
 │   │   │   ├── cmd/
 │   │   │   │   └── main.go
 │   │   │   └── reaper.go                   # enforces retention policies
-│   │   ├── emergency-review-monitor/
+│   │   ├── emergency_review_monitor/
 │   │   │   ├── cmd/
 │   │   │   │   └── main.go
 │   │   │   └── monitor.go                  # escalates overdue emergency reviews
-│   │   └── notification-runner/
+│   │   └── notification_runner/
 │   │       ├── cmd/
 │   │       │   └── main.go
 │   │       ├── runner.go                   # reads state transitions, dispatches
@@ -117,7 +117,7 @@ opsdb/
 │   │           └── webhook.go
 │   │
 │   └── importers/
-│       ├── opsdb-import-aws/
+│       ├── opsdb_import_aws/
 │       │   ├── cmd/
 │       │   │   └── main.go
 │       │   ├── ec2.go
@@ -127,7 +127,7 @@ opsdb/
 │       │   ├── vpc.go
 │       │   ├── route53.go
 │       │   └── mapping.go                  # AWS → OpsDB schema mapping
-│       ├── opsdb-import-gcp/
+│       ├── opsdb_import_gcp/
 │       │   ├── cmd/
 │       │   │   └── main.go
 │       │   ├── gce.go
@@ -136,7 +136,7 @@ opsdb/
 │       │   ├── gke.go
 │       │   ├── iam.go
 │       │   └── mapping.go
-│       ├── opsdb-import-k8s/
+│       ├── opsdb_import_k8s/
 │       │   ├── cmd/
 │       │   │   └── main.go
 │       │   ├── cluster.go
@@ -149,23 +149,23 @@ opsdb/
 │       │   ├── secret.go
 │       │   ├── service.go
 │       │   └── watcher.go                  # K8s watch with level-triggered backstop
-│       ├── opsdb-import-identity/
+│       ├── opsdb_import_identity/
 │       │   ├── cmd/
 │       │   │   └── main.go
 │       │   ├── okta.go
 │       │   ├── azuread.go
 │       │   └── ldap.go
-│       ├── opsdb-import-monitoring/
+│       ├── opsdb_import_monitoring/
 │       │   ├── cmd/
 │       │   │   └── main.go
 │       │   ├── prometheus.go
 │       │   └── datadog.go
-│       ├── opsdb-import-oncall/
+│       ├── opsdb_import_oncall/
 │       │   ├── cmd/
 │       │   │   └── main.go
 │       │   ├── pagerduty.go
 │       │   └── opsgenie.go
-│       └── opsdb-import-secrets/
+│       └── opsdb_import_secrets/
 │           ├── cmd/
 │           │   └── main.go
 │           ├── vault.go
@@ -450,10 +450,10 @@ opsdb/
 ├── docs/
 │   ├── architecture/
 │   │   ├── overview.md                      # what OpsDB is, link to spec papers
-│   │   ├── schema-engine.md                 # opsdb-schema technical doc (phase 1 doc)
-│   │   ├── api-gate.md                      # opsdb-api technical doc
+│   │   ├── schema-engine.md                 # opsdb_schema technical doc (phase 1 doc)
+│   │   ├── api-gate.md                      # opsdb_api technical doc
 │   │   ├── runner-pattern.md                # runner lifecycle + disciplines
-│   │   ├── library-contracts.md             # opsdb-runner-lib contracts
+│   │   ├── library-contracts.md             # opsdb_runner_lib contracts
 │   │   ├── importer-pattern.md              # how importers work
 │   │   └── n-substrate.md                   # N-DOS pattern explanation
 │   ├── guides/
@@ -496,7 +496,7 @@ opsdb/
 │
 └── .github/
     └── workflows/
-        ├── validate-schema.yaml             # runs opsdb-schema validate on PR
+        ├── validate-schema.yaml             # runs opsdb_schema validate on PR
         ├── test.yaml                        # unit + integration tests
         └── release.yaml                     # build + publish binaries
 ```
@@ -514,8 +514,8 @@ module github.com/ghowland/opsdb
 Import paths for all packages follow from this root:
 
 ```go
-import "github.com/ghowland/opsdb/tools/opsdb-schema/loader"
-import "github.com/ghowland/opsdb/tools/opsdb-api/gate"
+import "github.com/ghowland/opsdb/tools/opsdb_schema/loader"
+import "github.com/ghowland/opsdb/tools/opsdb_api/gate"
 import "github.com/ghowland/opsdb/tools/opsdb_runner_lib"
 import "github.com/ghowland/opsdb/internal/pg"
 import "github.com/ghowland/opsdb/internal/model"
@@ -526,12 +526,12 @@ import "github.com/ghowland/opsdb/internal/conventions"
 Binaries are built from `cmd/main.go` files within each tool:
 
 ```
-go build -o bin/opsdb-schema       ./tools/opsdb-schema/cmd
-go build -o bin/opsdb-api          ./tools/opsdb-api/cmd
-go build -o bin/opsdb-changeset-executor  ./tools/runners/change-set-executor/cmd
+go build -o bin/opsdb_schema       ./tools/opsdb_schema/cmd
+go build -o bin/opsdb_api          ./tools/opsdb_api/cmd
+go build -o bin/opsdb-changeset-executor  ./tools/runners/change_set_executor/cmd
 go build -o bin/opsdb-reaper       ./tools/runners/reaper/cmd
-go build -o bin/opsdb-import-aws   ./tools/importers/opsdb-import-aws/cmd
-go build -o bin/opsdb-import-k8s   ./tools/importers/opsdb_import_k8s/cmd
+go build -o bin/opsdb_import_aws   ./tools/importers/opsdb_import_aws/cmd
+go build -o bin/opsdb_import_k8s   ./tools/importers/opsdb_import_k8s/cmd
 # ... and so on for each binary
 ```
 
@@ -543,26 +543,26 @@ The Makefile provides targets:
 all: schema api runners importers
 
 schema:
-	go build -o bin/opsdb-schema ./tools/opsdb-schema/cmd
+	go build -o bin/opsdb_schema ./tools/opsdb_schema/cmd
 
 api:
-	go build -o bin/opsdb-api ./tools/opsdb-api/cmd
+	go build -o bin/opsdb_api ./tools/opsdb_api/cmd
 
 runners:
-	go build -o bin/opsdb-changeset-executor ./tools/runners/change-set-executor/cmd
-	go build -o bin/opsdb-schema-executor    ./tools/runners/schema-executor/cmd
+	go build -o bin/opsdb-changeset-executor ./tools/runners/change_set_executor/cmd
+	go build -o bin/opsdb_schema_executor    ./tools/runners/schema_executor/cmd
 	go build -o bin/opsdb-reaper             ./tools/runners/reaper/cmd
-	go build -o bin/opsdb-emergency-monitor  ./tools/runners/emergency-review-monitor/cmd
-	go build -o bin/opsdb-notification       ./tools/runners/notification-runner/cmd
+	go build -o bin/opsdb-emergency-monitor  ./tools/runners/emergency_review_monitor/cmd
+	go build -o bin/opsdb-notification       ./tools/runners/notification_runner/cmd
 
 importers:
-	go build -o bin/opsdb-import-aws        ./tools/importers/opsdb-import-aws/cmd
-	go build -o bin/opsdb-import-gcp        ./tools/importers/opsdb-import-gcp/cmd
-	go build -o bin/opsdb-import-k8s        ./tools/importers/opsdb_import_k8s/cmd
-	go build -o bin/opsdb-import-identity   ./tools/importers/opsdb_import_identity/cmd
-	go build -o bin/opsdb-import-monitoring ./tools/importers/opsdb_import_monitoring/cmd
-	go build -o bin/opsdb-import-oncall     ./tools/importers/opsdb_import_oncall/cmd
-	go build -o bin/opsdb-import-secrets    ./tools/importers/opsdb_import_secrets/cmd
+	go build -o bin/opsdb_import_aws        ./tools/importers/opsdb_import_aws/cmd
+	go build -o bin/opsdb_import_gcp        ./tools/importers/opsdb_import_gcp/cmd
+	go build -o bin/opsdb_import_k8s        ./tools/importers/opsdb_import_k8s/cmd
+	go build -o bin/opsdb_import_identity   ./tools/importers/opsdb_import_identity/cmd
+	go build -o bin/opsdb_import_monitoring ./tools/importers/opsdb_import_monitoring/cmd
+	go build -o bin/opsdb_import_oncall     ./tools/importers/opsdb_import_oncall/cmd
+	go build -o bin/opsdb_import_secrets    ./tools/importers/opsdb_import_secrets/cmd
 
 test:
 	go test ./...
@@ -571,7 +571,7 @@ test-integration:
 	OPSDB_TEST_PG=1 go test ./... -tags integration -count=1
 
 validate:
-	go run ./tools/opsdb-schema/cmd validate --repo ./schema
+	go run ./tools/opsdb_schema/cmd validate --repo ./schema
 
 clean:
 	rm -rf bin/
@@ -608,7 +608,7 @@ schema:
 
 Every DOS points at the same `schema/` directory. Schema is shared. Configuration is diverged. This is the N pipeline in practice.
 
-**seed/ directory** — bootstrap data loaded via opsdb-api after schema apply. Each seed file is a set of API write operations expressed as YAML, processed by the seed script in order:
+**seed/ directory** — bootstrap data loaded via opsdb_api after schema apply. Each seed file is a set of API write operations expressed as YAML, processed by the seed script in order:
 
 ```yaml
 # dos/opsdb-ops-prod/seed/site.yaml
@@ -650,7 +650,7 @@ The `@ref:entity_type:name` syntax lets seed files reference rows created earlie
 
 ```yaml
 runners:
-  - name: change-set-executor
+  - name: change_set_executor
     binary: opsdb-changeset-executor
     schedule: "continuous"
     override_file: overrides/changeset-executor.yaml
@@ -658,10 +658,10 @@ runners:
     binary: opsdb-reaper
     schedule: "daily"
     override_file: overrides/reaper.yaml
-  - name: emergency-review-monitor
+  - name: emergency_review_monitor
     binary: opsdb-emergency-monitor
     schedule: "hourly"
-  - name: notification-runner
+  - name: notification_runner
     binary: opsdb-notification
     schedule: "continuous"
     override_file: overrides/notification.yaml
@@ -672,21 +672,21 @@ runners:
 ```yaml
 importers:
   - name: aws
-    binary: opsdb-import-aws
+    binary: opsdb_import_aws
     schedule: "every_5m"
     credential_config: credentials/aws.yaml
     targets:
       - cloud_account: "123456789012"
         regions: [us-east-1, us-west-2]
   - name: k8s
-    binary: opsdb-import-k8s
+    binary: opsdb_import_k8s
     schedule: "watch"                     # continuous via K8s watch API
     credential_config: credentials/k8s.yaml
     targets:
       - cluster: prod-east
         kubeconfig_env_var: KUBECONFIG_PROD_EAST
   - name: oncall
-    binary: opsdb-import-oncall
+    binary: opsdb_import_oncall
     schedule: "every_15m"
     credential_config: credentials/pagerduty.yaml
 ```
@@ -714,7 +714,7 @@ The two shipped DOS configurations — prod and staging — demonstrate the N pi
 |--------|--------|----------|
 | Schema YAML files | Same `schema/` directory | — |
 | Tool binaries | Same binaries | — |
-| Library code | Same `opsdb-runner-lib` | — |
+| Library code | Same `opsdb_runner_lib` | — |
 | Database | — | Separate Postgres instances |
 | API instance | — | Separate process per DOS |
 | Users and roles | — | Different users.yaml per DOS |
@@ -745,12 +745,12 @@ createdb opsdb_staging
 export OPSDB_PROD_DSN="postgres://localhost/opsdb_prod?sslmode=disable"
 export OPSDB_STAGING_DSN="postgres://localhost/opsdb_staging?sslmode=disable"
 
-bin/opsdb-schema apply --repo ./schema --dsn "$OPSDB_PROD_DSN"
-bin/opsdb-schema apply --repo ./schema --dsn "$OPSDB_STAGING_DSN"
+bin/opsdb_schema apply --repo ./schema --dsn "$OPSDB_PROD_DSN"
+bin/opsdb_schema apply --repo ./schema --dsn "$OPSDB_STAGING_DSN"
 
 # 4. Start APIs (one per DOS)
-bin/opsdb-api --config ./dos/opsdb-ops-prod/config.yaml &
-bin/opsdb-api --config ./dos/opsdb-ops-staging/config.yaml &
+bin/opsdb_api --config ./dos/opsdb-ops-prod/config.yaml &
+bin/opsdb_api --config ./dos/opsdb-ops-staging/config.yaml &
 
 # 5. Seed both substrates
 ./scripts/seed.sh ./dos/opsdb-ops-prod
@@ -764,10 +764,10 @@ bin/opsdb-reaper --dos ./dos/opsdb-ops-prod &
 # ... etc
 
 # 7. Start importers for each DOS
-bin/opsdb-import-aws --dos ./dos/opsdb-ops-prod &
-bin/opsdb-import-k8s --dos ./dos/opsdb-ops-prod &
+bin/opsdb_import_aws --dos ./dos/opsdb-ops-prod &
+bin/opsdb_import_k8s --dos ./dos/opsdb-ops-prod &
 # staging might import from staging AWS account
-bin/opsdb-import-aws --dos ./dos/opsdb-ops-staging &
+bin/opsdb_import_aws --dos ./dos/opsdb-ops-staging &
 ```
 
 The `--dos` flag on runners and importers points to the DOS directory. The runner reads `config.yaml` to find the API address and credential source. All runners for a given DOS talk to that DOS's API instance, which talks to that DOS's database. Schema is shared. Data is diverged. The N pipeline is live.
@@ -778,7 +778,7 @@ The `--dos` flag on runners and importers points to the DOS directory. The runne
 
 **On every PR:**
 
-`opsdb-schema validate` runs against the schema directory. Any YAML file that violates the meta-schema, uses forbidden vocabulary, has unresolved FK references, or violates naming conventions fails the PR.
+`opsdb_schema validate` runs against the schema directory. Any YAML file that violates the meta-schema, uses forbidden vocabulary, has unresolved FK references, or violates naming conventions fails the PR.
 
 `go test ./...` runs unit tests for all packages.
 
@@ -792,7 +792,7 @@ If integration tests pass, binaries are built for linux/amd64, linux/arm64, darw
 
 **On schema changes (files in `schema/` modified):**
 
-The PR check additionally runs `opsdb-schema plan` against a test database to show exactly what DDL would be generated. The plan output is posted as a PR comment so reviewers see the concrete database impact of the schema change.
+The PR check additionally runs `opsdb_schema plan` against a test database to show exactly what DDL would be generated. The plan output is posted as a PR comment so reviewers see the concrete database impact of the schema change.
 
 ---
 
@@ -803,13 +803,13 @@ The PR check additionally runs `opsdb-schema plan` against a test database to sh
 1. Create the YAML file in the appropriate domain directory.
 2. If it depends on entities in a later domain, consider whether it belongs in the correct domain or the dependency order needs adjustment.
 3. Run `make validate` to check meta-schema compliance.
-4. Run `bin/opsdb-schema plan --repo ./schema --dsn "$OPSDB_PROD_DSN"` to see the DDL.
+4. Run `bin/opsdb_schema plan --repo ./schema --dsn "$OPSDB_PROD_DSN"` to see the DDL.
 5. PR. CI validates. Schema steward reviews. Merge. Apply to substrates.
 
 **Adding a new runner:**
 
 1. Create directory under `tools/runners/{runner-name}/`.
-2. Write `cmd/main.go` using `opsdb-runner-lib` lifecycle.
+2. Write `cmd/main.go` using `opsdb_runner_lib` lifecycle.
 3. Write runner logic following get/act/set pattern.
 4. Create runner_spec YAML in `dos/{dos-name}/seed/` for registration.
 5. Add to `dos/{dos-name}/runners/enabled.yaml`.
@@ -818,8 +818,8 @@ The PR check additionally runs `opsdb-schema plan` against a test database to sh
 
 **Adding a new importer:**
 
-1. Create directory under `tools/importers/opsdb-import-{authority}/`.
-2. Write `cmd/main.go` using `opsdb-runner-lib` lifecycle.
+1. Create directory under `tools/importers/opsdb_import_{authority}/`.
+2. Write `cmd/main.go` using `opsdb_runner_lib` lifecycle.
 3. Write mapping code translating authority data to schema entities.
 4. Create credential config template in `dos/{dos-name}/importers/credentials/`.
 5. Add to `dos/{dos-name}/importers/enabled.yaml`.
@@ -833,7 +833,7 @@ The PR check additionally runs `opsdb-schema plan` against a test database to sh
 3. Edit seed files for environment-specific site, users, policies.
 4. Edit `runners/enabled.yaml` and `importers/enabled.yaml` for what this environment needs.
 5. Create the Postgres database.
-6. Apply schema: `bin/opsdb-schema apply --repo ./schema --dsn "$NEW_DSN"`.
+6. Apply schema: `bin/opsdb_schema apply --repo ./schema --dsn "$NEW_DSN"`.
 7. Seed: `./scripts/seed.sh ./dos/opsdb-ops-newenv`.
 8. Start API and runners.
 

@@ -14,7 +14,7 @@ the authority — it only reads.
 Every importer follows this file layout:
 
 ```
-tools/importers/opsdb-import-{authority}/
+tools/importers/opsdb_import_{authority}/
 ├── cmd/
 │   └── main.go          # CLI entrypoint, runner lifecycle loop
 ├── mapping.go           # Authority data → OpsDB entity mapping
@@ -35,7 +35,7 @@ import (
 )
 
 func main() {
-    config, err := runner.Init("opsdb-import-myauthority")
+    config, err := runner.Init("opsdb_import_myauthority")
     if err != nil { os.Exit(1) }
 
     for runner.ShouldRun(config) {

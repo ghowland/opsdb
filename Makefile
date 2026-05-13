@@ -8,36 +8,36 @@ BUILD_DIR ?= bin
 
 PKG_ALL := ./...
 CMD_DIRS := \
-	./tools/opsdb-api/cmd \
-	./tools/opsdb-schema/cmd \
-	./tools/importers/opsdb-import-aws/cmd \
-	./tools/importers/opsdb-import-gcp/cmd \
+	./tools/opsdb_api/cmd \
+	./tools/opsdb_schema/cmd \
+	./tools/importers/opsdb_import_aws/cmd \
+	./tools/importers/opsdb_import_gcp/cmd \
 	./tools/importers/opsdb_import_identity/cmd \
 	./tools/importers/opsdb_import_k8s/cmd \
 	./tools/importers/opsdb_import_monitoring/cmd \
 	./tools/importers/opsdb_import_oncall/cmd \
 	./tools/importers/opsdb_import_secrets/cmd \
-	./tools/runners/change-set-executor/cmd \
-	./tools/runners/emergency-review-monitor/cmd \
-	./tools/runners/notification-runner/cmd \
+	./tools/runners/change_set_executor/cmd \
+	./tools/runners/emergency_review_monitor/cmd \
+	./tools/runners/notification_runner/cmd \
 	./tools/runners/reaper/cmd \
-	./tools/runners/schema-executor/cmd
+	./tools/runners/schema_executor/cmd
 
 BINS := \
-	opsdb-api \
-	opsdb-schema \
-	opsdb-import-aws \
-	opsdb-import-gcp \
-	opsdb-import-identity \
-	opsdb-import-k8s \
-	opsdb-import-monitoring \
-	opsdb-import-oncall \
-	opsdb-import-secrets \
-	change-set-executor \
-	emergency-review-monitor \
-	notification-runner \
+	opsdb_api \
+	opsdb_schema \
+	opsdb_import_aws \
+	opsdb_import_gcp \
+	opsdb_import_identity \
+	opsdb_import_k8s \
+	opsdb_import_monitoring \
+	opsdb_import_oncall \
+	opsdb_import_secrets \
+	change_set_executor \
+	emergency_review_monitor \
+	notification_runner \
 	reaper \
-	schema-executor
+	schema_executor
 
 .DEFAULT_GOAL := help
 
@@ -45,8 +45,8 @@ BINS := \
 help:
 	@echo "Common targets:"
 	@echo "  make build          Build all binaries"
-	@echo "  make build-one CMD=./tools/opsdb-api/cmd OUT=opsdb-api"
-	@echo "  make run CMD=./tools/opsdb-api/cmd"
+	@echo "  make build-one CMD=./tools/opsdb_api/cmd OUT=opsdb_api"
+	@echo "  make run CMD=./tools/opsdb_api/cmd"
 	@echo "  make test           Run unit tests"
 	@echo "  make test-race      Run tests with race detector"
 	@echo "  make test-cover     Run tests with coverage"
@@ -67,67 +67,67 @@ dirs:
 
 .PHONY: build
 build: dirs \
-	$(BUILD_DIR)/opsdb-api \
-	$(BUILD_DIR)/opsdb-schema \
-	$(BUILD_DIR)/opsdb-import-aws \
-	$(BUILD_DIR)/opsdb-import-gcp \
-	$(BUILD_DIR)/opsdb-import-identity \
-	$(BUILD_DIR)/opsdb-import-k8s \
-	$(BUILD_DIR)/opsdb-import-monitoring \
-	$(BUILD_DIR)/opsdb-import-oncall \
-	$(BUILD_DIR)/opsdb-import-secrets \
-	$(BUILD_DIR)/change-set-executor \
-	$(BUILD_DIR)/emergency-review-monitor \
-	$(BUILD_DIR)/notification-runner \
+	$(BUILD_DIR)/opsdb_api \
+	$(BUILD_DIR)/opsdb_schema \
+	$(BUILD_DIR)/opsdb_import_aws \
+	$(BUILD_DIR)/opsdb_import_gcp \
+	$(BUILD_DIR)/opsdb_import_identity \
+	$(BUILD_DIR)/opsdb_import_k8s \
+	$(BUILD_DIR)/opsdb_import_monitoring \
+	$(BUILD_DIR)/opsdb_import_oncall \
+	$(BUILD_DIR)/opsdb_import_secrets \
+	$(BUILD_DIR)/change_set_executor \
+	$(BUILD_DIR)/emergency_review_monitor \
+	$(BUILD_DIR)/notification_runner \
 	$(BUILD_DIR)/reaper \
-	$(BUILD_DIR)/schema-executor
+	$(BUILD_DIR)/schema_executor
 
-$(BUILD_DIR)/opsdb-api: dirs
-	$(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $@ ./tools/opsdb-api/cmd
+$(BUILD_DIR)/opsdb_api: dirs
+	$(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $@ ./tools/opsdb_api/cmd
 
-$(BUILD_DIR)/opsdb-schema: dirs
-	$(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $@ ./tools/opsdb-schema/cmd
+$(BUILD_DIR)/opsdb_schema: dirs
+	$(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $@ ./tools/opsdb_schema/cmd
 
-$(BUILD_DIR)/opsdb-import-aws: dirs
-	$(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $@ ./tools/importers/opsdb-import-aws/cmd
+$(BUILD_DIR)/opsdb_import_aws: dirs
+	$(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $@ ./tools/importers/opsdb_import_aws/cmd
 
-$(BUILD_DIR)/opsdb-import-gcp: dirs
-	$(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $@ ./tools/importers/opsdb-import-gcp/cmd
+$(BUILD_DIR)/opsdb_import_gcp: dirs
+	$(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $@ ./tools/importers/opsdb_import_gcp/cmd
 
-$(BUILD_DIR)/opsdb-import-identity: dirs
+$(BUILD_DIR)/opsdb_import_identity: dirs
 	$(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $@ ./tools/importers/opsdb_import_identity/cmd
 
-$(BUILD_DIR)/opsdb-import-k8s: dirs
+$(BUILD_DIR)/opsdb_import_k8s: dirs
 	$(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $@ ./tools/importers/opsdb_import_k8s/cmd
 
-$(BUILD_DIR)/opsdb-import-monitoring: dirs
+$(BUILD_DIR)/opsdb_import_monitoring: dirs
 	$(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $@ ./tools/importers/opsdb_import_monitoring/cmd
 
-$(BUILD_DIR)/opsdb-import-oncall: dirs
+$(BUILD_DIR)/opsdb_import_oncall: dirs
 	$(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $@ ./tools/importers/opsdb_import_oncall/cmd
 
-$(BUILD_DIR)/opsdb-import-secrets: dirs
+$(BUILD_DIR)/opsdb_import_secrets: dirs
 	$(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $@ ./tools/importers/opsdb_import_secrets/cmd
 
-$(BUILD_DIR)/change-set-executor: dirs
-	$(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $@ ./tools/runners/change-set-executor/cmd
+$(BUILD_DIR)/change_set_executor: dirs
+	$(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $@ ./tools/runners/change_set_executor/cmd
 
-$(BUILD_DIR)/emergency-review-monitor: dirs
-	$(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $@ ./tools/runners/emergency-review-monitor/cmd
+$(BUILD_DIR)/emergency_review_monitor: dirs
+	$(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $@ ./tools/runners/emergency_review_monitor/cmd
 
-$(BUILD_DIR)/notification-runner: dirs
-	$(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $@ ./tools/runners/notification-runner/cmd
+$(BUILD_DIR)/notification_runner: dirs
+	$(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $@ ./tools/runners/notification_runner/cmd
 
 $(BUILD_DIR)/reaper: dirs
 	$(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $@ ./tools/runners/reaper/cmd
 
-$(BUILD_DIR)/schema-executor: dirs
-	$(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $@ ./tools/runners/schema-executor/cmd
+$(BUILD_DIR)/schema_executor: dirs
+	$(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $@ ./tools/runners/schema_executor/cmd
 
 .PHONY: build-one
 build-one: dirs
 ifndef CMD
-	$(error CMD is required, e.g. make build-one CMD=./tools/opsdb-api/cmd OUT=opsdb-api)
+	$(error CMD is required, e.g. make build-one CMD=./tools/opsdb_api/cmd OUT=opsdb_api)
 endif
 	@out="$${OUT:-$$(basename "$(CMD)")}" ; \
 	$(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o "$(BUILD_DIR)/$$out" "$(CMD)"
@@ -135,7 +135,7 @@ endif
 .PHONY: run
 run:
 ifndef CMD
-	$(error CMD is required, e.g. make run CMD=./tools/opsdb-api/cmd)
+	$(error CMD is required, e.g. make run CMD=./tools/opsdb_api/cmd)
 endif
 	$(GO) run $(GOFLAGS) "$(CMD)"
 	

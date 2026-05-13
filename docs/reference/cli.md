@@ -1,6 +1,6 @@
 # CLI Reference
 
-## opsdb-schema
+## opsdb_schema
 
 Schema management tool. Validates, diffs, plans, and applies schema changes.
 
@@ -11,7 +11,7 @@ Schema management tool. Validates, diffs, plans, and applies schema changes.
 Parse and validate schema YAML files. No database required.
 
 ```bash
-opsdb-schema validate --repo .
+opsdb_schema validate --repo .
 ```
 
 Checks: YAML syntax, meta-schema conformance, naming conventions, type/constraint/modifier validity, forbidden patterns (regex, embedded logic, inheritance, templating, imports), reserved field collisions, mutually exclusive flags.
@@ -23,7 +23,7 @@ Exit codes: 0 = clean, 1 = validation errors.
 Show what DDL would be generated against a database.
 
 ```bash
-opsdb-schema plan --repo . --dsn "$OPSDB_DSN"
+opsdb_schema plan --repo . --dsn "$OPSDB_DSN"
 ```
 
 Runs the full pipeline: load → diff → evolution check → DDL generation. Prints each DDL statement with entity name and description. Forbidden changes printed as errors with alternatives.
@@ -33,7 +33,7 @@ Runs the full pipeline: load → diff → evolution check → DDL generation. Pr
 Execute DDL against the database.
 
 ```bash
-opsdb-schema apply --repo . --dsn "$OPSDB_DSN" [--verbose] [--dry-run]
+opsdb_schema apply --repo . --dsn "$OPSDB_DSN" [--verbose] [--dry-run]
 ```
 
 Acquires Postgres advisory lock. Begins transaction. Executes DDL in dependency order. Populates `_schema_*` metadata tables. Commits.
@@ -47,7 +47,7 @@ Acquires Postgres advisory lock. Begins transaction. Executes DDL in dependency 
 Show differences between YAML and current database.
 
 ```bash
-opsdb-schema diff --repo . --dsn "$OPSDB_DSN"
+opsdb_schema diff --repo . --dsn "$OPSDB_DSN"
 ```
 
 Output format:
@@ -63,7 +63,7 @@ Output format:
 Dump current database schema as YAML.
 
 ```bash
-opsdb-schema export --dsn "$OPSDB_DSN"
+opsdb_schema export --dsn "$OPSDB_DSN"
 ```
 
 Reads from `_schema_*` tables (preferred) or `information_schema` (fallback). Writes to stdout.
@@ -73,7 +73,7 @@ Reads from `_schema_*` tables (preferred) or `information_schema` (fallback). Wr
 Create a new empty schema repository.
 
 ```bash
-opsdb-schema init --repo /path/to/new/repo
+opsdb_schema init --repo /path/to/new/repo
 ```
 
 Creates `schema/meta/_schema_meta.yaml`, `schema/conventions/reserved.yaml`, `schema/directory.yaml`, and `schema/domains/`.
@@ -88,12 +88,12 @@ Creates `schema/meta/_schema_meta.yaml`, `schema/conventions/reserved.yaml`, `sc
 | `--verbose` | bool | false | Verbose output |
 | `--dry-run` | bool | false | Apply: rollback instead of commit |
 
-## opsdb-api
+## opsdb_api
 
 API server.
 
 ```bash
-opsdb-api --dos dos/prod-0
+opsdb_api --dos dos/prod-0
 ```
 
 ### Flags
@@ -118,7 +118,7 @@ opsdb-api --dos dos/prod-0
 All importers follow the same CLI pattern:
 
 ```bash
-opsdb-import-{authority} --dos dos/prod-0
+opsdb_import_{authority} --dos dos/prod-0
 ```
 
 ### Environment Variables (per importer)

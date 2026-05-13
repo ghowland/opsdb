@@ -52,7 +52,7 @@ widen a constraint.
 ### 2. Validate locally
 
 ```bash
-bin/opsdb-schema validate --repo .
+bin/opsdb_schema validate --repo .
 ```
 
 This parses all YAML, checks naming conventions, validates types and constraints,
@@ -61,7 +61,7 @@ scans for forbidden patterns, and reports errors. No database needed.
 ### 3. Plan against your database
 
 ```bash
-bin/opsdb-schema plan --repo . --dsn "$OPSDB_DSN"
+bin/opsdb_schema plan --repo . --dsn "$OPSDB_DSN"
 ```
 
 This diffs the YAML against the current database, checks evolution rules, and
@@ -73,7 +73,7 @@ rule name and the alternative approach.
 In dev:
 
 ```bash
-bin/opsdb-schema apply --repo . --dsn "$OPSDB_DSN" --verbose
+bin/opsdb_schema apply --repo . --dsn "$OPSDB_DSN" --verbose
 ```
 
 In operational: commit the YAML change, create a `_schema_change_set` through
@@ -83,7 +83,7 @@ applies it.
 ### 5. Dry-run first
 
 ```bash
-bin/opsdb-schema apply --repo . --dsn "$OPSDB_DSN" --dry-run
+bin/opsdb_schema apply --repo . --dsn "$OPSDB_DSN" --dry-run
 ```
 
 Executes all DDL inside a transaction then rolls back. Validates everything

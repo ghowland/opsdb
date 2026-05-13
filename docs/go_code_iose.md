@@ -248,10 +248,10 @@
 
 ---
 
-## tools/opsdb-schema/
+## tools/opsdb_schema/
 
 ### cmd/main.go
-**Purpose:** CLI entrypoint for the opsdb-schema binary. Parses command-line flags (command, repo path, DSN, scope, verbose, dry-run), dispatches to the appropriate loader function.
+**Purpose:** CLI entrypoint for the opsdb_schema binary. Parses command-line flags (command, repo path, DSN, scope, verbose, dry-run), dispatches to the appropriate loader function.
 
 **Inputs:** Command-line arguments: command (init, validate, plan, apply, diff, export), --repo path, --dsn connection string, --scope entity or entity/field, --verbose flag, --version flag.
 
@@ -429,10 +429,10 @@
 
 ---
 
-## tools/opsdb-api/
+## tools/opsdb_api/
 
 ### cmd/main.go
-**Purpose:** CLI entrypoint for the opsdb-api binary. Loads configuration, initializes auth provider, connects to database, loads runtime schema from _schema_* tables, starts HTTP server.
+**Purpose:** CLI entrypoint for the opsdb_api binary. Loads configuration, initializes auth provider, connects to database, loads runtime schema from _schema_* tables, starts HTTP server.
 
 **Inputs:** --config path to DOS config.yaml. Environment variables for DSN and secrets.
 
@@ -713,7 +713,7 @@
 
 ---
 
-## tools/opsdb-runner-lib/
+## tools/opsdb_runner_lib/
 
 ### lifecycle.go
 **Purpose:** Runner lifecycle helpers. Init, cycle management, shutdown, bound enforcement. Not a framework — the runner calls these, they don't call the runner.
@@ -804,7 +804,7 @@
 
 ## tools/runners/
 
-### change-set-executor/executor.go
+### change_set_executor/executor.go
 **Purpose:** Drains approved change sets. Reads change_sets with status=approved, applies each field change via API, marks change sets applied.
 
 **Inputs (get):** change_set rows with status=approved. change_set_field_change rows per change set.
@@ -813,14 +813,14 @@
 
 **Side effects:** API write calls for each field change application and status transition.
 
-### schema-executor/executor.go
-**Purpose:** Applies approved schema change sets. Reads _schema_change_set rows with approved status, runs opsdb-schema apply against the schema repo at the specified commit.
+### schema_executor/executor.go
+**Purpose:** Applies approved schema change sets. Reads _schema_change_set rows with approved status, runs opsdb_schema apply against the schema repo at the specified commit.
 
 **Inputs (get):** _schema_change_set rows with approved status.
 
-**Outputs (set):** Updated database schema via opsdb-schema apply. Updated _schema_* tables. runner_job row.
+**Outputs (set):** Updated database schema via opsdb_schema apply. Updated _schema_* tables. runner_job row.
 
-**Side effects:** Runs opsdb-schema binary or calls loader directly. Database DDL changes.
+**Side effects:** Runs opsdb_schema binary or calls loader directly. Database DDL changes.
 
 ### reaper/reaper.go
 **Purpose:** Enforces retention policies. Reads retention_policy rows, queries target tables for rows past retention horizon, deletes or soft-deletes.
@@ -831,7 +831,7 @@
 
 **Side effects:** API delete/update calls for expired rows.
 
-### emergency-review-monitor/monitor.go
+### emergency_review_monitor/monitor.go
 **Purpose:** Escalates overdue emergency reviews. Reads change_set_emergency_review rows where status=pending and review window elapsed.
 
 **Inputs (get):** change_set_emergency_review rows. Change management rule for review window.
@@ -840,7 +840,7 @@
 
 **Side effects:** API writes for findings. Notification dispatch through notification library.
 
-### notification-runner/runner.go
+### notification_runner/runner.go
 **Purpose:** Reads state transitions requiring notification and dispatches through configured channels.
 
 **Inputs (get):** Change sets entering pending_approval. Emergency changes filed. Compliance findings created. Escalation timeouts.
@@ -849,7 +849,7 @@
 
 **Side effects:** Email, webhook, or other notification delivery.
 
-### notification-runner/backends/email.go
+### notification_runner/backends/email.go
 **Purpose:** Email notification backend. Sends email via SMTP.
 
 **Inputs:** Recipient, subject, body, SMTP configuration.
@@ -858,7 +858,7 @@
 
 **Side effects:** SMTP connection and email delivery.
 
-### notification-runner/backends/webhook.go
+### notification_runner/backends/webhook.go
 **Purpose:** Webhook notification backend. Posts JSON payload to configured URL.
 
 **Inputs:** URL, payload, optional headers.
@@ -875,13 +875,13 @@ All importers follow identical structure. Differences are in which authority the
 
 ### Common pattern per importer:
 
-**cmd/main.go** — CLI entrypoint. Reads --dos flag for DOS config, initializes runner via opsdb-runner-lib, starts cycle loop.
+**cmd/main.go** — CLI entrypoint. Reads --dos flag for DOS config, initializes runner via opsdb_runner_lib, starts cycle loop.
 
 **mapping.go** (where present) — Defines the mapping from authority data structures to OpsDB entity types, field names, and observation cache keys. Central place for DSNC flattening decisions.
 
 **Per-resource files** (ec2.go, rds.go, pod.go, etc.) — Each file handles one resource type from the authority. Reads from authority API, transforms to schema shape, returns observation data ready to write.
 
-### opsdb-import-aws/
+### opsdb_import_aws/
 - **ec2.go** — Reads EC2 instances. Maps to cloud_resource/ec2_instance observations.
 - **rds.go** — Reads RDS instances. Maps to cloud_resource/rds_database observations.
 - **s3.go** — Reads S3 buckets. Maps to cloud_resource/s3_bucket observations.
@@ -889,14 +889,14 @@ All importers follow identical structure. Differences are in which authority the
 - **vpc.go** — Reads VPCs, subnets, security groups. Maps to cloud_resource/vpc observations.
 - **route53.go** — Reads Route53 hosted zones. Maps to cloud_resource/route53_zone observations.
 
-### opsdb-import-gcp/
+### opsdb_import_gcp/
 - **gce.go** — GCE instances to cloud_resource/gce_instance.
 - **cloudsql.go** — Cloud SQL to cloud_resource/cloud_sql_instance.
 - **gcs.go** — GCS buckets to cloud_resource/gcs_bucket.
 - **gke.go** — GKE clusters to both cloud_resource and k8s_cluster observations.
 - **iam.go** — Service accounts to cloud_resource/service_account.
 
-### opsdb-import-k8s/
+### opsdb_import_k8s/
 - **cluster.go** — Cluster metadata to k8s_cluster observations.
 - **node.go** — Nodes to k8s_cluster_node observations.
 - **namespace.go** — Namespaces to k8s_namespace observations.
@@ -908,19 +908,19 @@ All importers follow identical structure. Differences are in which authority the
 - **service.go** — K8s Service objects to k8s_service observations.
 - **watcher.go** — Kubernetes watch API with level-triggered backstop. Full list on connect, incremental via watch, re-list on disconnect.
 
-### opsdb-import-identity/
+### opsdb_import_identity/
 - **okta.go** — Okta users, groups, memberships to ops_user, ops_group, ops_group_member observations.
 - **azuread.go** — Azure AD users, groups, memberships. Same target entities.
 - **ldap.go** — LDAP directory users, groups, memberships. Same target entities.
 
-### opsdb-import-monitoring/
+### opsdb_import_monitoring/
 - **prometheus.go** — Prometheus scrape configs, alert rules, metric metadata to prometheus_config, alert, observation_cache_metric.
 - **datadog.go** — Datadog monitors, alert definitions to monitor, alert observations.
 
-### opsdb-import-oncall/
+### opsdb_import_oncall/
 - **pagerduty.go** — PagerDuty schedules, assignments, escalation policies to on_call_schedule, on_call_assignment, escalation_path, escalation_step.
 - **opsgenie.go** — Opsgenie schedules and policies. Same target entities.
 
-### opsdb-import-secrets/
+### opsdb_import_secrets/
 - **vault.go** — Vault secret paths, metadata, rotation timestamps to authority_pointer observations. Never reads values.
 - **aws_sm.go** — AWS Secrets Manager secret metadata. Same pattern. Never reads values.

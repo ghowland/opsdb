@@ -290,7 +290,7 @@ The investment compounds. A well-stewarded suite makes the next runner cheap. Th
 
 Each of these refusals preserves a boundary that keeps the suite focused and the architecture clean.
 
-**Not a runner framework.** The library is callable, not controlling. A framework that owns the runner's main loop, event dispatch, and lifecycle would couple every runner's evolution to the framework's evolution. The runner owns its main loop. The runner calls library functions. The library does not call the runner. The `opsdb-runner-lib` in the FOSS project provides lifecycle helpers as composable functions, not as a controlling framework — the runner's main function calls the helpers, not the other way around.
+**Not a runner framework.** The library is callable, not controlling. A framework that owns the runner's main loop, event dispatch, and lifecycle would couple every runner's evolution to the framework's evolution. The runner owns its main loop. The runner calls library functions. The library does not call the runner. The `opsdb_runner_lib` in the FOSS project provides lifecycle helpers as composable functions, not as a controlling framework — the runner's main function calls the helpers, not the other way around.
 
 **Not a workflow engine.** The library does not mediate runner-to-runner messaging. Runners coordinate through OpsDB rows. A library that routed messages between runners would be an orchestrator by another name, violating the passive substrate commitment.
 

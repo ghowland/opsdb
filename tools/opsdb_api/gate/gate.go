@@ -1,4 +1,4 @@
-//# tools/opsdb-api/gate/gate.go
+//# tools/opsdb_api/gate/gate.go
 
 package gate
 
@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/ghowland/opsdb/internal/pg"
-	"github.com/ghowland/opsdb/tools/opsdb-api/auth"
-	"github.com/ghowland/opsdb/tools/opsdb-api/reportkeys"
-	runtimeschema "github.com/ghowland/opsdb/tools/opsdb-api/schema"
+	"github.com/ghowland/opsdb/tools/opsdb_api/auth"
+	"github.com/ghowland/opsdb/tools/opsdb_api/reportkeys"
+	runtimeschema "github.com/ghowland/opsdb/tools/opsdb_api/schema"
 )
 
 // Identity is a type alias so gate step files can reference auth.Identity

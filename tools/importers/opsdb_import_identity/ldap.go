@@ -1,4 +1,4 @@
-// === importers/opsdb-import-identity/ldap.go ===
+// === importers/opsdb_import_identity/ldap.go ===
 package identity
 
 import (

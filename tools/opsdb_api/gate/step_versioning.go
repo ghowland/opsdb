@@ -1,4 +1,4 @@
-//# tools/opsdb-api/gate/step_versioning.go
+//# tools/opsdb_api/gate/step_versioning.go
 
 package gate
 

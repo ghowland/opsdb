@@ -33,7 +33,7 @@ func main() {
 		os.Exit(2)
 	}
 
-	config, err := runner.Init("opsdb-import-k8s", *dosPath)
+	config, err := runner.Init("opsdb_import_k8s", *dosPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: failed to initialize: %v\n", err)
 		os.Exit(2)

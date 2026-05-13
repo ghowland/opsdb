@@ -8,7 +8,7 @@
 
 entity_type: runner_spec
 records:
-  - name: change-set-executor
+  - name: change_set_executor
     description: "Drains approved change sets by applying field changes"
     runner_spec_type: change_set_executor
     is_active: true
@@ -21,7 +21,7 @@ records:
       cycle_interval_seconds: 10
       dry_run: false
 
-  - name: schema-executor
+  - name: schema_executor
     description: "Applies approved schema change sets"
     runner_spec_type: schema_executor
     is_active: true
@@ -44,7 +44,7 @@ records:
       cycle_interval_seconds: 3600
       dry_run: false
 
-  - name: emergency-review-monitor
+  - name: emergency_review_monitor
     description: "Escalates overdue emergency change reviews"
     runner_spec_type: emergency_review_monitor
     is_active: true
@@ -56,7 +56,7 @@ records:
       cycle_interval_seconds: 900
       dry_run: false
 
-  - name: notification-runner
+  - name: notification_runner
     description: "Dispatches notifications for state transitions"
     runner_spec_type: notification_dispatch
     is_active: true

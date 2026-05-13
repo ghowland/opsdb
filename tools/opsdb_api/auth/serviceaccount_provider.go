@@ -1,4 +1,4 @@
-//# tools/opsdb-api/auth/serviceaccount_provider.go
+//# tools/opsdb_api/auth/serviceaccount_provider.go
 
 package auth
 

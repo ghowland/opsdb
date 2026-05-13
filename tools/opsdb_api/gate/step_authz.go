@@ -1,4 +1,4 @@
-//# tools/opsdb-api/gate/step_authz.go
+//# tools/opsdb_api/gate/step_authz.go
 
 package gate
 

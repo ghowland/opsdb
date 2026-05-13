@@ -1,4 +1,4 @@
-//# tools/opsdb-api/schema/runtime_schema.go
+//# tools/opsdb_api/schema/runtime_schema.go
 
 package schema
 

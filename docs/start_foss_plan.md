@@ -1,6 +1,6 @@
 ## OpsDB FOSS Technical Plan
 
-### Component 1: Schema Engine (opsdb-schema)
+### Component 1: Schema Engine (opsdb_schema)
 
 **What it does:** Reads the YAML schema repository, validates it against the closed vocabulary, and generates Postgres DDL. Applies schema changes idempotently to a running database.
 
@@ -62,11 +62,11 @@ The schema diff between current database state and desired YAML state is compute
 
 **Implementation language:** Go or Python. Go for a single binary distribution. Python for faster community contribution. I'd recommend Go — the loader is infrastructure tooling that should be dependency-minimal per the spec's own principles.
 
-**Deliverable:** A single binary, opsdb-schema, that takes a schema repo path and a Postgres connection string and makes the database match the schema, idempotently, within the evolution rules.
+**Deliverable:** A single binary, opsdb_schema, that takes a schema repo path and a Postgres connection string and makes the database match the schema, idempotently, within the evolution rules.
 
 ---
 
-### Component 2: API Gate (opsdb-api)
+### Component 2: API Gate (opsdb_api)
 
 **What it does:** Implements the sixteen API operations with the 10-step gate sequence. Serves as the only path to read or write OpsDB data. No direct database access for any consumer.
 
@@ -110,11 +110,11 @@ Stream operation: watch. Long-poll or WebSocket subscription to entity changes. 
 
 **Runner report key enforcement:** When a runner writes to observation_cache_metric, observation_cache_state, observation_cache_config, runner_job_output_var, or evidence_record, the API looks up runner_report_key rows for that runner's spec and target table. If the submitted key isn't in the declared set, reject. If the value doesn't match the report_key_data_json constraints, reject. Fail closed.
 
-**Starting configuration for development:** The YAML auth backend ships with a default admin user and a default runner service account. A seed script creates the minimum policy rows needed for the API to function — a default access control policy granting the admin role full access, and a default approval rule routing schema changes to the admin. This means you can deploy opsdb-schema, then opsdb-api, and immediately start reading and writing through the API with no external dependencies beyond Postgres.
+**Starting configuration for development:** The YAML auth backend ships with a default admin user and a default runner service account. A seed script creates the minimum policy rows needed for the API to function — a default access control policy granting the admin role full access, and a default approval rule routing schema changes to the admin. This means you can deploy opsdb_schema, then opsdb_api, and immediately start reading and writing through the API with no external dependencies beyond Postgres.
 
 **Implementation language:** Go. The API is infrastructure software. Single binary. Minimal dependencies. Embeds the YAML auth backend so zero-dependency startup works. OIDC and Vault backends as optional plugins or compile-time flags.
 
-**Deliverable:** A single binary, opsdb-api, that takes a Postgres connection string and a config file (specifying auth backend, listen address, TLS settings) and serves the full API surface.
+**Deliverable:** A single binary, opsdb_api, that takes a Postgres connection string and a config file (specifying auth backend, listen address, TLS settings) and serves the full API surface.
 
 ---
 
@@ -122,7 +122,7 @@ Stream operation: watch. Long-poll or WebSocket subscription to entity changes. 
 
 **What it does:** Ships the minimum set of runners needed to operate the OpsDB itself, plus a runner framework library that makes writing new runners trivial.
 
-**The runner framework library (opsdb-runner-lib):**
+**The runner framework library (opsdb_runner_lib):**
 
 Not a framework in the controlling sense — the spec explicitly forbids the library from owning the runner's main loop. It's a toolkit that provides the get/act/set lifecycle as composable functions.
 
@@ -165,7 +165,7 @@ The runner author writes compute_actions and execute_plan. Everything else is li
 
 **Change-Set Executor.** The most critical runner. Reads change_sets with status "approved." For each approved change-set, reads the change_set_field_change rows, applies each field change through the API's apply_change_set_field_change operation, writes the version sibling rows, and marks the change-set as applied. This is the runner that closes the change-management loop — without it, approved changes sit in the queue forever. Gating mode: direct write after verifying executor authority and change-set in approved state. Trigger: polls for approved change-sets on a short interval, maybe every 30 seconds.
 
-**Schema Executor.** Reads _schema_change_set rows with status "approved." Runs the opsdb-schema loader against the schema repo at the specified commit. Updates _schema_* tables. Marks the schema change-set as applied. This runner is how schema evolution happens in production — a schema change-set goes through approval, and this runner applies it. Gating mode: requires schema steward approval. Trigger: polls for approved schema change-sets.
+**Schema Executor.** Reads _schema_change_set rows with status "approved." Runs the opsdb_schema loader against the schema repo at the specified commit. Updates _schema_* tables. Marks the schema change-set as applied. This runner is how schema evolution happens in production — a schema change-set goes through approval, and this runner applies it. Gating mode: requires schema steward approval. Trigger: polls for approved schema change-sets.
 
 **Reaper.** Reads retention_policy rows. For each policy, queries the target table for rows older than the retention horizon. For cached observation tables, deletes directly (these are not change-managed). For change-managed entities, soft-deletes by setting is_active to false through a change-set if policy requires governance, or directly if policy permits. Writes runner_job recording what was reaped. Trigger: scheduled, maybe daily.
 
@@ -175,23 +175,23 @@ The runner author writes compute_actions and execute_plan. Everything else is li
 
 Each of these runners ships with its runner_spec YAML definition, including declared capabilities, target scopes, report keys, schedules, and bounds. A seed script registers them in the OpsDB through the API.
 
-**Deliverable:** The opsdb-runner-lib package (Go module), plus five runner binaries, plus their runner_spec YAML definitions, plus a seed script that registers them.
+**Deliverable:** The opsdb_runner_lib package (Go module), plus five runner binaries, plus their runner_spec YAML definitions, plus a seed script that registers them.
 
 ---
 
-### Component 4: Authority Importers (opsdb-import)
+### Component 4: Authority Importers (opsdb_import)
 
 **What it does:** Reads your live infrastructure and writes it to the OpsDB through the API. Not a one-time migration tool — these are pullers that run continuously as runners, following the get/act/set pattern.
 
 **The importer architecture:**
 
-Each importer is a runner built on opsdb-runner-lib. It reads from one authority (AWS, GCP, Kubernetes, Okta, PagerDuty, etc.), transforms the data to the OpsDB schema, and writes through the API using write_observation for cached state or submit_change_set for configuration data that should be governed.
+Each importer is a runner built on opsdb_runner_lib. It reads from one authority (AWS, GCP, Kubernetes, Okta, PagerDuty, etc.), transforms the data to the OpsDB schema, and writes through the API using write_observation for cached state or submit_change_set for configuration data that should be governed.
 
 The critical design decision: **importers write to observation cache tables by default, not to the main entity tables.** The first import of your AWS infrastructure writes to observation_cache_state with entity_type "cloud_resource" and state_key per resource. This lets the team see their infrastructure in the OpsDB immediately without committing to the OpsDB as source of truth for that data yet.
 
 When the team is ready to promote cached observations to governed entities — meaning AWS resource definitions live in the OpsDB and changes go through change-sets — a promotion runner reads observation_cache_state rows and submits change-sets to create the corresponding cloud_resource rows. This is a deliberate transition, not automatic. The team decides when each domain moves from "observed" to "governed."
 
-**AWS Importer (opsdb-import-aws):**
+**AWS Importer (opsdb_import_aws):**
 
 Reads from AWS APIs using the standard SDK. Requires IAM credentials with read-only access — the importer never writes to AWS, only reads.
 
@@ -209,11 +209,11 @@ Cloud accounts become cloud_account rows. Regions and availability zones map to 
 
 The importer handles pagination, rate limiting, and multi-region scanning. It writes _observed_time and _authority_id on every observation row. It declares runner_report_key entries for every state_key it writes.
 
-**GCP Importer (opsdb-import-gcp):**
+**GCP Importer (opsdb_import_gcp):**
 
 Same pattern, different APIs. GCE instances, Cloud SQL, GCS buckets, GKE clusters (which also populate k8s_cluster rows), IAM service accounts, VPCs, Cloud DNS zones. Maps to the same schema entities using different discriminator values.
 
-**Kubernetes Importer (opsdb-import-k8s):**
+**Kubernetes Importer (opsdb_import_k8s):**
 
 Reads from the Kubernetes API using in-cluster service account or kubeconfig.
 
@@ -221,23 +221,23 @@ Clusters become k8s_cluster rows linked to a service row (a Kubernetes cluster i
 
 The K8s importer uses the watch API for near-real-time state tracking. On reconnect it does a full list (level-triggered backstop) then resumes watching. This is the spec's reconciler pattern applied to the importer itself.
 
-**Identity Importer (opsdb-import-identity):**
+**Identity Importer (opsdb_import_identity):**
 
 Reads from Okta, Azure AD, or LDAP. Users become ops_user rows. Groups become ops_group rows. Group memberships become ops_group_member rows. Role assignments become ops_user_role_member rows.
 
 Ships with Okta and Azure AD backends. LDAP as a third option for orgs still running on-prem directory services.
 
-**Monitoring Importer (opsdb-import-monitoring):**
+**Monitoring Importer (opsdb_import_monitoring):**
 
 Reads from Prometheus or Datadog. Does not import raw metrics — the OpsDB is not a time-series database. Imports metric metadata, alert definitions, and current alert state.
 
 Prometheus scrape configs become prometheus_config and prometheus_scrape_target rows. Alert rules become monitor and alert rows. Currently firing alerts become alert_fire rows. Metric metadata (what metrics exist, their labels, their associated services) writes to observation_cache_metric.
 
-**On-Call Importer (opsdb-import-oncall):**
+**On-Call Importer (opsdb_import_oncall):**
 
 Reads from PagerDuty or Opsgenie. Schedules become on_call_schedule rows. Current assignments become on_call_assignment rows. Escalation policies become escalation_path and escalation_step rows.
 
-**Secret Metadata Importer (opsdb-import-secrets):**
+**Secret Metadata Importer (opsdb_import_secrets):**
 
 Reads from Vault or AWS Secrets Manager. Imports secret paths and metadata only — never values. Secret paths become authority_pointer rows with pointer_type "secret." Version metadata and rotation timestamps imported for tracking rotation compliance.
 
@@ -247,7 +247,7 @@ An org deploying OpsDB for the first time runs the importers against their live 
 
 This is the moment the value proposition becomes tangible. The org can immediately query across domains that were previously siloed. "Show me every service running on nodes in us-east-1, who is on call for each, and what alerts are configured" is one query across data that previously lived in AWS, Kubernetes, PagerDuty, and Datadog.
 
-**Deliverable:** Importer binaries — opsdb-import-aws, opsdb-import-gcp, opsdb-import-k8s, opsdb-import-identity, opsdb-import-monitoring, opsdb-import-oncall, opsdb-import-secrets. Each with runner_spec YAML definitions, report key declarations, and documentation mapping source fields to schema entities. Plus a quickstart script that deploys all relevant importers for a given environment profile (aws-k8s, gcp-k8s, aws-bare-metal, etc).
+**Deliverable:** Importer binaries — opsdb_import_aws, opsdb_import_gcp, opsdb_import_k8s, opsdb_import_identity, opsdb_import_monitoring, opsdb_import_oncall, opsdb_import_secrets. Each with runner_spec YAML definitions, report key declarations, and documentation mapping source fields to schema entities. Plus a quickstart script that deploys all relevant importers for a given environment profile (aws-k8s, gcp-k8s, aws-bare-metal, etc).
 
 ---
 
@@ -255,9 +255,9 @@ This is the moment the value proposition becomes tangible. The org can immediate
 
 The getting-started experience for an org:
 
-**Step 1:** Clone the schema repo. Run opsdb-schema against a fresh Postgres database. Database is ready. Takes under a minute.
+**Step 1:** Clone the schema repo. Run opsdb_schema against a fresh Postgres database. Database is ready. Takes under a minute.
 
-**Step 2:** Run the API seed script to create default admin user and base policies. Start opsdb-api. API is serving. Takes under a minute.
+**Step 2:** Run the API seed script to create default admin user and base policies. Start opsdb_api. API is serving. Takes under a minute.
 
 **Step 3:** Configure credentials for your authorities — AWS access keys, kubeconfig, Okta API token, PagerDuty API key, Prometheus endpoint. Run the quickstart script that deploys the relevant importers. Data starts flowing. Within an hour your full infrastructure is queryable in the OpsDB.
 

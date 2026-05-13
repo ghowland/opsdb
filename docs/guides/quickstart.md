@@ -31,7 +31,7 @@ export OPSDB_DSN="postgres://localhost:5432/opsdb_dev?sslmode=disable"
 ### 3. Apply the schema
 
 ```bash
-bin/opsdb-schema apply --repo . --dsn "$OPSDB_DSN" --verbose
+bin/opsdb_schema apply --repo . --dsn "$OPSDB_DSN" --verbose
 ```
 
 This reads every YAML file under `schema/`, validates against the meta-schema,
@@ -53,7 +53,7 @@ For local development, use one of the example DOS directories:
 
 ```bash
 export OPSDB_PROD0_DSN="$OPSDB_DSN"
-bin/opsdb-api --dos dos/prod-0
+bin/opsdb_api --dos dos/prod-0
 ```
 
 The API starts on port 8080 using the YAML auth provider with the bootstrap

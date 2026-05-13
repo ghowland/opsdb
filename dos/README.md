@@ -75,7 +75,7 @@ operational reality is covered by exactly one substrate, no gaps, no overlaps.
 |-----------|----------|------------|
 | Schema repository | `schema/` | One schema, N databases. Same entity types everywhere. |
 | Library suite | `internal/`, runner lib | Same contracts, same behavior, same runner code. |
-| API code | `tools/opsdb-api/` | One codebase deployed N times. |
+| API code | `tools/opsdb_api/` | One codebase deployed N times. |
 | Change management discipline | Same approval rules pattern | Same governance model at each substrate. |
 | Runner binaries | `tools/runners/`, `tools/importers/` | Same executables, different config. |
 
@@ -132,10 +132,10 @@ dos/
 
 bash
 # 1. Apply schema to the substrate's database
-OPSDB_DSN="postgres://..." opsdb-schema apply --repo . --dsn "$OPSDB_DSN"
+OPSDB_DSN="postgres://..." opsdb_schema apply --repo . --dsn "$OPSDB_DSN"
 
 # 2. Start the API pointing at this substrate's DOS config
-opsdb-api --dos dos/prod-0
+opsdb_api --dos dos/prod-0
 
 # 3. Seed initial data
 scripts/seed.sh --dos dos/prod-0 --api http://localhost:8080

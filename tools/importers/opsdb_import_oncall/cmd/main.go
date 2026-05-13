@@ -28,7 +28,7 @@ func main() {
 		os.Exit(2)
 	}
 
-	config, err := runner.Init("opsdb-import-oncall", *dosPath)
+	config, err := runner.Init("opsdb_import_oncall", *dosPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: failed to initialize: %v\n", err)
 		os.Exit(2)

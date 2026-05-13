@@ -6,7 +6,7 @@
 
 ### Goal
 
-A single Go binary, `opsdb-schema`, that reads a YAML schema repository and idempotently applies it to Postgres. The binary enforces the spec's closed vocabulary, naming conventions, reserved field injection, versioning sibling generation, and evolution rules mechanically. No human discipline required — if it violates the spec, the tool rejects it.
+A single Go binary, `opsdb_schema`, that reads a YAML schema repository and idempotently applies it to Postgres. The binary enforces the spec's closed vocabulary, naming conventions, reserved field injection, versioning sibling generation, and evolution rules mechanically. No human discipline required — if it violates the spec, the tool rejects it.
 
 ---
 
@@ -15,7 +15,7 @@ A single Go binary, `opsdb-schema`, that reads a YAML schema repository and idem
 The schema repo follows the spec's bootstrap sequence. The loader processes files in a defined order so that foreign key references resolve against already-loaded entities.
 
 ```
-opsdb-schema-repo/
+opsdb_schema-repo/
 ├── meta/
 │   └── _schema_meta.yaml          # meta-schema: what a valid entity file looks like
 ├── conventions/
@@ -524,9 +524,9 @@ The core feature. The loader runs against an existing database with data and mak
 **Scope argument:**
 
 ```
-opsdb-schema apply --repo /path/to/repo --dsn postgres://... 
-opsdb-schema apply --repo /path/to/repo --dsn postgres://... --scope "cloud_resource"
-opsdb-schema apply --repo /path/to/repo --dsn postgres://... --scope "cloud_resource/cloud_data_json"
+opsdb_schema apply --repo /path/to/repo --dsn postgres://... 
+opsdb_schema apply --repo /path/to/repo --dsn postgres://... --scope "cloud_resource"
+opsdb_schema apply --repo /path/to/repo --dsn postgres://... --scope "cloud_resource/cloud_data_json"
 ```
 
 No scope means full database. Entity name means that entity and its sibling. Entity/field means that specific field only.
@@ -595,7 +595,7 @@ These tables make the schema queryable through the API like any other data. "Sho
 ### 10. CLI Interface
 
 ```
-opsdb-schema [command] [flags]
+opsdb_schema [command] [flags]
 
 Commands:
   init        Create a new schema repository with meta-schema and conventions
@@ -614,17 +614,17 @@ Flags:
   --version   Show version
 ```
 
-**`opsdb-schema init`** creates the directory structure, meta-schema, conventions file, and an empty directory.yaml. Starting point for a new OpsDB.
+**`opsdb_schema init`** creates the directory structure, meta-schema, conventions file, and an empty directory.yaml. Starting point for a new OpsDB.
 
-**`opsdb-schema validate`** checks all YAML files against the meta-schema, resolves FK references, detects cycles, verifies naming conventions, checks enum values for validity, verifies json fields have json_type_discriminator. No database connection needed. Runs in CI as a schema PR check.
+**`opsdb_schema validate`** checks all YAML files against the meta-schema, resolves FK references, detects cycles, verifies naming conventions, checks enum values for validity, verifies json fields have json_type_discriminator. No database connection needed. Runs in CI as a schema PR check.
 
-**`opsdb-schema plan`** does everything `apply` does except execute the DDL. Prints the DDL that would be executed, or prints the evolution violations that would block it. This is what you run before `apply` to see what will happen.
+**`opsdb_schema plan`** does everything `apply` does except execute the DDL. Prints the DDL that would be executed, or prints the evolution violations that would block it. This is what you run before `apply` to see what will happen.
 
-**`opsdb-schema diff`** compares YAML against the current database state and shows the differences in a human-readable format — new entities, new fields, changed constraints, etc. No DDL generated, just the diff.
+**`opsdb_schema diff`** compares YAML against the current database state and shows the differences in a human-readable format — new entities, new fields, changed constraints, etc. No DDL generated, just the diff.
 
-**`opsdb-schema apply`** executes the full pipeline: validate YAML, connect to database, read current state, compute diff, check evolution rules, generate DDL, execute DDL in a transaction, update _schema_* tables, commit. If any step fails, the transaction rolls back and the database is unchanged.
+**`opsdb_schema apply`** executes the full pipeline: validate YAML, connect to database, read current state, compute diff, check evolution rules, generate DDL, execute DDL in a transaction, update _schema_* tables, commit. If any step fails, the transaction rolls back and the database is unchanged.
 
-**`opsdb-schema export`** reads an existing Postgres database and generates YAML entity files from its schema. This enables adopting the tool against an existing database. The exported files may need manual cleanup to match conventions, but they provide a starting point.
+**`opsdb_schema export`** reads an existing Postgres database and generates YAML entity files from its schema. This enables adopting the tool against an existing database. The exported files may need manual cleanup to match conventions, but they provide a starting point.
 
 ---
 
@@ -677,12 +677,12 @@ Flags:
 Single binary, statically compiled Go. No CGO dependencies. The only runtime dependency is a reachable Postgres instance.
 
 ```
-go build -o opsdb-schema ./cmd/opsdb-schema
+go build -o opsdb_schema ./cmd/opsdb_schema
 ```
 
 Releases as GitHub releases with binaries for linux/amd64, linux/arm64, darwin/amd64, darwin/arm64. Container image for running in CI or Kubernetes.
 
-The schema repository ships as a separate git repo (`opsdb-schema-repo`) containing the full 138-entity schema in YAML. The binary and the schema repo together are the complete Phase 1 deliverable.
+The schema repository ships as a separate git repo (`opsdb_schema-repo`) containing the full 138-entity schema in YAML. The binary and the schema repo together are the complete Phase 1 deliverable.
 
 ---
 
@@ -692,11 +692,11 @@ Phase 1 is done when:
 
 1. The full 138-entity schema from the spec exists as YAML files in the repo, valid against the meta-schema.
 
-2. `opsdb-schema validate` passes on the complete repo with zero errors.
+2. `opsdb_schema validate` passes on the complete repo with zero errors.
 
-3. `opsdb-schema apply` against a fresh Postgres instance creates all 138 tables, all versioning sibling tables, all indexes, all constraints, all _schema_* metadata rows, and the audit_log_entry REVOKE grants, in a single transaction.
+3. `opsdb_schema apply` against a fresh Postgres instance creates all 138 tables, all versioning sibling tables, all indexes, all constraints, all _schema_* metadata rows, and the audit_log_entry REVOKE grants, in a single transaction.
 
-4. A second `opsdb-schema apply` with no changes produces zero DDL.
+4. A second `opsdb_schema apply` with no changes produces zero DDL.
 
 5. Every allowed evolution type (new field, new entity, enum widening, range widening, length widening, new index) succeeds and updates _schema_* tables correctly.
 

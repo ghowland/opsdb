@@ -1,4 +1,4 @@
-// === importers/opsdb-import-identity/okta.go ===
+// === importers/opsdb_import_identity/okta.go ===
 package identity
 
 import (

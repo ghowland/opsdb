@@ -15,12 +15,12 @@ func main() {
 	flag.Parse()
 
 	if *dosPath == "" {
-		fmt.Fprintf(os.Stderr, "usage: change-set-executor --dos <dos-directory>\n")
+		fmt.Fprintf(os.Stderr, "usage: change_set_executor --dos <dos-directory>\n")
 		os.Exit(2)
 	}
 	_ = dosPath
 
-	config, err := runner.Init("change-set-executor")
+	config, err := runner.Init("change_set_executor")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "init failed: %v\n", err)
 		os.Exit(1)

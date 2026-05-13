@@ -1,6 +1,6 @@
 # OpsDB Runner Library — Technical Specification
 
-## Package: `tools/opsdb-runner-lib/` (package `runnerlib`)
+## Package: `tools/opsdb_runner_lib/` (package `runnerlib`)
 
 ### Overview
 

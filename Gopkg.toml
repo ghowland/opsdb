@@ -14,9 +14,9 @@ toml
   # Pure Go Postgres driver with connection pooling, LISTEN/NOTIFY,
   # advisory locks, COPY protocol, and pgx-native query interface.
   # Used by: internal/pg/conn.go, internal/pg/tx.go, internal/pg/advisory_lock.go,
-  #          tools/opsdb-schema/loader/applier.go, tools/opsdb-schema/loader/differ.go,
-  #          tools/opsdb-schema/loader/meta.go,
-  #          tools/opsdb-api/gate/step_execute.go, tools/opsdb-api/operations/*.go
+  #          tools/opsdb_schema/loader/applier.go, tools/opsdb_schema/loader/differ.go,
+  #          tools/opsdb_schema/loader/meta.go,
+  #          tools/opsdb_api/gate/step_execute.go, tools/opsdb_api/operations/*.go
 
 [[constraint]]
   name = "github.com/lib/pq"
@@ -33,10 +33,10 @@ toml
   # YAML parser and emitter. Handles all schema YAML files, DOS config,
   # seed data, meta-schema, reserved conventions, JSON payload schemas,
   # directory.yaml manifests.
-  # Used by: tools/opsdb-schema/loader/parser.go,
-  #          tools/opsdb-api/config/config.go,
-  #          tools/opsdb-api/auth/yaml_provider.go,
-  #          tools/opsdb-runner-lib/config.go,
+  # Used by: tools/opsdb_schema/loader/parser.go,
+  #          tools/opsdb_api/config/config.go,
+  #          tools/opsdb_api/auth/yaml_provider.go,
+  #          tools/opsdb_runner_lib/config.go,
   #          internal/conventions/reserved.go,
   #          all importers (DOS config parsing)
 
@@ -46,7 +46,7 @@ toml
   name = "golang.org/x/crypto"
   version = "0.31.*"
   # bcrypt for YAML auth provider password hashing.
-  # Used by: tools/opsdb-api/auth/yaml_provider.go (bcrypt.CompareHashAndPassword),
+  # Used by: tools/opsdb_api/auth/yaml_provider.go (bcrypt.CompareHashAndPassword),
   #          scripts and tooling for generating bcrypt hashes for seed users
 
 # --- Authentication ---
@@ -55,21 +55,21 @@ toml
   name = "github.com/coreos/go-oidc/v3"
   version = "3.12.*"
   # OIDC token validation, JWKS fetching and caching, issuer discovery.
-  # Used by: tools/opsdb-api/auth/oidc_provider.go
+  # Used by: tools/opsdb_api/auth/oidc_provider.go
 
 [[constraint]]
   name = "golang.org/x/oauth2"
   version = "0.25.*"
   # OAuth2 client for OIDC token refresh and service account token exchange.
-  # Used by: tools/opsdb-api/auth/oidc_provider.go (token refresh),
-  #          tools/opsdb-api/auth/serviceaccount_provider.go
+  # Used by: tools/opsdb_api/auth/oidc_provider.go (token refresh),
+  #          tools/opsdb_api/auth/serviceaccount_provider.go
 
 [[constraint]]
   name = "github.com/go-jose/go-jose/v4"
   version = "4.0.*"
   # JOSE/JWT signing and verification for service account tokens.
-  # Used by: tools/opsdb-api/auth/serviceaccount_provider.go (JWT validation),
-  #          tools/opsdb-api/auth/oidc_provider.go (JWT parsing)
+  # Used by: tools/opsdb_api/auth/serviceaccount_provider.go (JWT validation),
+  #          tools/opsdb_api/auth/oidc_provider.go (JWT parsing)
 
 # --- Identifiers ---
 
@@ -77,10 +77,10 @@ toml
   name = "github.com/google/uuid"
   version = "1.6.*"
   # UUID generation for correlation IDs, request IDs, idempotency keys.
-  # Used by: tools/opsdb-runner-lib/logging.go (correlation ID generation),
-  #          tools/opsdb-runner-lib/api_client.go (request IDs),
-  #          tools/opsdb-api/gate/gate.go (request ID generation),
-  #          tools/opsdb-api/gate/step_audit.go (audit entry correlation)
+  # Used by: tools/opsdb_runner_lib/logging.go (correlation ID generation),
+  #          tools/opsdb_runner_lib/api_client.go (request IDs),
+  #          tools/opsdb_api/gate/gate.go (request ID generation),
+  #          tools/opsdb_api/gate/step_audit.go (audit entry correlation)
 
 # --- Standard Library Usage (no external dependency) ---
 # These are documented here for completeness but require no constraint.
@@ -89,7 +89,7 @@ toml
 # crypto/tls         - TLS configuration for API server and outbound connections
 # database/sql       - Standard database interface used alongside pgx
 # encoding/json      - JSON marshal/unmarshal for API request/response, typed payloads
-# os/exec            - Git operations in schema-executor runner
+# os/exec            - Git operations in schema_executor runner
 # os/signal          - Graceful shutdown signal handling in all runners
 # text/template      - NOT USED (templates are deliberately dumb, no Go templates)
 # regexp             - NOT USED (forbidden by schema construction principles)
@@ -123,7 +123,7 @@ toml
 #   Runner library wraps slog with runner context fields.
 #
 # No retry library (go-retryablehttp, backoff)
-#   Retry logic is 40 lines in opsdb-runner-lib/retry.go.
+#   Retry logic is 40 lines in opsdb_runner_lib/retry.go.
 #   External library would add dependency for trivial code.
 #
 # No test container library (testcontainers-go)

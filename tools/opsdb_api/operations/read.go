@@ -1,4 +1,4 @@
-//# tools/opsdb-api/operations/read.go
+//# tools/opsdb_api/operations/read.go
 
 package operations
 
@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"github.com/ghowland/opsdb/internal/pg"
-	"github.com/ghowland/opsdb/tools/opsdb-api/auth"
-	"github.com/ghowland/opsdb/tools/opsdb-api/gate"
-	runtimeschema "github.com/ghowland/opsdb/tools/opsdb-api/schema"
+	"github.com/ghowland/opsdb/tools/opsdb_api/auth"
+	"github.com/ghowland/opsdb/tools/opsdb_api/gate"
+	runtimeschema "github.com/ghowland/opsdb/tools/opsdb_api/schema"
 
 	"github.com/google/uuid"
 )

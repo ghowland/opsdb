@@ -1,4 +1,4 @@
-//# tools/opsdb-api/gate/step_audit.go
+//# tools/opsdb_api/gate/step_audit.go
 
 package gate
 

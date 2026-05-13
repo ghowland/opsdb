@@ -28,7 +28,7 @@ The return values are all `nil, nil` or `return nil` — the functions compile, 
 
 The IOSE doc (`go_code_iose.md`) is the spec's IOSE worldview — Inputs, Outputs, Side Effects — applied to every Go file in the repo. This is the model-for-control version: accurate, synced, lifetime-maintained. Let me trace the major subsystems.
 
-### Schema Engine Pipeline (`tools/opsdb-schema/loader/`)
+### Schema Engine Pipeline (`tools/opsdb_schema/loader/`)
 
 This is the bootstrap path. The loader turns YAML files into a running Postgres database. The pipeline has strict phase ordering:
 
@@ -50,7 +50,7 @@ This is the bootstrap path. The loader turns YAML files into a running Postgres 
 
 **Meta populator** runs in the same transaction as the apply. It creates the `_schema_version` row, upserts entity types into `_schema_entity_type`, fields into `_schema_field`, relationships into `_schema_relationship`. This is what makes the schema self-describing — after apply, the database contains its own schema metadata as queryable rows. The runtime schema cache in the API reads from these tables.
 
-### API Gate Pipeline (`tools/opsdb-api/`)
+### API Gate Pipeline (`tools/opsdb_api/`)
 
 The gate is the single path into OpsDB. Every interaction passes through 10 steps, enforced uniformly.
 
@@ -74,7 +74,7 @@ The gate is the single path into OpsDB. Every interaction passes through 10 step
 
 **Step 10 (response)** assembles the return value. On success: the result data, affected row IDs, computed approvals, version info, warnings, and the audit entry ID for correlation. On rejection: the structured error identifying which step rejected, what code, what detail.
 
-### Runner Library (`tools/opsdb-runner-lib/`)
+### Runner Library (`tools/opsdb_runner_lib/`)
 
 The library is explicitly not a framework. The spec boundary is precise: the library is callable, it doesn't own the runner's main loop. The runner calls `Init`, `ShouldRun`, `WaitForNextCycle`, `Shutdown`. The library doesn't call back into the runner.
 

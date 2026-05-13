@@ -1,4 +1,4 @@
-// === importers/opsdb-import-identity/azuread.go ===
+// === importers/opsdb_import_identity/azuread.go ===
 package identity
 
 import (

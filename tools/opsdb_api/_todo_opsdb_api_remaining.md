@@ -2,7 +2,7 @@
 
 ## Document Purpose
 
-This document describes the current state of the `tools/opsdb-api/` package: what has been written, what each file does, how the files compose, what integration issues are known and deferred, and what remains to be built. A developer (or LLM) reading this document should be able to continue the work without re-reading the nine OPSDB spec papers or the prior conversation.
+This document describes the current state of the `tools/opsdb_api/` package: what has been written, what each file does, how the files compose, what integration issues are known and deferred, and what remains to be built. A developer (or LLM) reading this document should be able to continue the work without re-reading the nine OPSDB spec papers or the prior conversation.
 
 ---
 
@@ -26,7 +26,7 @@ Three populations consume the API through scoped access: humans operating the sy
 ## 2. Package Structure
 
 ```
-tools/opsdb-api/
+tools/opsdb_api/
 ├── cmd/
 │   └── main.go                  — CLI entrypoint, server startup, graceful shutdown
 ├── config/

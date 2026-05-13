@@ -1,4 +1,4 @@
-// === importers/opsdb-import-aws/vpc.go ===
+// === importers/opsdb_import_aws/vpc.go ===
 package main
 
 import (
@@ -168,21 +168,21 @@ func importSubnets(client *ec2.Client, ctx context.Context, region string, batch
 				StateKey:   "aws_subnet",
 				Value:      name,
 				DataJSON: map[string]interface{}{
-					"cloud_resource_type":          "cloud_network",
-					"subnet_id":                   subnetID,
-					"name":                         name,
-					"vpc_id":                       aws.ToString(subnet.VpcId),
-					"cidr_block":                   aws.ToString(subnet.CidrBlock),
-					"availability_zone":            aws.ToString(subnet.AvailabilityZone),
-					"availability_zone_id":         aws.ToString(subnet.AvailabilityZoneId),
-					"state":                        string(subnet.State),
-					"available_ip_count":           availableIPs,
-					"default_for_az":               aws.ToBool(subnet.DefaultForAz),
-					"map_public_ip_on_launch":      aws.ToBool(subnet.MapPublicIpOnLaunch),
-					"assign_ipv6_on_creation":      aws.ToBool(subnet.AssignIpv6AddressOnCreation),
-					"owner_id":                     aws.ToString(subnet.OwnerId),
-					"region":                       region,
-					"tags":                         tags,
+					"cloud_resource_type":     "cloud_network",
+					"subnet_id":               subnetID,
+					"name":                    name,
+					"vpc_id":                  aws.ToString(subnet.VpcId),
+					"cidr_block":              aws.ToString(subnet.CidrBlock),
+					"availability_zone":       aws.ToString(subnet.AvailabilityZone),
+					"availability_zone_id":    aws.ToString(subnet.AvailabilityZoneId),
+					"state":                   string(subnet.State),
+					"available_ip_count":      availableIPs,
+					"default_for_az":          aws.ToBool(subnet.DefaultForAz),
+					"map_public_ip_on_launch": aws.ToBool(subnet.MapPublicIpOnLaunch),
+					"assign_ipv6_on_creation": aws.ToBool(subnet.AssignIpv6AddressOnCreation),
+					"owner_id":                aws.ToString(subnet.OwnerId),
+					"region":                  region,
+					"tags":                    tags,
 				},
 			}
 			results = append(results, obs)

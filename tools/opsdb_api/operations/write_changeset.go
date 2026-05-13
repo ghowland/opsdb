@@ -1,4 +1,4 @@
-//# tools/opsdb-api/operations/write_changeset.go
+//# tools/opsdb_api/operations/write_changeset.go
 
 package operations
 
@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ghowland/opsdb/tools/opsdb-api/gate"
+	"github.com/ghowland/opsdb/tools/opsdb_api/gate"
 )
 
 // ---------------------------------------------------------------------------

@@ -264,35 +264,35 @@ These tables make the schema queryable through the API like any other data. "Sho
 
 ## CLI Interface
 
-The engine ships as a single binary, `opsdb-schema`, with six commands.
+The engine ships as a single binary, `opsdb_schema`, with six commands.
 
-### opsdb-schema init
+### opsdb_schema init
 
 Creates a new schema repository with the directory structure, meta-schema file, conventions file, and an empty directory.yaml. Starting point for a new OpsDB or for organizations extending the standard schema.
 
-### opsdb-schema validate
+### opsdb_schema validate
 
 Validates all YAML files against the meta-schema without connecting to a database. Checks that every key is from the recognized vocabulary, every type is one of the nine allowed types, every constraint is valid for its type, every foreign key reference points to an entity that exists (and is loaded before the referencing entity), every name follows conventions, and no forbidden patterns are present.
 
 This command runs in CI as a schema PR check. No database needed — pure YAML validation.
 
-### opsdb-schema plan
+### opsdb_schema plan
 
 Does everything `apply` does except execute the DDL. Connects to the database, reads current state, computes the diff, checks evolution rules, generates the DDL, and prints it. If any evolution violations would block the apply, those are printed instead.
 
 This is the "what would happen" command. Run it before apply to see the exact DDL that will execute, or to see why a proposed schema change is forbidden.
 
-### opsdb-schema apply
+### opsdb_schema apply
 
 The full pipeline. Validate YAML. Connect to database. Acquire advisory lock. Read current state from `_schema_*` tables (or information_schema on bootstrap). Compute diff. Check evolution rules — if any forbidden change is detected, print the error and exit without modifying the database. Generate DDL for allowed changes. Execute DDL in a transaction. Update `_schema_*` tables. Commit. Release advisory lock.
 
 If any step fails, the transaction rolls back. The database is either fully updated or completely unchanged.
 
-### opsdb-schema diff
+### opsdb_schema diff
 
 Compares YAML against current database state and shows differences in a human-readable format. New entities, new fields, changed constraints, deprecated fields. No DDL generated, no evolution rules checked — just the diff. Useful for understanding what has changed between the YAML and the database without the context of whether those changes are allowed.
 
-### opsdb-schema export
+### opsdb_schema export
 
 Reads an existing Postgres database and generates YAML entity files from its schema. This enables adopting the engine against an existing database that was created through other means. The exported files follow the naming conventions and vocabulary but may need manual cleanup — inferred types might not perfectly match intent, and relationships might need annotation.
 

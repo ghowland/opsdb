@@ -1,4 +1,4 @@
-//# tools/opsdb-api/gate/step_execute.go
+//# tools/opsdb_api/gate/step_execute.go
 
 package gate
 
@@ -350,7 +350,7 @@ func executeEmergencyApply(ctx *GateContext, tx *pg.Tx) error {
 		return fmt.Errorf("emergency change_set_field_change insert failed: %w", err)
 	}
 
-	// Create the emergency review row. The emergency-review-monitor runner
+	// Create the emergency review row. The emergency_review_monitor runner
 	// watches for these and escalates when the deadline passes without review.
 	_, err = pg.ExecInTx(tx,
 		"INSERT INTO change_set_emergency_review "+
@@ -374,7 +374,7 @@ func executeEmergencyApply(ctx *GateContext, tx *pg.Tx) error {
 // ---------------------------------------------------------------------------
 
 // executeApplyFieldChange applies one field change from an approved change
-// set. Called by the change-set-executor runner. Reads the pending field
+// set. Called by the change_set_executor runner. Reads the pending field
 // change to get the target entity, field, and value; updates the entity
 // row; marks the field change as applied; and optionally inserts a version
 // sibling row if step 6 prepared versioning info.

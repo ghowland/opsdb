@@ -3,29 +3,29 @@
 # Enabled Runners — prod-1
 
 runners:
-  - name: change-set-executor
+  - name: change_set_executor
     enabled: true
     instances: 1
-    service_account: sa-change-set-executor
+    service_account: sa-change_set_executor
 
-  - name: schema-executor
+  - name: schema_executor
     enabled: true
     instances: 1
-    service_account: sa-schema-executor
+    service_account: sa-schema_executor
 
   - name: reaper
     enabled: true
     instances: 1
     service_account: sa-reaper
 
-  - name: emergency-review-monitor
+  - name: emergency_review_monitor
     enabled: true
     instances: 1
-    service_account: sa-emergency-review-monitor
+    service_account: sa-emergency_review_monitor
 
-  - name: notification-runner
+  - name: notification_runner
     enabled: true
     instances: 1
-    service_account: sa-notification-runner
+    service_account: sa-notification_runner
 
 

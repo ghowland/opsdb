@@ -1,4 +1,4 @@
-//# tools/opsdb-api/reportkeys/enforcer.go
+//# tools/opsdb_api/reportkeys/enforcer.go
 
 package reportkeys
 

@@ -1,4 +1,4 @@
-//# tools/opsdb-api/concurrency/optimistic.go
+//# tools/opsdb_api/concurrency/optimistic.go
 
 package concurrency
 

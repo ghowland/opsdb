@@ -64,7 +64,7 @@ export OPSDB_PROD2_DSN="postgres://..."
 ### 7. Apply the same schema
 
 ```bash
-bin/opsdb-schema apply --repo . --dsn "$OPSDB_PROD2_DSN" --verbose
+bin/opsdb_schema apply --repo . --dsn "$OPSDB_PROD2_DSN" --verbose
 ```
 
 Same schema YAML, same loader, same DDL. The database is structurally
@@ -73,7 +73,7 @@ identical to every other substrate.
 ### 8. Start the API and seed
 
 ```bash
-bin/opsdb-api --dos dos/prod-2
+bin/opsdb_api --dos dos/prod-2
 scripts/seed.sh --dos dos/prod-2 --api http://localhost:8080
 ```
 

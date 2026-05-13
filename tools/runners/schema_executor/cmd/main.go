@@ -15,19 +15,19 @@ func main() {
 	flag.Parse()
 
 	if *dosPath == "" {
-		fmt.Fprintf(os.Stderr, "usage: schema-executor --dos <dos-directory>\n")
+		fmt.Fprintf(os.Stderr, "usage: schema_executor --dos <dos-directory>\n")
 		os.Exit(2)
 	}
 	_ = dosPath
 
-	config, err := runner.Init("schema-executor")
+	config, err := runner.Init("schema_executor")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "init failed: %v\n", err)
 		os.Exit(1)
 	}
 
 	// Schema executor needs direct database access for DDL execution.
-	// Read DSN from environment — same variable the opsdb-schema CLI uses.
+	// Read DSN from environment — same variable the opsdb_schema CLI uses.
 	dsn := os.Getenv("OPSDB_DSN")
 	if dsn == "" {
 		fmt.Fprintf(os.Stderr, "error: OPSDB_DSN environment variable required for schema executor\n")

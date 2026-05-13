@@ -1,4 +1,4 @@
-//# tools/opsdb-api/config/config.go
+//# tools/opsdb_api/config/config.go
 
 package config
 

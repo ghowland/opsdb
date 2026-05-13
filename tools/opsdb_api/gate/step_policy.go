@@ -1,4 +1,4 @@
-//# tools/opsdb-api/gate/step_policy.go
+//# tools/opsdb_api/gate/step_policy.go
 
 package gate
 

@@ -243,9 +243,9 @@ A3|delegates|AD1
 A3|delegates|AD2
 A3|owns|AD3
 A4|enables|passive-substrate-commitment
-A4|implies|notification-runner-pattern
-A5|implies|notification-runner-pattern
-A6|implies|change-set-executor-runner
+A4|implies|notification_runner-pattern
+A5|implies|notification_runner-pattern
+A6|implies|change_set_executor-runner
 A8|implements|all-operations
 A9|enables|change-without-redeployment
 A11|prevents|DoS-via-regex
@@ -292,8 +292,8 @@ AVE6|interacts_with|AVE7 (sharded retention)
 AVE8|never|side-channel
 AC2|fails_loud|true
 AC2|prevents|silent-overwrites+post-approval-state-drift
-LC4|observed_by|notification-runner
-LC5|observed_by|change-set-executor-runner
+LC4|observed_by|notification_runner
+LC5|observed_by|change_set_executor-runner
 SR4|computes|change_set_approval_required rows
 SR6|transitions|change_set to approved when all is_fulfilled
 AV1|blocks_on_failure|true

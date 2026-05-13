@@ -136,7 +136,7 @@ By N=3, the pipeline is mature. Adding the fourth, fifth, or tenth substrate is 
 
 **Schema deployment.** The schema steward merges changes to the schema repository. The schema engine is run against each substrate's database. The order doesn't matter because schema changes are additive — adding a field at substrate A before substrate B doesn't create inconsistency, it just means substrate A has the field slightly earlier.
 
-In practice, a CI pipeline runs `opsdb-schema apply` against each substrate's database in sequence. If any substrate's apply fails (which shouldn't happen for additive changes against valid schemas, but could happen due to connectivity or permission issues), the pipeline stops and alerts. The failed substrate is behind by one schema version until the issue is resolved. This is acceptable because schema changes are additive — the old schema is a subset of the new schema, so runners built against the old schema continue working.
+In practice, a CI pipeline runs `opsdb_schema apply` against each substrate's database in sequence. If any substrate's apply fails (which shouldn't happen for additive changes against valid schemas, but could happen due to connectivity or permission issues), the pipeline stops and alerts. The failed substrate is behind by one schema version until the issue is resolved. This is acceptable because schema changes are additive — the old schema is a subset of the new schema, so runners built against the old schema continue working.
 
 **API deployment.** The same API binary is deployed to each substrate's API endpoint. Standard deployment practices apply — rolling update, health checks, rollback on failure. The deployments are independent — updating the API at substrate A does not require updating at substrate B simultaneously, though keeping versions aligned is good practice.
 
@@ -196,7 +196,7 @@ When the organization determines that a new substrate is needed (validated again
 
 Copy an existing DOS directory as a starting point. Edit config.yaml with the new substrate name and database connection. Edit seed files for the new environment — site name, admin user, base policies, authority configurations. Edit runner and importer enabled lists for what this substrate needs.
 
-Create the database. Run `opsdb-schema apply` against it — the same schema, deployed to a new database. Run the seed script. Start the API. Start runners and importers.
+Create the database. Run `opsdb_schema apply` against it — the same schema, deployed to a new database. Run the seed script. Start the API. Start runners and importers.
 
 The new substrate uses the same schema, same tools, same libraries as every other substrate. Only data and configuration diverge. This is N=3 (or N=4, or N=10) with zero code changes, zero schema changes, and zero library changes.
 

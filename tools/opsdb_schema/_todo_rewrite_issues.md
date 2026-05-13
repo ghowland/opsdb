@@ -1,6 +1,6 @@
 # OpsDB Schema Engine — Technical Specification
 
-## Package: `tools/opsdb-schema/loader/` (package `loader`) + `tools/opsdb-schema/cmd/` (package `main`)
+## Package: `tools/opsdb_schema/loader/` (package `loader`) + `tools/opsdb_schema/cmd/` (package `main`)
 
 ### Overview
 
@@ -11,7 +11,7 @@ Twelve files: one CLI entrypoint and eleven loader package files implementing th
 ## File: cmd/main.go
 
 ### Purpose
-CLI entrypoint for the `opsdb-schema` binary. Parses flags, dispatches to six commands.
+CLI entrypoint for the `opsdb_schema` binary. Parses flags, dispatches to six commands.
 
 ### Commands
 - `validate` — Parse and validate schema YAML. No database required.

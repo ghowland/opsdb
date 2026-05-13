@@ -1,4 +1,4 @@
-//# tools/opsdb-api/gate/step_schema_validate.go
+//# tools/opsdb_api/gate/step_schema_validate.go
 
 package gate
 

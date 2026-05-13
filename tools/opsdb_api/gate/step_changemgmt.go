@@ -1,4 +1,4 @@
-//# tools/opsdb-api/gate/step_changemgmt.go
+//# tools/opsdb_api/gate/step_changemgmt.go
 
 package gate
 
