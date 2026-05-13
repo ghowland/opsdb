@@ -35,10 +35,10 @@ func NewAPIClient(endpoint string, authToken string) *APIClient {
 			Timeout:   30 * time.Second,
 			KeepAlive: 30 * time.Second,
 		}).DialContext,
-		TLSClientConfig:     &tls.Config{MinVersion: tls.VersionTLS12},
-		MaxIdleConns:         10,
-		MaxIdleConnsPerHost:  10,
-		IdleConnTimeout:      90 * time.Second,
+		TLSClientConfig:       &tls.Config{MinVersion: tls.VersionTLS12},
+		MaxIdleConns:          10,
+		MaxIdleConnsPerHost:   10,
+		IdleConnTimeout:       90 * time.Second,
 		ResponseHeaderTimeout: 60 * time.Second,
 	}
 
@@ -429,10 +429,6 @@ func (c *APIClient) Watch(entityType string, filters []SearchFilter, resumeToken
 // doRequest executes an HTTP request with retry for GET requests and
 // non-mutating POST requests.
 func (c *APIClient) doRequest(method string, path string, body interface{}) ([]byte, int, error) {
-	if method == "GET" {
-		return c.doRequestWithRetry(method, path, body, "")
-	}
-	// POST requests that are not explicitly idempotent: retry only on network errors.
 	return c.doRequestWithRetry(method, path, body, "")
 }
 
@@ -541,7 +537,7 @@ func (c *APIClient) setHeaders(req *http.Request, idempotencyKey string) {
 func (c *APIClient) parseErrorResponse(statusCode int, body []byte) error {
 	var errResp struct {
 		Step     int                    `json:"step"`
-		StepName string                `json:"step_name"`
+		StepName string                 `json:"step_name"`
 		Code     string                 `json:"code"`
 		Message  string                 `json:"message"`
 		Detail   map[string]interface{} `json:"detail"`

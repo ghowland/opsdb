@@ -121,9 +121,6 @@ func (l *Logger) emit(severity string, msg string, fields []LogField) {
 		return
 	}
 
-	// Build the log entry as an ordered map.
-	// Using a map and json.Marshal — field order is not guaranteed
-	// but all fields are present and machine-parseable.
 	entry := make(map[string]interface{}, 8+len(fields))
 
 	entry["timestamp"] = time.Now().UTC().Format(time.RFC3339Nano)
