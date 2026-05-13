@@ -1,4 +1,4 @@
-// === importers/opsdb-import-k8s/cluster.go ===
+// === importers/opsdb_import_k8s/cluster.go ===
 package k8s
 
 import (
@@ -88,19 +88,19 @@ func ImportCluster(config *K8sImportConfig) ([]Observation, error) {
 		StateKey:   "k8s_cluster_metadata",
 		Value:      clusterName,
 		DataJSON: map[string]interface{}{
-			"name":             clusterName,
-			"api_endpoint":     apiEndpoint,
-			"server_version":   serverVersion.GitVersion,
-			"major_version":    serverVersion.Major,
-			"minor_version":    serverVersion.Minor,
-			"platform":         serverVersion.Platform,
-			"go_version":       serverVersion.GoVersion,
-			"build_date":       serverVersion.BuildDate,
-			"git_commit":       serverVersion.GitCommit,
-			"compiler":         serverVersion.Compiler,
-			"distribution":     distribution,
-			"node_count":       nodeCount,
-			"namespace_count":  nsCount,
+			"name":            clusterName,
+			"api_endpoint":    apiEndpoint,
+			"server_version":  serverVersion.GitVersion,
+			"major_version":   serverVersion.Major,
+			"minor_version":   serverVersion.Minor,
+			"platform":        serverVersion.Platform,
+			"go_version":      serverVersion.GoVersion,
+			"build_date":      serverVersion.BuildDate,
+			"git_commit":      serverVersion.GitCommit,
+			"compiler":        serverVersion.Compiler,
+			"distribution":    distribution,
+			"node_count":      nodeCount,
+			"namespace_count": nsCount,
 		},
 	}
 	results = append(results, obs)

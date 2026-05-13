@@ -31,7 +31,7 @@ package main
 
 import (
     "os"
-    runner "github.com/ghowland/opsdb/tools/opsdb-runner-lib"
+    runner "github.com/ghowland/opsdb/tools/opsdb_runner_lib"
 )
 
 func main() {
@@ -171,4 +171,4 @@ the level-triggered backstop pattern:
 3. On disconnect: reconnect, full re-list, then resume streaming.
 
 This ensures missed events during disconnection are caught by the re-list.
-See `tools/importers/opsdb-import-k8s/watcher.go` for the reference implementation.
+See `tools/importers/opsdb_import_k8s/watcher.go` for the reference implementation.

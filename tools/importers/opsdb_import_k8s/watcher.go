@@ -1,4 +1,4 @@
-// === importers/opsdb-import-k8s/watcher.go ===
+// === importers/opsdb_import_k8s/watcher.go ===
 package k8s
 
 import (
@@ -7,13 +7,13 @@ import (
 	"sync"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 
-	runner "github.com/ghowland/opsdb/tools/opsdb-runner-lib"
+	runner "github.com/ghowland/opsdb/tools/opsdb_runner_lib"
 )
 
 // WatchConfig holds configuration for the watcher system.
@@ -373,20 +373,20 @@ func (w *Watcher) emitPodObservation(pod *corev1.Pod) {
 		StateKey:   "k8s_pod",
 		Value:      pod.Name,
 		DataJSON: map[string]interface{}{
-			"name":            pod.Name,
-			"namespace":       pod.Namespace,
-			"cluster_name":    clusterName,
-			"uid":             string(pod.UID),
-			"phase":           string(pod.Status.Phase),
-			"node_name":       pod.Spec.NodeName,
-			"pod_ip":          pod.Status.PodIP,
-			"start_time":      startTime,
-			"total_restarts":  totalRestarts,
-			"container_count": len(pod.Spec.Containers),
-			"containers":      containers,
-			"owner_kind":      ownerKind,
-			"owner_name":      ownerName,
-			"labels":          pod.Labels,
+			"name":             pod.Name,
+			"namespace":        pod.Namespace,
+			"cluster_name":     clusterName,
+			"uid":              string(pod.UID),
+			"phase":            string(pod.Status.Phase),
+			"node_name":        pod.Spec.NodeName,
+			"pod_ip":           pod.Status.PodIP,
+			"start_time":       startTime,
+			"total_restarts":   totalRestarts,
+			"container_count":  len(pod.Spec.Containers),
+			"containers":       containers,
+			"owner_kind":       ownerKind,
+			"owner_name":       ownerName,
+			"labels":           pod.Labels,
 			"resource_version": pod.ResourceVersion,
 		},
 	}
@@ -440,12 +440,12 @@ func (w *Watcher) emitConfigMapObservation(cm *corev1.ConfigMap) {
 		StateKey:   "k8s_configmap",
 		Value:      cm.Name,
 		DataJSON: map[string]interface{}{
-			"name":           cm.Name,
-			"namespace":      cm.Namespace,
-			"cluster_name":   clusterName,
-			"data_key_count": len(cm.Data),
-			"data_keys":      dataKeys,
-			"labels":         cm.Labels,
+			"name":             cm.Name,
+			"namespace":        cm.Namespace,
+			"cluster_name":     clusterName,
+			"data_key_count":   len(cm.Data),
+			"data_keys":        dataKeys,
+			"labels":           cm.Labels,
 			"resource_version": cm.ResourceVersion,
 		},
 	}
@@ -469,13 +469,13 @@ func (w *Watcher) emitSecretObservation(secret *corev1.Secret) {
 		StateKey:   "k8s_secret_reference",
 		Value:      secret.Name,
 		DataJSON: map[string]interface{}{
-			"name":           secret.Name,
-			"namespace":      secret.Namespace,
-			"cluster_name":   clusterName,
-			"secret_type":    string(secret.Type),
-			"data_key_count": len(secret.Data),
-			"data_keys":      dataKeys,
-			"labels":         secret.Labels,
+			"name":             secret.Name,
+			"namespace":        secret.Namespace,
+			"cluster_name":     clusterName,
+			"secret_type":      string(secret.Type),
+			"data_key_count":   len(secret.Data),
+			"data_keys":        dataKeys,
+			"labels":           secret.Labels,
 			"resource_version": secret.ResourceVersion,
 		},
 	}
@@ -493,10 +493,10 @@ func (w *Watcher) emitNamespaceObservation(ns *corev1.Namespace) {
 		StateKey:   "k8s_namespace",
 		Value:      ns.Name,
 		DataJSON: map[string]interface{}{
-			"name":         ns.Name,
-			"cluster_name": clusterName,
-			"status":       string(ns.Status.Phase),
-			"labels":       ns.Labels,
+			"name":             ns.Name,
+			"cluster_name":     clusterName,
+			"status":           string(ns.Status.Phase),
+			"labels":           ns.Labels,
 			"resource_version": ns.ResourceVersion,
 		},
 	}
@@ -522,7 +522,7 @@ func (w *Watcher) emitDeploymentObservation(deploy *appsv1.Deployment) {
 		StateKey:   "k8s_workload",
 		Value:      deploy.Name,
 		DataJSON: map[string]interface{}{
-			"name":                deploy.Name,
+			"name":               deploy.Name,
 			"namespace":          deploy.Namespace,
 			"cluster_name":       clusterName,
 			"workload_type":      "deployment",

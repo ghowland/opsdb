@@ -12,11 +12,11 @@ CMD_DIRS := \
 	./tools/opsdb-schema/cmd \
 	./tools/importers/opsdb-import-aws/cmd \
 	./tools/importers/opsdb-import-gcp/cmd \
-	./tools/importers/opsdb-import-identity/cmd \
-	./tools/importers/opsdb-import-k8s/cmd \
-	./tools/importers/opsdb-import-monitoring/cmd \
-	./tools/importers/opsdb-import-oncall/cmd \
-	./tools/importers/opsdb-import-secrets/cmd \
+	./tools/importers/opsdb_import_identity/cmd \
+	./tools/importers/opsdb_import_k8s/cmd \
+	./tools/importers/opsdb_import_monitoring/cmd \
+	./tools/importers/opsdb_import_oncall/cmd \
+	./tools/importers/opsdb_import_secrets/cmd \
 	./tools/runners/change-set-executor/cmd \
 	./tools/runners/emergency-review-monitor/cmd \
 	./tools/runners/notification-runner/cmd \
@@ -95,19 +95,19 @@ $(BUILD_DIR)/opsdb-import-gcp: dirs
 	$(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $@ ./tools/importers/opsdb-import-gcp/cmd
 
 $(BUILD_DIR)/opsdb-import-identity: dirs
-	$(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $@ ./tools/importers/opsdb-import-identity/cmd
+	$(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $@ ./tools/importers/opsdb_import_identity/cmd
 
 $(BUILD_DIR)/opsdb-import-k8s: dirs
-	$(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $@ ./tools/importers/opsdb-import-k8s/cmd
+	$(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $@ ./tools/importers/opsdb_import_k8s/cmd
 
 $(BUILD_DIR)/opsdb-import-monitoring: dirs
-	$(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $@ ./tools/importers/opsdb-import-monitoring/cmd
+	$(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $@ ./tools/importers/opsdb_import_monitoring/cmd
 
 $(BUILD_DIR)/opsdb-import-oncall: dirs
-	$(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $@ ./tools/importers/opsdb-import-oncall/cmd
+	$(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $@ ./tools/importers/opsdb_import_oncall/cmd
 
 $(BUILD_DIR)/opsdb-import-secrets: dirs
-	$(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $@ ./tools/importers/opsdb-import-secrets/cmd
+	$(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $@ ./tools/importers/opsdb_import_secrets/cmd
 
 $(BUILD_DIR)/change-set-executor: dirs
 	$(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $@ ./tools/runners/change-set-executor/cmd

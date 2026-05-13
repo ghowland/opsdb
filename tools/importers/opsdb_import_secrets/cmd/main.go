@@ -1,4 +1,4 @@
-//# tools/importers/opsdb-import-secrets/cmd/main.go
+//# tools/importers/opsdb_import_secrets/cmd/main.go
 
 package main
 
@@ -9,8 +9,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	runner "github.com/ghowland/opsdb/tools/opsdb-runner-lib"
-	secrets "github.com/ghowland/opsdb/tools/importers/opsdb-import-secrets"
+	secrets "github.com/ghowland/opsdb/tools/importers/opsdb_import_secrets"
+	runner "github.com/ghowland/opsdb/tools/opsdb_runner_lib"
 )
 
 func main() {
@@ -145,8 +145,8 @@ func runCycle(config *runner.RunnerConfig, logger *runner.Logger, backend string
 
 	case "aws_sm":
 		awsConfig := secrets.AWSSecretsManagerConfig{
-			Region:    config.SpecData.StringOrDefault("region", ""),
-			Regions:   config.SpecData.StringListOrDefault("regions", nil),
+			Region:     config.SpecData.StringOrDefault("region", ""),
+			Regions:    config.SpecData.StringListOrDefault("regions", nil),
 			MaxResults: config.SpecData.IntOrDefault("max_results", 1000),
 		}
 		observations, err = secrets.ImportAWSSecretsManager(&awsConfig)
@@ -202,18 +202,18 @@ func runCycle(config *runner.RunnerConfig, logger *runner.Logger, backend string
 // as an authority_pointer with pointer_type=secret. Never writes secret values.
 func writeSecretObservation(client *runner.APIClient, authorityID int, obs secrets.Observation) error {
 	return client.WriteObservation("observation_cache_state", 0, "secret_metadata", map[string]interface{}{
-		"authority_id":    authorityID,
-		"entity_type":    "authority_pointer",
-		"state_key":      obs.SecretPath,
-		"pointer_type":   "secret",
-		"locator":        obs.SecretPath,
+		"authority_id": authorityID,
+		"entity_type":  "authority_pointer",
+		"state_key":    obs.SecretPath,
+		"pointer_type": "secret",
+		"locator":      obs.SecretPath,
 		"pointer_data_json": map[string]interface{}{
-			"secret_engine":       obs.Engine,
-			"secret_version":      obs.Version,
-			"last_rotated_time":   obs.LastRotatedTime,
-			"rotation_enabled":    obs.RotationEnabled,
-			"expiration_time":     obs.ExpirationTime,
-			"tags":                obs.Tags,
+			"secret_engine":     obs.Engine,
+			"secret_version":    obs.Version,
+			"last_rotated_time": obs.LastRotatedTime,
+			"rotation_enabled":  obs.RotationEnabled,
+			"expiration_time":   obs.ExpirationTime,
+			"tags":              obs.Tags,
 		},
 	})
 }

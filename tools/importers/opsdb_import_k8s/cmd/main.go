@@ -1,4 +1,4 @@
-// === importers/opsdb-import-k8s/cmd/main.go ===
+// === importers/opsdb_import_k8s/cmd/main.go ===
 package main
 
 import (
@@ -8,8 +8,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	k8s "github.com/ghowland/opsdb/tools/importers/opsdb-import-k8s"
-	runner "github.com/ghowland/opsdb/tools/opsdb-runner-lib"
+	k8s "github.com/ghowland/opsdb/tools/importers/opsdb_import_k8s"
+	runner "github.com/ghowland/opsdb/tools/opsdb_runner_lib"
 )
 
 type CycleSummary struct {

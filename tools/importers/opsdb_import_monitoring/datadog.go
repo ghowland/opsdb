@@ -1,4 +1,4 @@
-// === importers/opsdb-import-monitoring/datadog.go ===
+// === importers/opsdb_import_monitoring/datadog.go ===
 package monitoring
 
 import (
@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	runner "github.com/ghowland/opsdb/tools/opsdb-runner-lib"
+	runner "github.com/ghowland/opsdb/tools/opsdb_runner_lib"
 )
 
 // ImportDatadogMonitors reads monitors from the Datadog API and maps them
@@ -35,22 +35,22 @@ func ImportDatadogMonitors(config *ImportConfig) ([]Observation, error) {
 				StateKey:   "datadog_monitor",
 				Value:      mon.Name,
 				DataJSON: map[string]interface{}{
-					"monitor_type":       mapDatadogMonitorType(mon.Type),
-					"name":               mon.Name,
-					"query":              mon.Query,
-					"message":            mon.Message,
-					"tags":               mon.Tags,
-					"tags_csv":           tagList,
-					"datadog_type":       mon.Type,
-					"datadog_id":         mon.ID,
-					"created":            mon.Created,
-					"modified":           mon.Modified,
-					"creator_name":       mon.CreatorName,
-					"creator_email":      mon.CreatorEmail,
-					"overall_state":      mon.OverallState,
-					"priority":           mon.Priority,
-					"restricted_roles":   mon.RestrictedRoles,
-					"multi":              mon.Multi,
+					"monitor_type":     mapDatadogMonitorType(mon.Type),
+					"name":             mon.Name,
+					"query":            mon.Query,
+					"message":          mon.Message,
+					"tags":             mon.Tags,
+					"tags_csv":         tagList,
+					"datadog_type":     mon.Type,
+					"datadog_id":       mon.ID,
+					"created":          mon.Created,
+					"modified":         mon.Modified,
+					"creator_name":     mon.CreatorName,
+					"creator_email":    mon.CreatorEmail,
+					"overall_state":    mon.OverallState,
+					"priority":         mon.Priority,
+					"restricted_roles": mon.RestrictedRoles,
+					"multi":            mon.Multi,
 				},
 			}
 			results = append(results, obs)
@@ -88,22 +88,22 @@ func ImportDatadogAlerts(config *ImportConfig) ([]Observation, error) {
 				StateKey:   "datadog_alert_definition",
 				Value:      mon.Name,
 				DataJSON: map[string]interface{}{
-					"name":                  mon.Name,
-					"severity":              severity,
-					"monitor_id":            fmt.Sprintf("dd_%d", mon.ID),
-					"query":                 mon.Query,
-					"message":               mon.Message,
-					"tags":                  mon.Tags,
-					"datadog_type":          mon.Type,
-					"datadog_id":            mon.ID,
-					"threshold_critical":    mon.ThresholdCritical,
-					"threshold_warning":     mon.ThresholdWarning,
-					"threshold_ok":          mon.ThresholdOK,
-					"notify_no_data":        mon.NotifyNoData,
-					"no_data_timeframe":     mon.NoDataTimeframe,
-					"renotify_interval":     mon.RenotifyInterval,
-					"escalation_message":    mon.EscalationMessage,
-					"evaluation_delay":      mon.EvaluationDelay,
+					"name":               mon.Name,
+					"severity":           severity,
+					"monitor_id":         fmt.Sprintf("dd_%d", mon.ID),
+					"query":              mon.Query,
+					"message":            mon.Message,
+					"tags":               mon.Tags,
+					"datadog_type":       mon.Type,
+					"datadog_id":         mon.ID,
+					"threshold_critical": mon.ThresholdCritical,
+					"threshold_warning":  mon.ThresholdWarning,
+					"threshold_ok":       mon.ThresholdOK,
+					"notify_no_data":     mon.NotifyNoData,
+					"no_data_timeframe":  mon.NoDataTimeframe,
+					"renotify_interval":  mon.RenotifyInterval,
+					"escalation_message": mon.EscalationMessage,
+					"evaluation_delay":   mon.EvaluationDelay,
 				},
 			}
 			results = append(results, obs)
@@ -140,17 +140,17 @@ func ImportDatadogMetrics(config *ImportConfig) ([]Observation, error) {
 				StateKey:   "datadog_alert_fire",
 				Value:      mon.Name,
 				DataJSON: map[string]interface{}{
-					"alert_name":       mon.Name,
-					"state":            groupState.Status,
-					"group_name":       groupName,
-					"last_triggered":   groupState.LastTriggered,
-					"last_resolved":    groupState.LastResolved,
-					"last_notified":    groupState.LastNotified,
-					"datadog_id":       mon.ID,
-					"datadog_type":     mon.Type,
-					"query":            mon.Query,
-					"tags":             mon.Tags,
-					"overall_state":    mon.OverallState,
+					"alert_name":     mon.Name,
+					"state":          groupState.Status,
+					"group_name":     groupName,
+					"last_triggered": groupState.LastTriggered,
+					"last_resolved":  groupState.LastResolved,
+					"last_notified":  groupState.LastNotified,
+					"datadog_id":     mon.ID,
+					"datadog_type":   mon.Type,
+					"query":          mon.Query,
+					"tags":           mon.Tags,
+					"overall_state":  mon.OverallState,
 				},
 			}
 			results = append(results, obs)

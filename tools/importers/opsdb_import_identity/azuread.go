@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	runner "github.com/ghowland/opsdb/tools/opsdb-runner-lib"
+	runner "github.com/ghowland/opsdb/tools/opsdb_runner_lib"
 )
 
 // ImportAzureADUsers reads users from Microsoft Graph API and maps to ops_user observations.
@@ -58,24 +58,24 @@ func ImportAzureADUsers(config *ImportConfig) ([]Observation, error) {
 				StateKey:   "azuread_user",
 				Value:      displayName,
 				DataJSON: map[string]interface{}{
-					"azure_id":              azGetString(m, "id"),
-					"user_principal_name":   upn,
-					"display_name":          displayName,
-					"email":                 azGetString(m, "mail"),
-					"given_name":            azGetString(m, "givenName"),
-					"surname":               azGetString(m, "surname"),
-					"title":                 azGetString(m, "jobTitle"),
-					"department":            azGetString(m, "department"),
-					"company_name":          azGetString(m, "companyName"),
-					"mobile_phone":          azGetString(m, "mobilePhone"),
-					"office_location":       azGetString(m, "officeLocation"),
-					"is_active":             accountEnabled,
-					"user_type":             userType,
-					"is_guest":              userType == "Guest",
-					"created_time":          azGetString(m, "createdDateTime"),
-					"last_sign_in_time":     azGetString(m, "lastSignInDateTime"),
-					"source":                "azuread",
-					"tenant_id":             config.TenantID,
+					"azure_id":            azGetString(m, "id"),
+					"user_principal_name": upn,
+					"display_name":        displayName,
+					"email":               azGetString(m, "mail"),
+					"given_name":          azGetString(m, "givenName"),
+					"surname":             azGetString(m, "surname"),
+					"title":               azGetString(m, "jobTitle"),
+					"department":          azGetString(m, "department"),
+					"company_name":        azGetString(m, "companyName"),
+					"mobile_phone":        azGetString(m, "mobilePhone"),
+					"office_location":     azGetString(m, "officeLocation"),
+					"is_active":           accountEnabled,
+					"user_type":           userType,
+					"is_guest":            userType == "Guest",
+					"created_time":        azGetString(m, "createdDateTime"),
+					"last_sign_in_time":   azGetString(m, "lastSignInDateTime"),
+					"source":              "azuread",
+					"tenant_id":           config.TenantID,
 				},
 			}
 			results = append(results, obs)
@@ -135,19 +135,19 @@ func ImportAzureADGroups(config *ImportConfig) ([]Observation, error) {
 				StateKey:   "azuread_group",
 				Value:      name,
 				DataJSON: map[string]interface{}{
-					"azure_id":                azGetString(m, "id"),
-					"name":                    name,
-					"description":             azGetString(m, "description"),
-					"group_types":             groupTypes,
-					"group_classification":    groupClassification,
-					"security_enabled":        azGetBool(m, "securityEnabled"),
-					"mail_enabled":            azGetBool(m, "mailEnabled"),
-					"mail":                    azGetString(m, "mail"),
-					"membership_rule":         azGetString(m, "membershipRule"),
-					"membership_processing":   azGetString(m, "membershipRuleProcessingState"),
-					"created_time":            azGetString(m, "createdDateTime"),
-					"source":                  "azuread",
-					"tenant_id":               config.TenantID,
+					"azure_id":              azGetString(m, "id"),
+					"name":                  name,
+					"description":           azGetString(m, "description"),
+					"group_types":           groupTypes,
+					"group_classification":  groupClassification,
+					"security_enabled":      azGetBool(m, "securityEnabled"),
+					"mail_enabled":          azGetBool(m, "mailEnabled"),
+					"mail":                  azGetString(m, "mail"),
+					"membership_rule":       azGetString(m, "membershipRule"),
+					"membership_processing": azGetString(m, "membershipRuleProcessingState"),
+					"created_time":          azGetString(m, "createdDateTime"),
+					"source":                "azuread",
+					"tenant_id":             config.TenantID,
 				},
 			}
 			results = append(results, obs)

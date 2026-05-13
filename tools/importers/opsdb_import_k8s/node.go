@@ -1,4 +1,4 @@
-// === importers/opsdb-import-k8s/node.go ===
+// === importers/opsdb_import_k8s/node.go ===
 package k8s
 
 import (
@@ -49,33 +49,33 @@ func ImportNodes(config *K8sImportConfig) ([]Observation, error) {
 				StateKey:   "k8s_node",
 				Value:      node.Name,
 				DataJSON: map[string]interface{}{
-					"name":                    node.Name,
-					"cluster_name":            config.ClusterName,
-					"roles":                   roles,
-					"schedulable":             !node.Spec.Unschedulable,
-					"provider_id":             node.Spec.ProviderID,
-					"cloud_provider":          providerID,
-					"cloud_instance_id":       instanceID,
-					"capacity":                capacity,
-					"allocatable":             allocatable,
-					"conditions":              conditions,
-					"addresses":               addresses,
-					"os_image":                node.Status.NodeInfo.OSImage,
-					"os":                      node.Status.NodeInfo.OperatingSystem,
-					"architecture":            node.Status.NodeInfo.Architecture,
-					"kernel_version":          node.Status.NodeInfo.KernelVersion,
-					"container_runtime":       node.Status.NodeInfo.ContainerRuntimeVersion,
-					"kubelet_version":         node.Status.NodeInfo.KubeletVersion,
-					"kube_proxy_version":      node.Status.NodeInfo.KubeProxyVersion,
-					"machine_id":              node.Status.NodeInfo.MachineID,
-					"system_uuid":             node.Status.NodeInfo.SystemUUID,
-					"pod_cidr":                node.Spec.PodCIDR,
-					"labels":                  node.Labels,
-					"annotations":             filterAnnotations(node.Annotations),
-					"taints":                  summarizeTaints(node.Spec.Taints),
-					"resource_version":        node.ResourceVersion,
-					"uid":                     string(node.UID),
-					"created_time":            node.CreationTimestamp.Format(time.RFC3339),
+					"name":               node.Name,
+					"cluster_name":       config.ClusterName,
+					"roles":              roles,
+					"schedulable":        !node.Spec.Unschedulable,
+					"provider_id":        node.Spec.ProviderID,
+					"cloud_provider":     providerID,
+					"cloud_instance_id":  instanceID,
+					"capacity":           capacity,
+					"allocatable":        allocatable,
+					"conditions":         conditions,
+					"addresses":          addresses,
+					"os_image":           node.Status.NodeInfo.OSImage,
+					"os":                 node.Status.NodeInfo.OperatingSystem,
+					"architecture":       node.Status.NodeInfo.Architecture,
+					"kernel_version":     node.Status.NodeInfo.KernelVersion,
+					"container_runtime":  node.Status.NodeInfo.ContainerRuntimeVersion,
+					"kubelet_version":    node.Status.NodeInfo.KubeletVersion,
+					"kube_proxy_version": node.Status.NodeInfo.KubeProxyVersion,
+					"machine_id":         node.Status.NodeInfo.MachineID,
+					"system_uuid":        node.Status.NodeInfo.SystemUUID,
+					"pod_cidr":           node.Spec.PodCIDR,
+					"labels":             node.Labels,
+					"annotations":        filterAnnotations(node.Annotations),
+					"taints":             summarizeTaints(node.Spec.Taints),
+					"resource_version":   node.ResourceVersion,
+					"uid":                string(node.UID),
+					"created_time":       node.CreationTimestamp.Format(time.RFC3339),
 				},
 			}
 			results = append(results, obs)
@@ -165,9 +165,10 @@ func summarizeTaints(taints []corev1.Taint) []map[string]string {
 
 // parseProviderID extracts cloud provider and instance ID from the node's provider ID.
 // Format varies by provider:
-//   aws:///us-east-1a/i-0abcdef1234567890
-//   gce://project-id/zone/instance-name
-//   azure:///subscriptions/.../virtualMachines/vm-name
+//
+//	aws:///us-east-1a/i-0abcdef1234567890
+//	gce://project-id/zone/instance-name
+//	azure:///subscriptions/.../virtualMachines/vm-name
 func parseProviderID(providerID string) (string, string) {
 	if providerID == "" {
 		return "", ""

@@ -1,4 +1,4 @@
-// === importers/opsdb-import-oncall/pagerduty.go ===
+// === importers/opsdb_import_oncall/pagerduty.go ===
 package oncall
 
 import (
@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	runner "github.com/ghowland/opsdb/tools/opsdb-runner-lib"
+	runner "github.com/ghowland/opsdb/tools/opsdb_runner_lib"
 )
 
 // ImportConfig holds on-call importer configuration shared across backends.
@@ -57,12 +57,12 @@ func ImportPagerDutySchedules(config *ImportConfig) ([]Observation, error) {
 				StateKey:   "pagerduty_schedule",
 				Value:      sched.Name,
 				DataJSON: map[string]interface{}{
-					"name":              sched.Name,
-					"description":       sched.Description,
-					"timezone":          sched.TimeZone,
-					"layer_count":       len(sched.ScheduleLayers),
-					"layer_names":       layerNames,
-					"pagerduty_id":      sched.ID,
+					"name":               sched.Name,
+					"description":        sched.Description,
+					"timezone":           sched.TimeZone,
+					"layer_count":        len(sched.ScheduleLayers),
+					"layer_names":        layerNames,
+					"pagerduty_id":       sched.ID,
 					"pagerduty_html_url": sched.HTMLURL,
 				},
 			}
@@ -130,15 +130,15 @@ func ImportPagerDutyAssignments(config *ImportConfig) ([]Observation, error) {
 				StateKey:   "pagerduty_assignment",
 				Value:      entry.UserName,
 				DataJSON: map[string]interface{}{
-					"schedule_id":        schedID,
-					"schedule_name":      scheduleName,
-					"user_name":          entry.UserName,
-					"user_id":            entry.UserID,
-					"user_email":         entry.UserEmail,
-					"start_time":         entry.Start.Format(time.RFC3339),
-					"end_time":           entry.End.Format(time.RFC3339),
-					"escalation_level":   entry.EscalationLevel,
-					"escalation_policy_id": entry.EscalationPolicyID,
+					"schedule_id":           schedID,
+					"schedule_name":         scheduleName,
+					"user_name":             entry.UserName,
+					"user_id":               entry.UserID,
+					"user_email":            entry.UserEmail,
+					"start_time":            entry.Start.Format(time.RFC3339),
+					"end_time":              entry.End.Format(time.RFC3339),
+					"escalation_level":      entry.EscalationLevel,
+					"escalation_policy_id":  entry.EscalationPolicyID,
 					"pagerduty_schedule_id": schedID,
 				},
 			}
@@ -228,14 +228,14 @@ func ImportPagerDutyEscalationSteps(config *ImportConfig) ([]Observation, error)
 					StateKey:   "pagerduty_escalation_step",
 					Value:      fmt.Sprintf("step %d of %s", stepOrder+1, policy.Name),
 					DataJSON: map[string]interface{}{
-						"escalation_path_id":   policy.ID,
-						"escalation_path_name": policy.Name,
-						"step_order":           stepOrder + 1,
+						"escalation_path_id":       policy.ID,
+						"escalation_path_name":     policy.Name,
+						"step_order":               stepOrder + 1,
 						"escalation_delay_minutes": rule.EscalationDelayMinutes,
-						"target_count":         len(rule.Targets),
-						"target_names":         targetNames,
-						"target_types":         targetTypes,
-						"pagerduty_rule_id":    rule.ID,
+						"target_count":             len(rule.Targets),
+						"target_names":             targetNames,
+						"target_types":             targetTypes,
+						"pagerduty_rule_id":        rule.ID,
 					},
 				}
 				results = append(results, obs)
@@ -303,21 +303,21 @@ type PDOnCallEntry struct {
 
 // PDEscalationPolicy represents an escalation policy from the PagerDuty API.
 type PDEscalationPolicy struct {
-	ID             string
-	Name           string
-	Description    string
-	NumLoops       int
-	OnCallHandoff  string
-	HTMLURL        string
-	Rules          []PDEscalationRule
-	Services       []PDServiceRef
+	ID            string
+	Name          string
+	Description   string
+	NumLoops      int
+	OnCallHandoff string
+	HTMLURL       string
+	Rules         []PDEscalationRule
+	Services      []PDServiceRef
 }
 
 // PDEscalationRule represents one rule in an escalation policy.
 type PDEscalationRule struct {
-	ID                      string
-	EscalationDelayMinutes  int
-	Targets                 []PDTarget
+	ID                     string
+	EscalationDelayMinutes int
+	Targets                []PDTarget
 }
 
 // PDTarget represents a target within an escalation rule.

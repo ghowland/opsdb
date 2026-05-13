@@ -1,4 +1,4 @@
-//# tools/importers/opsdb-import-secrets/vault.go
+//# tools/importers/opsdb_import_secrets/vault.go
 
 package secrets
 

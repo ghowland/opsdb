@@ -1,4 +1,4 @@
-// === importers/opsdb-import-k8s/namespace.go ===
+// === importers/opsdb_import_k8s/namespace.go ===
 package k8s
 
 import (

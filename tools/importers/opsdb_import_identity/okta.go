@@ -9,25 +9,25 @@ import (
 	"strings"
 	"time"
 
-	runner "github.com/ghowland/opsdb/tools/opsdb-runner-lib"
+	runner "github.com/ghowland/opsdb/tools/opsdb_runner_lib"
 )
 
 // ImportConfig holds identity importer configuration shared across backends.
 type ImportConfig struct {
-	Backend      string
-	BaseURL      string
-	APIToken     string
-	BatchSize    int
-	MaxRetries   int
-	Domain       string
-	TenantID     string
-	ClientID     string
-	ClientSecret string
-	LDAPBaseDN   string
-	LDAPBindDN   string
-	LDAPBindPass string
-	UserFilter   string
-	GroupFilter  string
+	Backend       string
+	BaseURL       string
+	APIToken      string
+	BatchSize     int
+	MaxRetries    int
+	Domain        string
+	TenantID      string
+	ClientID      string
+	ClientSecret  string
+	LDAPBaseDN    string
+	LDAPBindDN    string
+	LDAPBindPass  string
+	UserFilter    string
+	GroupFilter   string
 	ExcludeGroups []string
 }
 
@@ -75,24 +75,24 @@ func ImportOktaUsers(config *ImportConfig) ([]Observation, error) {
 				StateKey:   "okta_user",
 				Value:      displayName,
 				DataJSON: map[string]interface{}{
-					"okta_id":          user.ID,
-					"login":            oktaGetString(profile, "login"),
-					"email":            oktaGetString(profile, "email"),
-					"display_name":     displayName,
-					"first_name":       oktaGetString(profile, "firstName"),
-					"last_name":        oktaGetString(profile, "lastName"),
-					"title":            oktaGetString(profile, "title"),
-					"department":       oktaGetString(profile, "department"),
-					"organization":     oktaGetString(profile, "organization"),
-					"mobile_phone":     oktaGetString(profile, "mobilePhone"),
-					"status":           user.Status,
-					"is_active":        isActive,
-					"created_time":     user.Created,
-					"last_login_time":  user.LastLogin,
-					"last_updated_time": user.LastUpdated,
+					"okta_id":             user.ID,
+					"login":               oktaGetString(profile, "login"),
+					"email":               oktaGetString(profile, "email"),
+					"display_name":        displayName,
+					"first_name":          oktaGetString(profile, "firstName"),
+					"last_name":           oktaGetString(profile, "lastName"),
+					"title":               oktaGetString(profile, "title"),
+					"department":          oktaGetString(profile, "department"),
+					"organization":        oktaGetString(profile, "organization"),
+					"mobile_phone":        oktaGetString(profile, "mobilePhone"),
+					"status":              user.Status,
+					"is_active":           isActive,
+					"created_time":        user.Created,
+					"last_login_time":     user.LastLogin,
+					"last_updated_time":   user.LastUpdated,
 					"status_changed_time": user.StatusChanged,
-					"source":           "okta",
-					"okta_domain":      config.Domain,
+					"source":              "okta",
+					"okta_domain":         config.Domain,
 				},
 			}
 			results = append(results, obs)
@@ -133,15 +133,15 @@ func ImportOktaGroups(config *ImportConfig) ([]Observation, error) {
 				StateKey:   "okta_group",
 				Value:      name,
 				DataJSON: map[string]interface{}{
-					"okta_id":          group.ID,
-					"name":             name,
-					"description":      oktaGetString(group.Profile, "description"),
-					"group_type":       group.Type,
-					"member_count":     group.MemberCount,
-					"created_time":     group.Created,
+					"okta_id":           group.ID,
+					"name":              name,
+					"description":       oktaGetString(group.Profile, "description"),
+					"group_type":        group.Type,
+					"member_count":      group.MemberCount,
+					"created_time":      group.Created,
 					"last_updated_time": group.LastUpdated,
-					"source":           "okta",
-					"okta_domain":      config.Domain,
+					"source":            "okta",
+					"okta_domain":       config.Domain,
 				},
 			}
 			results = append(results, obs)
@@ -217,14 +217,14 @@ func ImportOktaGroupMemberships(config *ImportConfig) ([]Observation, error) {
 					StateKey:   "okta_group_member",
 					Value:      fmt.Sprintf("%s in %s", memberLogin, groupName),
 					DataJSON: map[string]interface{}{
-						"group_name":    groupName,
-						"group_id":      group.ID,
-						"user_login":    memberLogin,
-						"user_id":       member.ID,
-						"user_email":    oktaGetString(member.Profile, "email"),
-						"user_status":   member.Status,
-						"source":        "okta",
-						"okta_domain":   config.Domain,
+						"group_name":  groupName,
+						"group_id":    group.ID,
+						"user_login":  memberLogin,
+						"user_id":     member.ID,
+						"user_email":  oktaGetString(member.Profile, "email"),
+						"user_status": member.Status,
+						"source":      "okta",
+						"okta_domain": config.Domain,
 					},
 				}
 				results = append(results, obs)

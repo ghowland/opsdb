@@ -1,4 +1,4 @@
-// === importers/opsdb-import-k8s/secret.go ===
+// === importers/opsdb_import_k8s/secret.go ===
 package k8s
 
 import (

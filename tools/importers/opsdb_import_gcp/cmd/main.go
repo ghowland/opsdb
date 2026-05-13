@@ -6,8 +6,8 @@ import (
 	"os"
 	"time"
 
-	gcp "github.com/ghowland/opsdb/tools/importers/opsdb-import-gcp"
-	runner "github.com/ghowland/opsdb/tools/opsdb-runner-lib"
+	gcp "github.com/ghowland/opsdb/tools/importers/opsdb_import_gcp"
+	runner "github.com/ghowland/opsdb/tools/opsdb_runner_lib"
 )
 
 func main() {

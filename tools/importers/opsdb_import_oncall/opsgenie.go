@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	runner "github.com/ghowland/opsdb/tools/opsdb-runner-lib"
+	runner "github.com/ghowland/opsdb/tools/opsdb_runner_lib"
 )
 
 // ImportOpsgenieSchedules reads on-call schedules from the Opsgenie API
@@ -217,9 +217,9 @@ func ImportOpsgenieEscalationSteps(config *ImportConfig) ([]Observation, error) 
 
 // opsgenieClient wraps Opsgenie API access with authentication and retry.
 type opsgenieClient struct {
-	apiToken   string
-	baseURL    string
-	maxRetries int
+	apiToken    string
+	baseURL     string
+	maxRetries  int
 	retryConfig runner.RetryConfig
 }
 

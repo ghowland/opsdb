@@ -1,4 +1,4 @@
-// === importers/opsdb-import-monitoring/prometheus.go ===
+// === importers/opsdb_import_monitoring/prometheus.go ===
 package monitoring
 
 import (
@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	runner "github.com/ghowland/opsdb/tools/opsdb-runner-lib"
+	runner "github.com/ghowland/opsdb/tools/opsdb_runner_lib"
 )
 
 // ImportConfig holds monitoring importer configuration shared across backends.
@@ -73,19 +73,19 @@ func ImportPrometheusConfigs(config *ImportConfig) ([]Observation, error) {
 			StateKey:   "prometheus_scrape_target",
 			Value:      target.ScrapeURL,
 			DataJSON: map[string]interface{}{
-				"scrape_url":         target.ScrapeURL,
-				"job_name":           target.JobName,
-				"health":             target.Health,
-				"scrape_interval":    target.ScrapeInterval,
-				"scrape_timeout":     target.ScrapeTimeout,
-				"scheme":             target.Scheme,
-				"metrics_path":       target.MetricsPath,
-				"last_scrape_time":   target.LastScrape.Format(time.RFC3339),
+				"scrape_url":                   target.ScrapeURL,
+				"job_name":                     target.JobName,
+				"health":                       target.Health,
+				"scrape_interval":              target.ScrapeInterval,
+				"scrape_timeout":               target.ScrapeTimeout,
+				"scheme":                       target.Scheme,
+				"metrics_path":                 target.MetricsPath,
+				"last_scrape_time":             target.LastScrape.Format(time.RFC3339),
 				"last_scrape_duration_seconds": target.LastScrapeDuration,
-				"last_error":         target.LastError,
-				"labels":             target.Labels,
-				"discovered_labels":  target.DiscoveredLabels,
-				"prometheus_server":  client.baseURL,
+				"last_error":                   target.LastError,
+				"labels":                       target.Labels,
+				"discovered_labels":            target.DiscoveredLabels,
+				"prometheus_server":            client.baseURL,
 			},
 		}
 		results = append(results, obs)
@@ -121,19 +121,19 @@ func ImportPrometheusAlerts(config *ImportConfig) ([]Observation, error) {
 				StateKey:   "prometheus_alerting_rule",
 				Value:      rule.Name,
 				DataJSON: map[string]interface{}{
-					"monitor_type":       "prometheus_query",
-					"name":               rule.Name,
-					"query":              rule.Query,
-					"duration_seconds":   rule.Duration,
-					"group_name":         group.Name,
-					"group_file":         group.File,
-					"group_interval":     group.Interval,
-					"labels":             rule.Labels,
-					"annotations":        rule.Annotations,
-					"health":             rule.Health,
-					"last_evaluation":    rule.LastEvaluation.Format(time.RFC3339),
+					"monitor_type":            "prometheus_query",
+					"name":                    rule.Name,
+					"query":                   rule.Query,
+					"duration_seconds":        rule.Duration,
+					"group_name":              group.Name,
+					"group_file":              group.File,
+					"group_interval":          group.Interval,
+					"labels":                  rule.Labels,
+					"annotations":             rule.Annotations,
+					"health":                  rule.Health,
+					"last_evaluation":         rule.LastEvaluation.Format(time.RFC3339),
 					"evaluation_time_seconds": rule.EvaluationTime,
-					"prometheus_server":  client.baseURL,
+					"prometheus_server":       client.baseURL,
 				},
 			}
 			results = append(results, monitorObs)

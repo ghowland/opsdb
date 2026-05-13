@@ -9,8 +9,8 @@ import (
 	"strings"
 	"syscall"
 
-	identity "github.com/ghowland/opsdb/tools/importers/opsdb-import-identity"
-	runner "github.com/ghowland/opsdb/tools/opsdb-runner-lib"
+	identity "github.com/ghowland/opsdb/tools/importers/opsdb_import_identity"
+	runner "github.com/ghowland/opsdb/tools/opsdb_runner_lib"
 )
 
 type CycleSummary struct {
@@ -92,20 +92,20 @@ func runCycle(config *runner.RunnerConfig, logger *runner.Logger) (*CycleSummary
 	)
 
 	importConfig := &identity.ImportConfig{
-		Backend:    backend,
-		BaseURL:    config.SpecData.StringOrDefault("base_url", ""),
-		APIToken:   config.ResolveCredential("api_token"),
-		BatchSize:  config.SpecData.IntOrDefault("batch_size", 200),
-		MaxRetries: config.SpecData.IntOrDefault("max_retries", 3),
-		Domain:     config.SpecData.StringOrDefault("domain", ""),
-		TenantID:   config.SpecData.StringOrDefault("tenant_id", ""),
-		ClientID:   config.ResolveCredential("client_id"),
-		ClientSecret: config.ResolveCredential("client_secret"),
-		LDAPBaseDN:   config.SpecData.StringOrDefault("ldap_base_dn", ""),
-		LDAPBindDN:   config.SpecData.StringOrDefault("ldap_bind_dn", ""),
-		LDAPBindPass: config.ResolveCredential("ldap_bind_password"),
-		UserFilter:   config.SpecData.StringOrDefault("user_filter", ""),
-		GroupFilter:  config.SpecData.StringOrDefault("group_filter", ""),
+		Backend:       backend,
+		BaseURL:       config.SpecData.StringOrDefault("base_url", ""),
+		APIToken:      config.ResolveCredential("api_token"),
+		BatchSize:     config.SpecData.IntOrDefault("batch_size", 200),
+		MaxRetries:    config.SpecData.IntOrDefault("max_retries", 3),
+		Domain:        config.SpecData.StringOrDefault("domain", ""),
+		TenantID:      config.SpecData.StringOrDefault("tenant_id", ""),
+		ClientID:      config.ResolveCredential("client_id"),
+		ClientSecret:  config.ResolveCredential("client_secret"),
+		LDAPBaseDN:    config.SpecData.StringOrDefault("ldap_base_dn", ""),
+		LDAPBindDN:    config.SpecData.StringOrDefault("ldap_bind_dn", ""),
+		LDAPBindPass:  config.ResolveCredential("ldap_bind_password"),
+		UserFilter:    config.SpecData.StringOrDefault("user_filter", ""),
+		GroupFilter:   config.SpecData.StringOrDefault("group_filter", ""),
 		ExcludeGroups: config.SpecData.StringListOrDefault("exclude_groups", nil),
 	}
 

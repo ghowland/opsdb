@@ -516,7 +516,7 @@ Import paths for all packages follow from this root:
 ```go
 import "github.com/ghowland/opsdb/tools/opsdb-schema/loader"
 import "github.com/ghowland/opsdb/tools/opsdb-api/gate"
-import "github.com/ghowland/opsdb/tools/opsdb-runner-lib"
+import "github.com/ghowland/opsdb/tools/opsdb_runner_lib"
 import "github.com/ghowland/opsdb/internal/pg"
 import "github.com/ghowland/opsdb/internal/model"
 import "github.com/ghowland/opsdb/internal/vocabulary"
@@ -531,7 +531,7 @@ go build -o bin/opsdb-api          ./tools/opsdb-api/cmd
 go build -o bin/opsdb-changeset-executor  ./tools/runners/change-set-executor/cmd
 go build -o bin/opsdb-reaper       ./tools/runners/reaper/cmd
 go build -o bin/opsdb-import-aws   ./tools/importers/opsdb-import-aws/cmd
-go build -o bin/opsdb-import-k8s   ./tools/importers/opsdb-import-k8s/cmd
+go build -o bin/opsdb-import-k8s   ./tools/importers/opsdb_import_k8s/cmd
 # ... and so on for each binary
 ```
 
@@ -558,11 +558,11 @@ runners:
 importers:
 	go build -o bin/opsdb-import-aws        ./tools/importers/opsdb-import-aws/cmd
 	go build -o bin/opsdb-import-gcp        ./tools/importers/opsdb-import-gcp/cmd
-	go build -o bin/opsdb-import-k8s        ./tools/importers/opsdb-import-k8s/cmd
-	go build -o bin/opsdb-import-identity   ./tools/importers/opsdb-import-identity/cmd
-	go build -o bin/opsdb-import-monitoring ./tools/importers/opsdb-import-monitoring/cmd
-	go build -o bin/opsdb-import-oncall     ./tools/importers/opsdb-import-oncall/cmd
-	go build -o bin/opsdb-import-secrets    ./tools/importers/opsdb-import-secrets/cmd
+	go build -o bin/opsdb-import-k8s        ./tools/importers/opsdb_import_k8s/cmd
+	go build -o bin/opsdb-import-identity   ./tools/importers/opsdb_import_identity/cmd
+	go build -o bin/opsdb-import-monitoring ./tools/importers/opsdb_import_monitoring/cmd
+	go build -o bin/opsdb-import-oncall     ./tools/importers/opsdb_import_oncall/cmd
+	go build -o bin/opsdb-import-secrets    ./tools/importers/opsdb_import_secrets/cmd
 
 test:
 	go test ./...

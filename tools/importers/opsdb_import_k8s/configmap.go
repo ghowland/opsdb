@@ -1,4 +1,4 @@
-// === importers/opsdb-import-k8s/configmap.go ===
+// === importers/opsdb_import_k8s/configmap.go ===
 package k8s
 
 import (

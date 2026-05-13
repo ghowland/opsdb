@@ -1,4 +1,4 @@
-// === importers/opsdb-import-monitoring/cmd/main.go ===
+// === importers/opsdb_import_monitoring/cmd/main.go ===
 package main
 
 import (
@@ -8,8 +8,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	monitoring "github.com/ghowland/opsdb/tools/importers/opsdb-import-monitoring"
-	runner "github.com/ghowland/opsdb/tools/opsdb-runner-lib"
+	monitoring "github.com/ghowland/opsdb/tools/importers/opsdb_import_monitoring"
+	runner "github.com/ghowland/opsdb/tools/opsdb_runner_lib"
 )
 
 type CycleSummary struct {
@@ -93,14 +93,14 @@ func runCycle(config *runner.RunnerConfig, logger *runner.Logger) (*CycleSummary
 	)
 
 	importConfig := &monitoring.ImportConfig{
-		Backend:         backend,
-		APIToken:        config.ResolveCredential("api_token"),
-		BaseURL:         config.SpecData.StringOrDefault("base_url", ""),
-		BatchSize:       config.SpecData.IntOrDefault("batch_size", 100),
-		MaxRetries:      config.SpecData.IntOrDefault("max_retries", 3),
-		MetricPrefixes:  config.SpecData.StringListOrDefault("metric_prefixes", nil),
-		ScrapeInterval:  config.SpecData.IntOrDefault("scrape_interval_seconds", 60),
-		AppKey:          config.ResolveCredential("app_key"),
+		Backend:        backend,
+		APIToken:       config.ResolveCredential("api_token"),
+		BaseURL:        config.SpecData.StringOrDefault("base_url", ""),
+		BatchSize:      config.SpecData.IntOrDefault("batch_size", 100),
+		MaxRetries:     config.SpecData.IntOrDefault("max_retries", 3),
+		MetricPrefixes: config.SpecData.StringListOrDefault("metric_prefixes", nil),
+		ScrapeInterval: config.SpecData.IntOrDefault("scrape_interval_seconds", 60),
+		AppKey:         config.ResolveCredential("app_key"),
 	}
 
 	// ACT phase: call the appropriate backend importer

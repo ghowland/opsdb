@@ -1,4 +1,4 @@
-//# tools/importers/opsdb-import-secrets/aws_sm.go
+//# tools/importers/opsdb_import_secrets/aws_sm.go
 
 package secrets
 
@@ -108,14 +108,14 @@ func listSecrets(svc *secretsmanager.SecretsManager, maxResults int) ([]awsSecre
 
 		for _, secret := range output.SecretList {
 			entry := awsSecretEntry{
-				Name:            aws.StringValue(secret.Name),
-				ARN:             aws.StringValue(secret.ARN),
-				Description:     aws.StringValue(secret.Description),
-				CreatedDate:     secret.CreatedDate,
-				LastChangedDate: secret.LastChangedDate,
+				Name:             aws.StringValue(secret.Name),
+				ARN:              aws.StringValue(secret.ARN),
+				Description:      aws.StringValue(secret.Description),
+				CreatedDate:      secret.CreatedDate,
+				LastChangedDate:  secret.LastChangedDate,
 				LastAccessedDate: secret.LastAccessedDate,
-				LastRotatedDate: secret.LastRotatedDate,
-				RotationEnabled: aws.BoolValue(secret.RotationEnabled),
+				LastRotatedDate:  secret.LastRotatedDate,
+				RotationEnabled:  aws.BoolValue(secret.RotationEnabled),
 			}
 
 			if secret.RotationRules != nil && secret.RotationRules.AutomaticallyAfterDays != nil {

@@ -1,4 +1,4 @@
-// === importers/opsdb-import-k8s/helm.go ===
+// === importers/opsdb_import_k8s/helm.go ===
 package k8s
 
 import (

@@ -190,6 +190,10 @@ OpsDB is a skeleton implementation of a unified operations, automation, and audi
 
 - Second LLM pass complete
 
-## tools/*
+## tools/runners/*
 
-- Besides opsdb-api, these are still just skeleton examples of what the logic in-total needs to do, and need a 2nd pass to integrate them together, before human troubleshooting to get them to compile and run.
+- Second LLM pass complete
+
+## tools/importers/*
+
+- These are still just skeleton examples of what the logic in-total needs to do, and need a 2nd pass to integrate them together, before human troubleshooting to get them to compile and run.

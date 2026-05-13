@@ -1,10 +1,9 @@
-// === importers/opsdb-import-k8s/service.go ===
+// === importers/opsdb_import_k8s/service.go ===
 package k8s
 
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -66,26 +65,26 @@ func ImportServices(config *K8sImportConfig) ([]Observation, error) {
 					StateKey:   "k8s_service",
 					Value:      svc.Name,
 					DataJSON: map[string]interface{}{
-						"name":               svc.Name,
-						"namespace":          svc.Namespace,
-						"cluster_name":       config.ClusterName,
-						"service_type":       svcType,
-						"cluster_ip":         svc.Spec.ClusterIP,
-						"cluster_ips":        svc.Spec.ClusterIPs,
-						"external_ips":       externalIPs,
-						"load_balancer_ips":  loadBalancerIPs,
-						"external_name":      svc.Spec.ExternalName,
-						"ports":              ports,
-						"port_count":         len(svc.Spec.Ports),
-						"selector":           selector,
-						"session_affinity":   string(svc.Spec.SessionAffinity),
-						"ip_families":        ipFamiliesToStrings(svc.Spec.IPFamilies),
-						"ip_family_policy":   ipFamilyPolicyToString(svc.Spec.IPFamilyPolicy),
-						"labels":             svc.Labels,
-						"annotations":        filterAnnotations(svc.Annotations),
-						"resource_version":   svc.ResourceVersion,
-						"uid":                string(svc.UID),
-						"created_time":       svc.CreationTimestamp.Format(time.RFC3339),
+						"name":              svc.Name,
+						"namespace":         svc.Namespace,
+						"cluster_name":      config.ClusterName,
+						"service_type":      svcType,
+						"cluster_ip":        svc.Spec.ClusterIP,
+						"cluster_ips":       svc.Spec.ClusterIPs,
+						"external_ips":      externalIPs,
+						"load_balancer_ips": loadBalancerIPs,
+						"external_name":     svc.Spec.ExternalName,
+						"ports":             ports,
+						"port_count":        len(svc.Spec.Ports),
+						"selector":          selector,
+						"session_affinity":  string(svc.Spec.SessionAffinity),
+						"ip_families":       ipFamiliesToStrings(svc.Spec.IPFamilies),
+						"ip_family_policy":  ipFamilyPolicyToString(svc.Spec.IPFamilyPolicy),
+						"labels":            svc.Labels,
+						"annotations":       filterAnnotations(svc.Annotations),
+						"resource_version":  svc.ResourceVersion,
+						"uid":               string(svc.UID),
+						"created_time":      svc.CreationTimestamp.Format(time.RFC3339),
 					},
 				}
 				results = append(results, obs)
